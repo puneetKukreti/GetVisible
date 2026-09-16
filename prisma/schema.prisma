@@ -1,0 +1,328 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum LeadStatus {
+  NEW
+  RESEARCHING
+  QUALIFIED
+  DEMO_GENERATED
+  OUTREACH_PENDING
+  CONTACTED
+  REPLIED
+  INTERESTED
+  NOT_INTERESTED
+  DO_NOT_CONTACT
+  PROPOSAL
+  CUSTOMER
+  LOST
+}
+
+enum WebsiteStatus {
+  NO_WEBSITE
+  WEBSITE_EXISTS
+  UNKNOWN
+  REQUIRES_REVIEW
+}
+
+enum Channel {
+  EMAIL
+  WHATSAPP
+  SMS
+  VOICE
+}
+
+enum ConsentStatus {
+  UNKNOWN
+  PENDING
+  OPTED_IN
+  OPTED_OUT
+  EXPIRED
+}
+
+enum JobType {
+  LEAD_DISCOVERY
+  WEBSITE_ANALYSIS
+  AI_ANALYSIS
+  DEMO_GENERATION
+  OUTREACH_GENERATION
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Organization {
+  id                 String              @id @default(cuid())
+  name               String
+  slug               String              @unique
+  domain             String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  users              User[]
+  leads              Lead[]
+  contacts           Contact[]
+  leadSources        LeadSource[]
+  websites           Website[]
+  activities         Activity[]
+  auditLogs          AuditLog[]
+  consentRecords     ConsentRecord[]
+  suppressionRecords SuppressionRecord[]
+  jobs               Job[]
+  websiteDemos       WebsiteDemo[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String        @id @default(cuid())
+  name           String
+  email          String        @unique
+  passwordHash   String?
+  role           Role          @default(MEMBER)
+  organizationId String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  activities     Activity[]
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Lead {
+  id                 String              @id @default(cuid())
+  businessName       String
+  profession         String              @default("Chartered Accountant")
+  city               String              @default("Gurgaon")
+  address            String
+  website            String?
+  publicEmail        String?
+  publicPhone        String?
+  source             String              @default("Public Directory")
+  sourceUrl          String?
+  websiteStatus      WebsiteStatus       @default(NO_WEBSITE)
+  leadStatus         LeadStatus          @default(NEW)
+  opportunityScore   Int                 @default(50)
+  opportunityReason  String
+  isDemoData         Boolean             @default(false)
+  organizationId     String
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contacts           Contact[]
+  leadSources        LeadSource[]
+  websites           Website[]
+  activities         Activity[]
+  consentRecords     ConsentRecord[]
+  suppressionRecords SuppressionRecord[]
+  jobs               Job[]
+  websiteDemos       WebsiteDemo[]
+
+  @@index([organizationId])
+  @@index([leadStatus])
+  @@index([city])
+  @@index([isDemoData])
+  @@map("leads")
+}
+
+model Contact {
+  id             String       @id @default(cuid())
+  name           String
+  role           String?
+  email          String?
+  phone          String?
+  isPrimary      Boolean      @default(false)
+  linkedinUrl    String?
+  leadId         String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([organizationId])
+  @@map("contacts")
+}
+
+model LeadSource {
+  id             String       @id @default(cuid())
+  name           String
+  type           String
+  sourceUrl      String?
+  leadId         String
+  organizationId String
+  createdAt      DateTime     @default(now())
+
+  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([organizationId])
+  @@map("lead_sources")
+}
+
+model Website {
+  id             String        @id @default(cuid())
+  url            String
+  status         WebsiteStatus @default(WEBSITE_EXISTS)
+  cms            String?
+  speedScore     Int?
+  mobileFriendly Boolean       @default(false)
+  hasSsl         Boolean       @default(false)
+  auditNotes     String?
+  leadId         String
+  organizationId String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  lead           Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([organizationId])
+  @@map("websites")
+}
+
+model Activity {
+  id             String       @id @default(cuid())
+  type           String
+  title          String
+  description    String
+  metadata       Json?
+  leadId         String
+  userId         String?
+  organizationId String
+  createdAt      DateTime     @default(now())
+
+  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([organizationId])
+  @@map("activities")
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  action         String
+  entity         String
+  entityId       String
+  actor          String
+  actorId        String?
+  organizationId String
+  details        Json?
+  createdAt      DateTime     @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([entity, entityId])
+  @@map("audit_logs")
+}
+
+model ConsentRecord {
+  id             String        @id @default(cuid())
+  leadId         String
+  organizationId String
+  channel        Channel
+  status         ConsentStatus @default(UNKNOWN)
+  source         String
+  evidence       String?
+  timestamp      DateTime      @default(now())
+  expiresAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  lead           Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([organizationId])
+  @@index([channel, status])
+  @@map("consent_records")
+}
+
+model SuppressionRecord {
+  id             String       @id @default(cuid())
+  leadId         String
+  organizationId String
+  channel        Channel
+  reason         String
+  createdAt      DateTime     @default(now())
+  createdBy      String?
+
+  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([organizationId])
+  @@index([channel])
+  @@map("suppression_records")
+}
+
+model Job {
+  id             String       @id @default(cuid())
+  organizationId String
+  type           JobType
+  status         JobStatus    @default(QUEUED)
+  leadId         String?
+  progress       Int          @default(0)
+  error          String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([type])
+  @@map("jobs")
+}
+
+model WebsiteDemo {
+  id               String       @id @default(cuid())
+  leadId           String
+  organizationId   String
+  templateId       String       @default("CA_ACCOUNTING_PROFESSIONAL")
+  version          Int          @default(1)
+  generationStatus String       @default("COMPLETED")
+  content          Json
+  theme            Json
+  error            String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  lead             Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([organizationId])
+  @@index([createdAt])
+  @@map("website_demos")
+}
+
+
