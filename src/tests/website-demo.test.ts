@@ -197,4 +197,175 @@ describe('Phase 4: Personalized Website Demo Generator', () => {
       expect(listB.some((d) => d.id === demoA.id)).toBe(false);
     });
   });
+
+  describe('6. Regression Tests: Phase 4 Open Demo & Organization Context (Requirements 9A-9G)', () => {
+    const orgAlpha = 'org-regression-alpha';
+    const orgBeta = 'org-regression-beta';
+
+    it('A. Imported NO_WEBSITE lead can generate a demo and open its demo page (retrieve lead and demo)', async () => {
+      // Create imported lead
+      const importedLead = await LeadRepository.createLead(
+        {
+          businessName: 'Sharma Tax Consultancy',
+          profession: 'Chartered Accountant',
+          city: 'Gurgaon',
+          address: 'Cyber Hub Phase 2, Gurgaon',
+          website: null,
+          publicEmail: 'info@sharmatax.example',
+          websiteStatus: 'NO_WEBSITE',
+          leadStatus: 'NEW',
+          source: 'CSV Import',
+          sourceQuality: 'USER_IMPORTED',
+          isDemoData: false,
+        },
+        orgAlpha,
+        'Agency User'
+      );
+
+      expect(importedLead.id).toBeDefined();
+      expect(importedLead.websiteStatus).toBe('NO_WEBSITE');
+
+      // Check eligibility
+      const eligibility = WebsiteDemoGeneratorService.canGenerateDemo(importedLead);
+      expect(eligibility.allowed).toBe(true);
+
+      // Generate demo for same org and lead
+      const generatedDemo = await WebsiteDemoGeneratorService.generateDemo(importedLead, {
+        organizationId: orgAlpha,
+        version: 1,
+      });
+      await WebsiteDemoRepository.saveDemo(orgAlpha, generatedDemo, 'test-system');
+
+      // Simulate Demo Page lookup: retrieve lead and demo using the resolved organizationId + leadId
+      const retrievedLead = await LeadRepository.getLeadById(importedLead.id, orgAlpha);
+      expect(retrievedLead).not.toBeNull();
+      expect(retrievedLead?.id).toBe(importedLead.id);
+      expect(retrievedLead?.businessName).toBe('Sharma Tax Consultancy');
+
+      const retrievedDemos = await WebsiteDemoRepository.listDemos(orgAlpha, importedLead.id);
+      expect(retrievedDemos.length).toBeGreaterThanOrEqual(1);
+      expect(retrievedDemos[0].id).toBe(generatedDemo.id);
+      expect(retrievedDemos[0].leadId).toBe(importedLead.id);
+    });
+
+    it('B. Existing WEBSITE_EXISTS lead remains blocked', async () => {
+      const existingLead: LeadData = {
+        ...baseEligibleLead,
+        id: 'lead-has-site-001',
+        websiteStatus: 'WEBSITE_EXISTS',
+        website: 'https://sharmaca.example',
+      };
+      const eligibility = WebsiteDemoGeneratorService.canGenerateDemo(existingLead);
+      expect(eligibility.allowed).toBe(false);
+      expect(eligibility.reason).toContain('already has an existing official website');
+    });
+
+    it('C. UNKNOWN lead remains blocked', async () => {
+      const unknownLead: LeadData = {
+        ...baseEligibleLead,
+        id: 'lead-unknown-001',
+        websiteStatus: 'UNKNOWN',
+      };
+      const eligibility = WebsiteDemoGeneratorService.canGenerateDemo(unknownLead);
+      expect(eligibility.allowed).toBe(false);
+      expect(eligibility.reason).toContain('UNKNOWN');
+    });
+
+    it('D. REQUIRES_REVIEW lead remains blocked', async () => {
+      const reviewLead: LeadData = {
+        ...baseEligibleLead,
+        id: 'lead-review-001',
+        websiteStatus: 'REQUIRES_REVIEW',
+      };
+      const eligibility = WebsiteDemoGeneratorService.canGenerateDemo(reviewLead);
+      expect(eligibility.allowed).toBe(false);
+      expect(eligibility.reason).toContain('REQUIRES_REVIEW');
+    });
+
+    it('E. Demo lookup uses the same organizationId and leadId', async () => {
+      const lead = await LeadRepository.createLead(
+        {
+          businessName: 'Gupta & Sons CA',
+          profession: 'Chartered Accountant',
+          city: 'Delhi NCR',
+          address: 'Connaught Place, New Delhi',
+          websiteStatus: 'NO_WEBSITE',
+          leadStatus: 'NEW',
+        },
+        orgAlpha,
+        'Test Actor'
+      );
+
+      const demo = await WebsiteDemoGeneratorService.generateDemo(lead, {
+        organizationId: orgAlpha,
+        version: 1,
+      });
+      await WebsiteDemoRepository.saveDemo(orgAlpha, demo, 'Test Actor');
+
+      // Exact orgId and leadId lookup
+      const foundLead = await LeadRepository.getLeadById(lead.id, orgAlpha);
+      const foundDemos = await WebsiteDemoRepository.listDemos(orgAlpha, lead.id);
+
+      expect(foundLead).not.toBeNull();
+      expect(foundLead?.organizationId).toBe(orgAlpha);
+      expect(foundDemos.length).toBe(1);
+      expect(foundDemos[0].organizationId).toBe(orgAlpha);
+      expect(foundDemos[0].leadId).toBe(lead.id);
+    });
+
+    it('F. A lead from organization A cannot be retrieved using organization B', async () => {
+      const leadA = await LeadRepository.createLead(
+        {
+          businessName: 'Org A Exclusive Practice',
+          profession: 'Chartered Accountant',
+          city: 'Gurgaon',
+          address: 'Sector 29, Gurgaon',
+          websiteStatus: 'NO_WEBSITE',
+        },
+        orgAlpha,
+        'Org A Admin'
+      );
+
+      // Retrieving with Org A succeeds
+      const foundA = await LeadRepository.getLeadById(leadA.id, orgAlpha);
+      expect(foundA).not.toBeNull();
+
+      // Retrieving with Org B fails (strictly null)
+      const foundB = await LeadRepository.getLeadById(leadA.id, orgBeta);
+      expect(foundB).toBeNull();
+    });
+
+    it('G. A WebsiteDemo from organization A cannot be retrieved using organization B', async () => {
+      const leadA = await LeadRepository.createLead(
+        {
+          businessName: 'Org A Demo Test',
+          profession: 'Chartered Accountant',
+          city: 'Gurgaon',
+          address: 'Golf Course Road, Gurgaon',
+          websiteStatus: 'NO_WEBSITE',
+        },
+        orgAlpha,
+        'Org A Admin'
+      );
+
+      const demoA = await WebsiteDemoGeneratorService.generateDemo(leadA, {
+        organizationId: orgAlpha,
+        version: 1,
+      });
+      await WebsiteDemoRepository.saveDemo(orgAlpha, demoA, 'Org A Admin');
+
+      // Org A retrieves demo
+      const listA = await WebsiteDemoRepository.listDemos(orgAlpha, leadA.id);
+      expect(listA.length).toBe(1);
+      const getA = await WebsiteDemoRepository.getDemo(orgAlpha, demoA.id);
+      expect(getA).not.toBeNull();
+
+      // Org B cannot list or get demo A
+      const listB = await WebsiteDemoRepository.listDemos(orgBeta, leadA.id);
+      expect(listB.length).toBe(0);
+      const getB = await WebsiteDemoRepository.getDemo(orgBeta, demoA.id);
+      expect(getB).toBeNull();
+    });
+  });
 });
+

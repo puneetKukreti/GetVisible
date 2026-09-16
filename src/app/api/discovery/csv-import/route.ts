@@ -6,7 +6,7 @@ import { LeadQualityValidator } from '@/lib/discovery/validator';
 import { WebsiteVerifier } from '@/lib/discovery/website-verifier';
 import { LeadRepository } from '@/lib/db/repository';
 import { createAuditLogEntry } from '@/lib/audit';
-import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
+import { getResolvedOrganizationId } from '@/lib/auth';
 import { LeadData, WebsiteStatus } from '@/types';
 import { DiscoveryItemResult } from '@/lib/discovery/job-runner';
 
@@ -14,7 +14,11 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
+
 
     let csvContent = '';
     const contentType = request.headers.get('content-type') || '';

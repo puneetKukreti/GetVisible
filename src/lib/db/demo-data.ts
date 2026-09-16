@@ -2,6 +2,17 @@ import { LeadData, JobData, ConsentRecordData, SuppressionRecordData, AuditLogDa
 
 export const DEMO_ORGANIZATION_ID = 'org-demo-gurgaon';
 
+export function isExplicitDemoMode(): boolean {
+  if (process.env.DEMO_MODE !== undefined) {
+    return process.env.DEMO_MODE === 'true';
+  }
+  if (process.env.NEXT_PUBLIC_DEMO_MODE !== undefined) {
+    return process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+  }
+  return true;
+}
+
+
 export const INITIAL_DEMO_LEADS: LeadData[] = [
   {
     id: 'demo-lead-001',

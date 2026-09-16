@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
-import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
+import { getResolvedOrganizationId } from '@/lib/auth';
 import { DiscoveryJobRunner } from '@/lib/discovery/job-runner';
 import { DiscoverySearchInput } from '@/lib/discovery/providers/types';
 import { z } from 'zod';
@@ -18,7 +18,10 @@ const DiscoveryRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
     const body = await request.json();
     const validated = DiscoveryRequestSchema.parse(body);
 
@@ -49,7 +52,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
     const allJobs = await LeadRepository.getJobs(orgId);
     const discoveryJobs = allJobs.filter((j) => j.type === 'LEAD_DISCOVERY');
     return NextResponse.json(discoveryJobs);
@@ -58,3 +64,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+

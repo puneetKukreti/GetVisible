@@ -16,6 +16,7 @@ import {
   INITIAL_DEMO_JOBS,
   INITIAL_DEMO_AUDIT_LOGS,
   DEMO_ORGANIZATION_ID,
+  isExplicitDemoMode,
 } from './demo-data';
 import { createAuditLogEntry } from '../audit';
 
@@ -264,17 +265,19 @@ class DemoDataStore {
   }
 }
 
-const demoStore = new DemoDataStore();
+const globalForDemoStore = globalThis as unknown as {
+  __leadforge_demo_store__?: DemoDataStore;
+};
 
-export function isExplicitDemoMode(): boolean {
-  if (process.env.DEMO_MODE !== undefined) {
-    return process.env.DEMO_MODE === 'true';
-  }
-  if (process.env.NEXT_PUBLIC_DEMO_MODE !== undefined) {
-    return process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
-  }
-  return true;
+export const demoStore: DemoDataStore =
+  globalForDemoStore.__leadforge_demo_store__ ?? new DemoDataStore();
+
+if (process.env.NODE_ENV !== 'production' || isExplicitDemoMode()) {
+  globalForDemoStore.__leadforge_demo_store__ = demoStore;
 }
+
+export { isExplicitDemoMode };
+
 
 /**
  * Ensures production mode does NOT silently fake data.

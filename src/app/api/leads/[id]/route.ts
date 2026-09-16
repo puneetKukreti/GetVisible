@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
-import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
+import { getResolvedOrganizationId } from '@/lib/auth';
 import { LeadStatus } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
     const lead = await LeadRepository.getLeadById(params.id, orgId);
 
     if (!lead) {
@@ -29,8 +32,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
     const body = await request.json();
+
 
     if (body.leadStatus) {
       const updated = await LeadRepository.updateLeadStatus(

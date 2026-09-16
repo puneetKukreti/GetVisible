@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
-import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
+import { getResolvedOrganizationId } from '@/lib/auth';
 import { z } from 'zod';
 import { LeadFilterParams, LeadStatus, WebsiteStatus } from '@/types';
 
@@ -24,7 +24,10 @@ const CreateLeadSchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
 
     const params: LeadFilterParams = {
       search: searchParams.get('search') || undefined,
@@ -64,7 +67,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
     const body = await request.json();
     const validated = CreateLeadSchema.parse(body);
 
@@ -73,6 +79,7 @@ export async function POST(request: NextRequest) {
       orgId,
       'Agency User'
     );
+
 
     return NextResponse.json(lead, { status: 201 });
   } catch (error: unknown) {

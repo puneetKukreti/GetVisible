@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebsiteDemoRepository } from '@/lib/db/repository';
-import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
+import { getResolvedOrganizationId } from '@/lib/auth';
 import { WebsiteContentSchema, WebsiteThemeSchema } from '@/lib/demos/schema';
 import { z } from 'zod';
 
@@ -18,7 +18,10 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
     const { id } = params;
 
     const demo = await WebsiteDemoRepository.getDemo(orgId, id);
@@ -38,8 +41,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const orgId = request.headers.get('x-organization-id') || DEMO_ORGANIZATION_ID;
+    const orgId = await getResolvedOrganizationId(request);
+    if (!orgId) {
+      return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });
+    }
     const { id } = params;
+
     const body = await request.json();
 
     const parsed = UpdateDemoRequestSchema.safeParse(body);
