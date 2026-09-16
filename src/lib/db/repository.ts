@@ -533,8 +533,11 @@ export class LeadRepository {
     }
 
     if (isExplicitDemoMode()) {
+      const leadId =
+        leadData.id || `demo-lead-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
       const newLead: LeadData = {
-        id: `demo-lead-${Date.now()}`,
+        id: leadId,
         businessName: leadData.businessName || 'Demo CA Firm',
         profession: leadData.profession || 'Chartered Accountant',
         city: leadData.city || 'Gurgaon',
@@ -557,11 +560,11 @@ export class LeadRepository {
         websites: leadData.websites || [],
         activities: [
           {
-            id: `act-${Date.now()}`,
+            id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             type: 'DISCOVERY',
             title: 'Lead Created',
             description: `Lead created by ${actorName}`,
-            leadId: `demo-lead-${Date.now()}`,
+            leadId,
             organizationId,
             createdAt: new Date().toISOString(),
           },

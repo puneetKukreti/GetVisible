@@ -20,7 +20,11 @@ export async function GET(
       return NextResponse.json({ error: 'Lead not found in this organization' }, { status: 404 });
     }
 
-    return NextResponse.json(lead);
+    return NextResponse.json(lead, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch lead';
     return NextResponse.json({ error: message }, { status: 500 });
