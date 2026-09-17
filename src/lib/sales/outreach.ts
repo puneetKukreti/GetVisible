@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { LeadData, WebsiteDemoData, OutreachMessage, OutreachInput } from '@/types';
 import { canPrepareOutreach } from './lifecycle';
 import { GeminiAIProvider } from '@/lib/providers/ai.provider';
+import { getAppBaseUrl, getPublicDemoUrl } from '@/lib/demos/public';
 
 export const OutreachMessageSchema = z.object({
   subject: z.string().min(5).max(120),
@@ -117,10 +118,10 @@ export class OutreachGeneratorService {
     }
 
     // 2. Strict Demo URL Construction (Prefer cryptographically secure publicToken if requested)
-    const base = options?.baseUrl || '';
+    const base = options?.baseUrl ? options.baseUrl.replace(/\/+$/, '') : getAppBaseUrl();
     const demoUrl =
       options?.usePublicToken && activeDemo?.publicToken
-        ? `${base}/demo/${activeDemo.publicToken}`
+        ? getPublicDemoUrl(activeDemo.publicToken, base)
         : `${base}/demo/${lead.id}`;
 
     const input: OutreachInput = {

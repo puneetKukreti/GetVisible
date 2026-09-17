@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { OutreachGeneratorService } from '@/lib/sales/outreach';
+import { getAppBaseUrl, getPublicDemoUrl } from '@/lib/demos/public';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,16 +45,16 @@ export async function POST(request: NextRequest) {
     }
 
     const service = new OutreachGeneratorService();
-    const origin = request.nextUrl.origin || '';
+    const baseUrl = getAppBaseUrl(request.nextUrl.origin);
 
     const result = await service.generateOutreach(lead, demo, {
-      baseUrl: origin,
+      baseUrl,
       usePublicToken: true,
     });
 
     const publicUrl = demo?.publicToken
-      ? `${origin}/demo/${demo.publicToken}`
-      : `${origin}/demo/${lead.id}`;
+      ? getPublicDemoUrl(demo.publicToken, baseUrl)
+      : `${baseUrl}/demo/${lead.id}`;
 
     return NextResponse.json({
       success: true,

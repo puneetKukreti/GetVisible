@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
-import { generatePublicDemoToken, getAppBaseUrl, getPublicDemoUrl } from '@/lib/demos/public';
+import {
+  generatePublicDemoToken,
+  getAppBaseUrl,
+  getPublicDemoUrl,
+  sanitizeVercelPreviewOrigin,
+} from '@/lib/demos/public';
 import { WebsiteDemoData } from '@/types';
 
 describe('Public Shareable Website Demos & Security Gate', () => {
@@ -11,6 +16,8 @@ describe('Public Shareable Website Demos & Security Gate', () => {
     process.env.DEMO_MODE = 'true';
     delete process.env.NEXT_PUBLIC_APP_URL;
     delete process.env.APP_URL;
+    delete process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
     delete process.env.NEXT_PUBLIC_VERCEL_URL;
     delete process.env.VERCEL_URL;
   });
@@ -220,23 +227,36 @@ describe('Public Shareable Website Demos & Security Gate', () => {
   });
 
   // Test 7: Base URL resolution for local development and Vercel/production
-  it('7. getPublicDemoUrl generates correct URLs for local and production/Vercel', () => {
+  it('7. getPublicDemoUrl generates correct URLs for local, production, and sanitizes preview hashes', () => {
     const token = '8f3Kx92LmQ7w';
 
     // 1. Default local development fallback
     expect(getAppBaseUrl()).toBe('http://localhost:3000');
     expect(getPublicDemoUrl(token)).toBe('http://localhost:3000/demo/8f3Kx92LmQ7w');
 
-    // 2. Explicit production URL
-    process.env.NEXT_PUBLIC_APP_URL = 'https://getvisible.ai';
-    expect(getAppBaseUrl()).toBe('https://getvisible.ai');
-    expect(getPublicDemoUrl(token)).toBe('https://getvisible.ai/demo/8f3Kx92LmQ7w');
+    // 2. Explicit production URL via NEXT_PUBLIC_APP_URL
+    process.env.NEXT_PUBLIC_APP_URL = 'https://get-visible-web.vercel.app';
+    expect(getAppBaseUrl()).toBe('https://get-visible-web.vercel.app');
+    expect(getPublicDemoUrl(token)).toBe('https://get-visible-web.vercel.app/demo/8f3Kx92LmQ7w');
+    // Must NOT contain any Vercel deployment hashes
+    expect(getPublicDemoUrl(token)).not.toContain('-b64ejegts-');
+    expect(getPublicDemoUrl(token)).not.toContain('-projects.vercel.app');
 
-    // 3. Vercel deployment URL
+    // 3. Vercel project canonical production domain fallback
     delete process.env.NEXT_PUBLIC_APP_URL;
-    process.env.NEXT_PUBLIC_VERCEL_URL = 'getvisible-preview.vercel.app';
-    expect(getAppBaseUrl()).toBe('https://getvisible-preview.vercel.app');
-    expect(getPublicDemoUrl(token)).toBe('https://getvisible-preview.vercel.app/demo/8f3Kx92LmQ7w');
+    process.env.VERCEL_PROJECT_PRODUCTION_URL = 'get-visible-web.vercel.app';
+    expect(getAppBaseUrl()).toBe('https://get-visible-web.vercel.app');
+    expect(getPublicDemoUrl(token)).toBe('https://get-visible-web.vercel.app/demo/8f3Kx92LmQ7w');
+
+    // 4. Preview deployment hash detection & sanitization
+    delete process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    const previewOrigin = 'https://get-visible-b64ejegts-puneetkukretis-projects.vercel.app';
+    const sanitized = sanitizeVercelPreviewOrigin(previewOrigin);
+    expect(sanitized).toBe('https://get-visible.vercel.app');
+
+    // Fallback origin with preview hash gets sanitized automatically
+    expect(getAppBaseUrl(previewOrigin)).toBe('https://get-visible.vercel.app');
+    expect(getPublicDemoUrl(token, previewOrigin)).toBe('https://get-visible.vercel.app/demo/8f3Kx92LmQ7w');
   });
 
   // Test 8: Demo view event is recorded
@@ -274,7 +294,7 @@ describe('Public Shareable Website Demos & Security Gate', () => {
     expect((viewActivity?.metadata as any)?.publicToken).toBe(saved.publicToken);
   });
 
-  // Test 9: Existing seed demo in demo mode has an approved public token
+  // Test 9: Existing seed demo in demo organization has an approved public token
   it('9. Existing seed demo in demo organization has an approved public token', async () => {
     const seedDemos = await WebsiteDemoRepository.listDemos(DEMO_ORGANIZATION_ID);
     const demo003 = seedDemos.find((d) => d.id === 'demo-lead-003-v1');
@@ -287,5 +307,70 @@ describe('Public Shareable Website Demos & Security Gate', () => {
     const publicSeed = await WebsiteDemoRepository.getApprovedDemoByPublicToken('demo-public-003');
     expect(publicSeed).not.toBeNull();
     expect(publicSeed?.content.brand.businessName).toBe('Example Accounting Services');
+  });
+
+  // Test 10: Complete Security Lifecycle Gate
+  // approved demo -> anonymous access works
+  // pending demo -> blocked
+  // rejected demo -> blocked
+  // invalid token -> 404
+  // internal dashboard -> protected
+  // another demo cannot be accessed by manipulating the token
+  it('10. Complete security gate: approved works anonymously, pending/rejected blocked, internal protected', async () => {
+    // 1. Create a lead and an approved demo
+    const lead = await LeadRepository.createLead(
+      { businessName: 'Mittal & Associates CA', leadStatus: 'QUALIFIED' },
+      TEST_ORG,
+      'Specialist'
+    );
+    const approvedDemo = await WebsiteDemoRepository.saveDemo(
+      TEST_ORG,
+      createMockDemo({
+        leadId: lead.id,
+        approvalStatus: 'APPROVED',
+        content: {
+          ...createMockDemo().content,
+          brand: { businessName: 'Mittal & Associates', tagline: 'Audit & Tax', provenance: 'VERIFIED_LEAD' },
+        },
+      })
+    );
+
+    // 2. Approved demo -> anonymous access works without any orgId or auth session
+    const anonymousAccess = await WebsiteDemoRepository.getApprovedDemoByPublicToken(approvedDemo.publicToken!);
+    expect(anonymousAccess).not.toBeNull();
+    expect(anonymousAccess?.id).toBe(approvedDemo.id);
+
+    // 3. Pending demo -> blocked (returns null -> 404)
+    const pendingDemo = await WebsiteDemoRepository.saveDemo(
+      TEST_ORG,
+      createMockDemo({
+        leadId: lead.id,
+        approvalStatus: 'PENDING_REVIEW',
+      })
+    );
+    const pendingAccess = await WebsiteDemoRepository.getApprovedDemoByPublicToken(pendingDemo.publicToken!);
+    expect(pendingAccess).toBeNull();
+
+    // 4. Rejected demo -> blocked (returns null -> 404)
+    const rejectedDemo = await WebsiteDemoRepository.saveDemo(
+      TEST_ORG,
+      createMockDemo({
+        leadId: lead.id,
+        approvalStatus: 'REJECTED',
+      })
+    );
+    const rejectedAccess = await WebsiteDemoRepository.getApprovedDemoByPublicToken(rejectedDemo.publicToken!);
+    expect(rejectedAccess).toBeNull();
+
+    // 5. Invalid token -> 404 (returns null)
+    expect(await WebsiteDemoRepository.getApprovedDemoByPublicToken('fabricated-random-token')).toBeNull();
+    expect(await WebsiteDemoRepository.getApprovedDemoByPublicToken('../admin')).toBeNull();
+
+    // 6. Token manipulation: Tampered token cannot access any approved demo
+    const tamperedToken = approvedDemo.publicToken!.slice(0, -2) + 'XX';
+    expect(await WebsiteDemoRepository.getApprovedDemoByPublicToken(tamperedToken)).toBeNull();
+
+    // 7. Internal CRM data isolation: internal leads table requires valid organizationId
+    await expect(LeadRepository.listLeads('', {})).rejects.toThrow('organizationId is required');
   });
 });
