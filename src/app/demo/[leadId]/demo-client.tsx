@@ -182,9 +182,16 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
             layout: activeLayout,
             template: (activeLayout as WebsiteTemplate),
             theme: activeTheme,
-            sectionOrder: CA_LAYOUTS[activeLayout]?.sectionOrder || activeDemo.design?.sectionOrder || [],
+            sectionOrder:
+              (CA_LAYOUTS[activeLayout]?.sectionOrder && CA_LAYOUTS[activeLayout].sectionOrder.length > 0)
+                ? CA_LAYOUTS[activeLayout].sectionOrder
+                : (activeDemo.design?.sectionOrder && activeDemo.design.sectionOrder.length > 0)
+                ? activeDemo.design.sectionOrder
+                : CA_LAYOUTS.MODERN_INDIAN.sectionOrder,
           }}
         />
+
+
       </div>
 
       {/* Human Review & Edit Modal */}

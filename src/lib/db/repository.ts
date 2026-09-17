@@ -335,6 +335,30 @@ async function ensureDatabaseMode(): Promise<void> {
   }
 }
 
+function normalizeWebsiteDemo(demo: unknown): WebsiteDemoData {
+  if (!demo || typeof demo !== 'object') return demo as WebsiteDemoData;
+  const copy = { ...(demo as Record<string, unknown>) };
+  if (typeof copy.content === 'string') {
+    try {
+      copy.content = JSON.parse(copy.content);
+    } catch {
+      // Keep as is
+    }
+  }
+  if (typeof copy.theme === 'string') {
+    try {
+      copy.theme = JSON.parse(copy.theme);
+    } catch {
+      // Keep as is
+    }
+  }
+  const contentObj = (copy.content && typeof copy.content === 'object') ? (copy.content as Record<string, unknown>) : null;
+  if (!copy.design && contentObj?.design) {
+    copy.design = contentObj.design;
+  }
+  return copy as unknown as WebsiteDemoData;
+}
+
 export class LeadRepository {
   /**
    * List leads scoped strictly by organizationId.
@@ -454,7 +478,7 @@ export class LeadRepository {
       const startIndex = (page - 1) * pageSize;
       const paginatedLeads = items.slice(startIndex, startIndex + pageSize).map((l) => ({
         ...l,
-        websiteDemos: demoStore.getDemosForLead(organizationId, l.id),
+        websiteDemos: demoStore.getDemosForLead(organizationId, l.id).map(normalizeWebsiteDemo),
       }));
 
       return {
@@ -523,8 +547,18 @@ export class LeadRepository {
       }),
     ]);
 
+    const normalizedLeads = (leads as unknown as LeadData[]).map((ld) => {
+      if (ld.websiteDemos && Array.isArray(ld.websiteDemos)) {
+        return {
+          ...ld,
+          websiteDemos: ld.websiteDemos.map(normalizeWebsiteDemo),
+        };
+      }
+      return ld;
+    });
+
     return {
-      leads: leads as unknown as LeadData[],
+      leads: normalizedLeads,
       total,
       page,
       pageSize,
@@ -542,15 +576,18 @@ export class LeadRepository {
       throw new Error('Unauthorized: organizationId is required for data isolation.');
     }
 
+    const cleanId = id ? id.trim() : '';
+    if (!cleanId) return null;
+
     if (isExplicitDemoMode()) {
       const items = demoStore.getOrgLeads(organizationId);
-      const lead = items.find((l) => l.id === id);
+      const lead = items.find((l) => l.id === cleanId);
       if (!lead) return null;
 
       // Attach org suppressions, consents, and demos
-      const suppressions = demoStore.getOrgSuppressions(organizationId).filter((s) => s.leadId === id);
-      const consents = demoStore.getOrgConsents(organizationId).filter((c) => c.leadId === id);
-      const demos = demoStore.getDemosForLead(organizationId, id);
+      const suppressions = demoStore.getOrgSuppressions(organizationId).filter((s) => s.leadId === cleanId);
+      const consents = demoStore.getOrgConsents(organizationId).filter((c) => c.leadId === cleanId);
+      const demos = demoStore.getDemosForLead(organizationId, cleanId).map(normalizeWebsiteDemo);
       return {
         ...lead,
         suppressionRecords: suppressions,
@@ -561,7 +598,7 @@ export class LeadRepository {
 
     const { prisma } = await import('./prisma');
     const lead = await prisma.lead.findFirst({
-      where: { id, organizationId },
+      where: { id: cleanId, organizationId },
       include: {
         contacts: true,
         websites: true,
@@ -573,8 +610,16 @@ export class LeadRepository {
       },
     });
 
-    return lead as unknown as LeadData | null;
+    if (!lead) return null;
+
+    const leadObj = lead as unknown as LeadData;
+    if (leadObj.websiteDemos && Array.isArray(leadObj.websiteDemos)) {
+      leadObj.websiteDemos = leadObj.websiteDemos.map(normalizeWebsiteDemo);
+    }
+
+    return leadObj;
   }
+
 
   /**
    * Create a new Lead scoped to organization.
@@ -1093,11 +1138,12 @@ export class WebsiteDemoRepository {
 
     if (isExplicitDemoMode()) {
       if (leadId) {
-        return demoStore.getDemosForLead(organizationId, leadId);
+        return demoStore.getDemosForLead(organizationId, leadId).map(normalizeWebsiteDemo);
       }
       return demoStore
         .getOrgDemos(organizationId)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .map(normalizeWebsiteDemo);
     }
 
     const { prisma } = await import('./prisma');
@@ -1111,7 +1157,7 @@ export class WebsiteDemoRepository {
       orderBy: { createdAt: 'desc' },
     });
 
-    return demos as unknown as WebsiteDemoData[];
+    return (demos as unknown as WebsiteDemoData[]).map(normalizeWebsiteDemo);
   }
 
   /**
@@ -1125,7 +1171,8 @@ export class WebsiteDemoRepository {
     }
 
     if (isExplicitDemoMode()) {
-      return demoStore.getDemoById(organizationId, id);
+      const found = demoStore.getDemoById(organizationId, id);
+      return found ? normalizeWebsiteDemo(found) : null;
     }
 
     const { prisma } = await import('./prisma');
@@ -1133,7 +1180,7 @@ export class WebsiteDemoRepository {
       where: { id, organizationId },
     });
 
-    return demo as unknown as WebsiteDemoData | null;
+    return demo ? normalizeWebsiteDemo(demo) : null;
   }
 
   /**
@@ -1167,7 +1214,7 @@ export class WebsiteDemoRepository {
         actor: actorName,
         details: { leadId: demo.leadId, version: demo.version, templateId: demo.templateId },
       });
-      return saved;
+      return normalizeWebsiteDemo(saved);
     }
 
     const { prisma } = await import('./prisma');
@@ -1197,7 +1244,7 @@ export class WebsiteDemoRepository {
       details: { leadId: demo.leadId, version: demo.version, templateId: demo.templateId },
     });
 
-    return created as unknown as WebsiteDemoData;
+    return normalizeWebsiteDemo(created);
   }
 
   /**
@@ -1227,7 +1274,7 @@ export class WebsiteDemoRepository {
           details: { updatedFields: Object.keys(updates) },
         });
       }
-      return updated;
+      return updated ? normalizeWebsiteDemo(updated) : null;
     }
 
     const { prisma } = await import('./prisma');
@@ -1259,7 +1306,7 @@ export class WebsiteDemoRepository {
       details: { updatedFields: Object.keys(updates) },
     });
 
-    return updated as unknown as WebsiteDemoData;
+    return normalizeWebsiteDemo(updated);
   }
 
   /**
@@ -1398,23 +1445,25 @@ export class WebsiteDemoRepository {
       return null;
     }
 
+    const cleanToken = publicToken.trim();
+
     if (isExplicitDemoMode()) {
-      const demo = demoStore.getDemoByPublicToken(publicToken.trim());
+      const demo = demoStore.getDemoByPublicToken(cleanToken);
       if (!demo || demo.approvalStatus !== 'APPROVED') {
         return null;
       }
-      return demo;
+      return normalizeWebsiteDemo(demo);
     }
 
     const { prisma } = await import('./prisma');
     const demo = await prisma.websiteDemo.findFirst({
       where: {
-        publicToken: publicToken.trim(),
+        publicToken: cleanToken,
         approvalStatus: 'APPROVED',
       },
     });
 
-    return demo as unknown as WebsiteDemoData | null;
+    return demo ? normalizeWebsiteDemo(demo) : null;
   }
 
   /**

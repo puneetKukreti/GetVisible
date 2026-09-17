@@ -373,4 +373,62 @@ describe('Public Shareable Website Demos & Security Gate', () => {
     // 7. Internal CRM data isolation: internal leads table requires valid organizationId
     await expect(LeadRepository.listLeads('', {})).rejects.toThrow('organizationId is required');
   });
+
+  // Test 11: Public demo resolution for CA_ACCOUNTING_PROFESSIONAL and non-empty section order
+  it('11. CA_ACCOUNTING_PROFESSIONAL resolves to valid layout and non-empty sectionOrder', async () => {
+    const seedDemo = await WebsiteDemoRepository.getApprovedDemoByPublicToken('demo-public-003');
+    expect(seedDemo).not.toBeNull();
+    expect(seedDemo?.templateId).toBe('CA_ACCOUNTING_PROFESSIONAL');
+
+    // Simulate resolution in PublicDemoView
+    const rawLayoutKey =
+      seedDemo?.design?.layout ||
+      seedDemo?.content?.design?.layout ||
+      seedDemo?.templateId ||
+      'MODERN_INDIAN';
+
+    const { CA_LAYOUTS } = await import('@/lib/demos/personalization');
+    const activeLayout =
+      (CA_LAYOUTS[rawLayoutKey as keyof typeof CA_LAYOUTS] ? rawLayoutKey : null) ||
+      (rawLayoutKey === 'CA_ACCOUNTING_PROFESSIONAL' ? 'MODERN_INDIAN' : null) ||
+      'MODERN_INDIAN';
+
+    expect(activeLayout).toBe('MODERN_INDIAN');
+
+    const rawSectionOrder =
+      seedDemo?.design?.sectionOrder ||
+      seedDemo?.content?.design?.sectionOrder ||
+      CA_LAYOUTS[activeLayout as keyof typeof CA_LAYOUTS]?.sectionOrder;
+
+    const sectionOrder =
+      Array.isArray(rawSectionOrder) && rawSectionOrder.length > 0
+        ? rawSectionOrder
+        : undefined;
+
+    expect(sectionOrder).toBeDefined();
+    expect(sectionOrder!.length).toBeGreaterThan(0);
+    expect(sectionOrder).toContain('HERO');
+    expect(sectionOrder).toContain('SERVICES');
+    expect(sectionOrder).toContain('CONTACT');
+  });
+
+  // Test 12: Public demo handles stringified JSON content and theme gracefully
+  it('12. Public demo safely parses stringified JSON content and theme', async () => {
+    const stringifiedDemo = createMockDemo({
+      approvalStatus: 'APPROVED',
+      publicToken: 'demo-stringified-token',
+      content: JSON.stringify(createMockDemo().content) as any,
+      theme: JSON.stringify(createMockDemo().theme) as any,
+    });
+
+    await WebsiteDemoRepository.saveDemo(TEST_ORG, stringifiedDemo);
+    const fetched = await WebsiteDemoRepository.getApprovedDemoByPublicToken('demo-stringified-token');
+
+    expect(fetched).not.toBeNull();
+    expect(typeof fetched?.content).toBe('object');
+    expect(typeof fetched?.theme).toBe('object');
+    expect(fetched?.content.brand.businessName).toBe('Verma & Co Chartered Accountants');
+    expect(fetched?.theme.primaryColor).toBe('#1e3a8a');
+  });
 });
+

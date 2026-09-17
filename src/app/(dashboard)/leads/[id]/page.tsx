@@ -8,14 +8,16 @@ export const dynamic = 'force-dynamic';
 interface PageProps {
   params: {
     id: string;
-  };
+  } | Promise<{ id: string }>;
 }
 
 export default async function LeadDetailPage({ params }: PageProps) {
-  const leadId = params.id;
+  const resolvedParams = await Promise.resolve(params);
+  const rawId = resolvedParams?.id;
+  const leadId = rawId ? decodeURIComponent(rawId).trim() : '';
   const orgId = await getResolvedOrganizationId();
 
-  if (!orgId) {
+  if (!orgId || !leadId) {
     notFound();
   }
 
@@ -27,3 +29,4 @@ export default async function LeadDetailPage({ params }: PageProps) {
 
   return <LeadDetailClient key={lead.id} initialLead={lead} />;
 }
+

@@ -186,4 +186,75 @@ describe('Workspace & Data Isolation: Demo Mode vs Real Pilot Workspace', () => 
     expect(pilotCsv).not.toContain('org-demo-gurgaon');
     expect(pilotCsv).not.toContain('demo-lead-');
   });
+
+  // Criterion 7: Organization context resolution via cookies
+  it('7. getResolvedOrganizationId respects workspace cookies on Request', async () => {
+    const { getResolvedOrganizationId } = await import('@/lib/auth');
+
+    // Pilot cookie
+    const pilotReq = new Request('http://localhost:3000/api/leads', {
+      headers: {
+        cookie: 'getvisible_workspace_mode=pilot; other_cookie=123',
+      },
+    });
+    const pilotOrg = await getResolvedOrganizationId(pilotReq);
+    expect(pilotOrg).toBe(PILOT_ORGANIZATION_ID);
+
+    // Demo cookie
+    const demoReq = new Request('http://localhost:3000/api/leads', {
+      headers: {
+        cookie: 'getvisible_workspace_mode=demo; other_cookie=123',
+      },
+    });
+    const demoOrg = await getResolvedOrganizationId(demoReq);
+    expect(demoOrg).toBe(DEMO_ORGANIZATION_ID);
+
+    // Legacy leadforge_workspace_mode cookie
+    const legacyPilotReq = new Request('http://localhost:3000/api/leads', {
+      headers: {
+        cookie: 'leadforge_workspace_mode=pilot',
+      },
+    });
+    expect(await getResolvedOrganizationId(legacyPilotReq)).toBe(PILOT_ORGANIZATION_ID);
+  });
+
+  // Criterion 8: Pilot lead detail lookup strictly requires pilot organizationId
+  it('8. Pilot lead detail lookup strictly requires pilot organization context', async () => {
+    // Create pilot prospect in standard PILOT_ORGANIZATION_ID
+    const pilotLead = await LeadRepository.createLead(
+      {
+        businessName: 'Haryana Corporate Advisors LLP',
+        profession: 'Chartered Accountant',
+        city: 'Gurgaon',
+        address: 'Sector 29, Gurgaon',
+        opportunityScore: 91,
+        isDemoData: false,
+      },
+      PILOT_ORGANIZATION_ID,
+      'Pilot Specialist'
+    );
+
+    // 1. Queried with PILOT_ORGANIZATION_ID -> succeeds
+    const foundInPilot = await LeadRepository.getLeadById(pilotLead.id, PILOT_ORGANIZATION_ID);
+    expect(foundInPilot).not.toBeNull();
+    expect(foundInPilot?.id).toBe(pilotLead.id);
+    expect(foundInPilot?.businessName).toBe('Haryana Corporate Advisors LLP');
+
+    // 2. Queried with DEMO_ORGANIZATION_ID -> returns null (404 guard)
+    const foundInDemo = await LeadRepository.getLeadById(pilotLead.id, DEMO_ORGANIZATION_ID);
+    expect(foundInDemo).toBeNull();
+  });
+
+  // Criterion 9: Demo lead detail lookup strictly requires demo organization context
+  it('9. Demo lead detail lookup strictly requires demo organization context', async () => {
+    // Existing demo lead: demo-lead-001
+    const foundInDemo = await LeadRepository.getLeadById('demo-lead-001', DEMO_ORGANIZATION_ID);
+    expect(foundInDemo).not.toBeNull();
+    expect(foundInDemo?.id).toBe('demo-lead-001');
+
+    // Queried with PILOT_ORGANIZATION_ID -> returns null (404 guard)
+    const foundInPilot = await LeadRepository.getLeadById('demo-lead-001', PILOT_ORGANIZATION_ID);
+    expect(foundInPilot).toBeNull();
+  });
 });
+
