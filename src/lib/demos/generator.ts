@@ -1,12 +1,14 @@
-import { LeadData, WebsiteDemoData, WebsiteTheme, WebsiteContent } from '@/types';
+import { LeadData, WebsiteDemoData, WebsiteTheme, WebsiteContent, WebsiteLayout, WebsiteDesign } from '@/types';
 import { WebsiteContentSchema, ValidatedWebsiteContent } from './schema';
 import { getTemplate, THEMES, LeadFacts } from './templates';
-import { GeminiAIProvider } from '@/lib/providers/ai.provider';
+import { GeminiAIProvider, MockAIProvider } from '@/lib/providers/ai.provider';
+import { selectWebsiteDesign } from './personalization';
 
 export interface GenerateDemoOptions {
   templateId?: string;
   themeId?: string;
-  organizationId: string;
+  layout?: WebsiteLayout;
+  organizationId?: string;
   version?: number;
   useAiEnrichment?: boolean;
 }
@@ -53,18 +55,27 @@ export class WebsiteDemoGeneratorService {
    */
   static async generateDemo(
     lead: LeadData,
-    options: GenerateDemoOptions
+    options: GenerateDemoOptions = {}
   ): Promise<WebsiteDemoData> {
     const eligibility = this.canGenerateDemo(lead);
     if (!eligibility.allowed) {
       throw new Error(`Demo Generation Blocked: ${eligibility.reason}`);
     }
 
+    const versionNumber = options.version || 1;
+
+    // Deterministically pick layout, theme, and sectionOrder
+    const design: WebsiteDesign = selectWebsiteDesign(
+      { id: lead.id, businessName: lead.businessName, city: lead.city },
+      versionNumber,
+      {
+        layout: options.layout,
+        themeId: options.themeId,
+      }
+    );
+
     const template = getTemplate(options.templateId, lead.profession);
-    const selectedTheme: WebsiteTheme =
-      (options.themeId && THEMES[options.themeId]) ||
-      template.themes.find((t) => t.id === options.themeId) ||
-      template.defaultTheme;
+    const selectedTheme: WebsiteTheme = design.theme;
 
     const leadFacts: LeadFacts = {
       businessName: lead.businessName,
@@ -76,12 +87,12 @@ export class WebsiteDemoGeneratorService {
       source: lead.source,
     };
 
-    // Synthesize factual baseline content
-    let content: WebsiteContent = template.buildContent(leadFacts, selectedTheme);
+    // Synthesize factual baseline content tailored to design and facts
+    let content: WebsiteContent = template.buildContent(leadFacts, selectedTheme, design);
 
-    // AI Enrichment if configured and requested
+    // Structured AI Enrichment if configured and requested
     if (options.useAiEnrichment) {
-      content = await this.enrichWithAi(content, leadFacts);
+      content = await this.enrichWithAi(content, leadFacts, design.layout);
     }
 
     // Strict Claim Safety Enforcement
@@ -90,18 +101,18 @@ export class WebsiteDemoGeneratorService {
     // Validate using Zod schema to ensure no unsafe URLs or boundary violations
     const validatedContent = WebsiteContentSchema.parse(content) as ValidatedWebsiteContent;
 
-    const versionNumber = options.version || 1;
     const demoId = `demo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
     const websiteDemo: WebsiteDemoData = {
       id: demoId,
       leadId: lead.id,
-      organizationId: options.organizationId,
+      organizationId: options.organizationId || lead.organizationId,
       templateId: template.id,
       version: versionNumber,
       generationStatus: 'COMPLETED',
       content: validatedContent as WebsiteContent,
       theme: selectedTheme,
+      design,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -167,36 +178,63 @@ export class WebsiteDemoGeneratorService {
   }
 
   /**
-   * Calls Gemini if configured, with strict claim safety prompt constraints.
+   * Calls Gemini or Mock AI provider if configured, with strict claim safety prompt constraints.
    * If not configured or if error occurs, falls back cleanly to factual synthesizer.
    */
   private static async enrichWithAi(
     content: WebsiteContent,
-    facts: LeadFacts
+    facts: LeadFacts,
+    layout?: WebsiteLayout
   ): Promise<WebsiteContent> {
-    const ai = new GeminiAIProvider();
-    if (!ai.isConfigured()) {
+    const gemini = new GeminiAIProvider();
+    const mock = new MockAIProvider();
+    const ai = gemini.isConfigured() ? gemini : mock.isConfigured() ? mock : null;
+
+    if (!ai) {
       return content;
     }
 
     try {
-      // If Gemini is active, we can flag provenance accordingly
+      const res = await ai.generatePersonalizedContent({
+        businessName: facts.businessName,
+        profession: facts.profession,
+        city: facts.city,
+        address: facts.address,
+        layout,
+      });
+
+      if (!res.success || !res.data) {
+        return content;
+      }
+
+      const copy = res.data;
+
       return {
         ...content,
         brand: {
           ...content.brand,
+          tagline: copy.tagline || content.brand.tagline,
           provenance: 'AI_SYNTHESIZED',
         },
         hero: {
           ...content.hero,
+          headline: copy.heroHeadline || content.hero.headline,
+          subheadline: copy.heroSubheadline || content.hero.subheadline,
+          primaryCta: {
+            ...content.hero.primaryCta,
+            label: copy.ctaText || content.hero.primaryCta.label,
+          },
           provenance: 'AI_SYNTHESIZED',
         },
         about: {
           ...content.about,
+          leadParagraph: copy.aboutLead || content.about.leadParagraph,
+          body: copy.aboutBody || content.about.body,
           provenance: 'AI_SYNTHESIZED',
         },
       };
     } catch {
+      // Safe fallback to deterministic baseline
       return content;
     }
   }

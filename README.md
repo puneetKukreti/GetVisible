@@ -1,4 +1,6 @@
-# LeadForge AI - Phase 1
+# GetVisible
+
+*Get your business seen online.*
 
 A production-grade B2B SaaS platform engineered for website agencies to discover legitimate business leads, analyze digital presence, generate tailored demo websites, and manage the sales pipeline with uncompromising anti-spam and privacy compliance safeguards.
 
@@ -90,7 +92,7 @@ npm run dev
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 **Sandbox Credentials:**
-- Email: `admin@leadforge.example`
+- Email: `admin@getvisible.example` (or legacy `admin@leadforge.example`)
 - Password: `demo123`
 - Organization: `Gurgaon CA Agency HQ` (`org-demo-gurgaon`)
 

@@ -37,7 +37,7 @@ export class PublicRegistryLeadSourceProvider implements ILeadSourceProvider {
         configured: false,
         isMock: false,
         error:
-          'Lead discovery provider is not configured. Set PUBLIC_REGISTRY_API_KEY in environment variables. Per system principles, LeadForge AI never fabricates simulated search results in production.',
+          'Lead discovery provider is not configured. Set PUBLIC_REGISTRY_API_KEY in environment variables. Per system principles, GetVisible never fabricates simulated search results in production.',
       };
     }
 

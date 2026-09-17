@@ -1,4 +1,4 @@
-import { WebsiteTheme, WebsiteContent } from '@/types';
+import { WebsiteTheme, WebsiteContent, WebsiteDesign, WebsiteLayout } from '@/types';
 
 export interface LeadFacts {
   businessName: string;
@@ -17,7 +17,7 @@ export interface ProfessionTemplate {
   description: string;
   themes: WebsiteTheme[];
   defaultTheme: WebsiteTheme;
-  buildContent(facts: LeadFacts, theme?: WebsiteTheme): WebsiteContent;
+  buildContent(facts: LeadFacts, theme?: WebsiteTheme, design?: WebsiteDesign): WebsiteContent;
 }
 
 // Predefined professional themes
@@ -76,11 +76,27 @@ export const CA_ACCOUNTING_TEMPLATE: ProfessionTemplate = {
     THEMES.classicBurgundy,
   ],
   defaultTheme: THEMES.executiveNavy,
-  buildContent(facts: LeadFacts, theme?: WebsiteTheme): WebsiteContent {
+  buildContent(facts: LeadFacts, theme?: WebsiteTheme, design?: WebsiteDesign): WebsiteContent {
     const brandName = facts.businessName || 'Chartered Accountancy Practice';
     const city = facts.city || 'Gurgaon';
-    const activeTheme = theme || THEMES.executiveNavy;
+    const activeTheme = theme || (design ? design.theme : THEMES.executiveNavy);
+    const layout: WebsiteLayout = design?.layout || 'MODERN_CORPORATE';
     const currentYear = new Date().getFullYear();
+
+    // Contextual hero messaging tailored by layout style
+    let heroBadge = 'Chartered Accountancy & Corporate Advisory';
+    let heroHeadline = `Modern Financial Clarity & Compliance for Growing Businesses`;
+    let heroSubheadline = `Dedicated chartered accountancy practice in ${city} providing statutory audit, corporate taxation, GST advisory, and strategic financial guidance.`;
+
+    if (layout === 'PREMIUM_PROFESSIONAL') {
+      heroBadge = 'Chartered Accountants & Financial Advisors';
+      heroHeadline = `Authoritative Tax Advisory & Statutory Assurance Practice`;
+      heroSubheadline = `Partner-led chartered accountancy solutions in ${city} safeguarding compliance, governance, and financial integrity for enterprises.`;
+    } else if (layout === 'TRADITIONAL_CA') {
+      heroBadge = 'Chartered Accountancy Practice';
+      heroHeadline = `Trusted Chartered Accountants & Statutory Tax Consultants`;
+      heroSubheadline = `Committed to ethical financial governance, meticulous statutory audits, and comprehensive corporate tax compliance in ${city}.`;
+    }
 
     return {
       meta: {
@@ -95,22 +111,20 @@ export const CA_ACCOUNTING_TEMPLATE: ProfessionTemplate = {
         provenance: facts.businessName ? 'VERIFIED_LEAD' : 'NEUTRAL_PLACEHOLDER',
       },
       theme: activeTheme,
+      design,
       navigation: {
         items: [
-          { label: 'Home', href: '#hero' },
-          { label: 'About', href: '#about' },
           { label: 'Services', href: '#services' },
-          { label: 'Why Us', href: '#why-choose-us' },
-          { label: 'FAQ', href: '#faq' },
+          { label: 'About', href: '#about' },
           { label: 'Contact', href: '#contact' },
         ],
-        ctaText: 'Inquire Now',
+        ctaText: 'Schedule Consultation',
         ctaHref: '#contact',
       },
       hero: {
-        badge: 'Chartered Accountancy & Advisory',
-        headline: `Modern Financial Clarity & Compliance for Growing Businesses`,
-        subheadline: `Dedicated chartered accountancy practice in ${city} providing statutory audit, corporate taxation, GST advisory, and strategic financial guidance.`,
+        badge: heroBadge,
+        headline: heroHeadline,
+        subheadline: heroSubheadline,
         primaryCta: {
           label: 'Schedule Consultation',
           href: '#contact',
@@ -219,6 +233,100 @@ export const CA_ACCOUNTING_TEMPLATE: ProfessionTemplate = {
           },
         ],
       },
+      process: {
+        sectionTitle: 'Structured Advisory & Audit Process',
+        sectionSubtitle: 'A transparent, step-by-step engagement model engineered for statutory precision and corporate compliance.',
+        steps: [
+          {
+            number: '01',
+            title: 'Initial Scope & Requirements',
+            description: `We analyze your corporate accounting structure, past returns, and compliance calendar specific to ${city}.`,
+          },
+          {
+            number: '02',
+            title: 'Documentation Review & Scrutiny',
+            description: 'Comprehensive review of trial balances, invoices, GST reconciliations, and tax position papers.',
+          },
+          {
+            number: '03',
+            title: 'Execution & Statutory Filings',
+            description: 'Methodical preparation and submission of audit reports, direct tax filings, and regulatory documentation.',
+          },
+          {
+            number: '04',
+            title: 'Proactive Compliance Advisory',
+            description: 'Continuous compliance tracking, statutory circular alerts, and periodic financial health updates.',
+          },
+        ],
+      },
+      trust: {
+        sectionTitle: 'Standards of Professional Governance',
+        badges: [
+          {
+            title: 'ICAI Ethical Guidelines Compliant',
+            description: 'Strict adherence to code of professional ethics, audit quality standards, and independence norms.',
+            iconName: 'ShieldCheck',
+          },
+          {
+            title: 'Direct Senior Partner Attention',
+            description: 'Senior chartered accountants directly supervise workpapers, audit programs, and tax positions.',
+            iconName: 'UserCheck',
+          },
+          {
+            title: 'Confidential Data Governance',
+            description: 'Institutional security protocols protecting sensitive corporate balance sheets and proprietary files.',
+            iconName: 'Lock',
+          },
+          {
+            title: 'Regulatory Precision',
+            description: 'Rigorous tracking of MCA notifications, Central Board of Direct Taxes circulars, and GST updates.',
+            iconName: 'CheckCircle2',
+          },
+        ],
+      },
+      expertise: {
+        sectionTitle: 'Specialized Practice Areas',
+        sectionSubtitle: 'Deep technical proficiency across complex accounting, audit, and tax challenges.',
+        items: [
+          {
+            title: 'Corporate Tax Planning & Revenue Representation',
+            description: 'Direct tax advisory, advance tax estimation, return filing, and formal representation before assessing officers.',
+            tags: ['Direct Tax', 'Appeals', 'CIT(A)', 'Tax Audit'],
+          },
+          {
+            title: 'Statutory & Internal Audit Assurance',
+            description: 'Independent evaluation of financial statements under Companies Act guidelines and Indian Accounting Standards.',
+            tags: ['Ind AS', 'Internal Controls', 'Statutory Audit'],
+          },
+          {
+            title: 'GST Advisory & Input Tax Reconciliation',
+            description: 'Monthly and annual return filings (GSTR-1, 3B, 9C), ITC reconciliation, and departmental notices support.',
+            tags: ['GSTR-9', 'ITC Optimization', 'Departmental Audits'],
+          },
+          {
+            title: 'Company Law & ROC Filings',
+            description: 'Entity formation, ROC annual statutory compliances, director KYC, and corporate secretarial governance.',
+            tags: ['MCA21', 'ROC Filings', 'Secretarial Support'],
+          },
+          {
+            title: 'Transaction Advisory & Valuation Support',
+            description: 'Financial scrutiny, due diligence reports, and valuation support for investments, partnerships, and M&A.',
+            tags: ['Due Diligence', 'Valuations', 'M&A'],
+          },
+        ],
+      },
+      ctaBanner: {
+        title: `Connect with Our ${city} Chartered Accountancy Practice`,
+        subtitle: 'Schedule an introductory consultation to discuss your business audit, corporate taxation, or regulatory compliance needs.',
+        primaryCta: {
+          label: 'Schedule Consultation',
+          href: '#contact',
+        },
+        secondaryCta: {
+          label: 'View Practice Areas',
+          href: '#services',
+        },
+      },
       industries: {
         enabled: true,
         sectionTitle: 'Industries We Support',
@@ -281,7 +389,7 @@ export const CA_ACCOUNTING_TEMPLATE: ProfessionTemplate = {
       },
       footer: {
         copyright: `© ${currentYear} ${brandName}. All rights reserved.`,
-        disclaimer: 'Personalized website demonstration concept generated by LeadForge AI. Prepared exclusively for review and evaluation.',
+        disclaimer: 'Personalized website demonstration concept generated by GetVisible. Prepared exclusively for review and evaluation.',
       },
     };
   },

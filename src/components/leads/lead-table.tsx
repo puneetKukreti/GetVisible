@@ -15,6 +15,7 @@ import {
   Mail,
   Phone,
   FileSpreadsheet,
+  Download,
 } from 'lucide-react';
 import { LeadData, LeadStatus, WebsiteStatus, PaginatedLeads } from '@/types';
 import { LeadStatusBadge, WebsiteStatusBadge, OpportunityScoreBadge } from '@/components/ui/status-badge';
@@ -38,7 +39,8 @@ export function LeadTable() {
   const [sourceFilter, setSourceFilter] = useState<string>('ALL');
   const [demoFilter, setDemoFilter] = useState<string>('ALL');
   const [contactFilter, setContactFilter] = useState<string>('ANY');
-  const [sortBy, setSortBy] = useState<'opportunityScore' | 'createdAt' | 'businessName'>('createdAt');
+  const [channelFilter, setChannelFilter] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<'opportunityScore' | 'createdAt' | 'businessName' | 'updatedAt'>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -77,6 +79,7 @@ export function LeadTable() {
       if (demoFilter === 'DEMO_ONLY') params.set('isDemoData', 'true');
       if (demoFilter === 'REAL_ONLY') params.set('isDemoData', 'false');
       if (contactFilter !== 'ANY') params.set('hasContact', contactFilter);
+      if (channelFilter !== 'ALL') params.set('channel', channelFilter);
 
       const res = await fetch(`/api/leads?${params.toString()}`);
       if (!res.ok) {
@@ -90,7 +93,7 @@ export function LeadTable() {
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, sortBy, sortOrder, search, professionFilter, statusFilter, websiteFilter, sourceFilter, demoFilter, contactFilter]);
+  }, [page, pageSize, sortBy, sortOrder, search, professionFilter, statusFilter, websiteFilter, sourceFilter, demoFilter, contactFilter, channelFilter]);
 
   useEffect(() => {
     fetchLeads();
@@ -141,7 +144,20 @@ export function LeadTable() {
     }
   };
 
-  const toggleSort = (field: 'opportunityScore' | 'createdAt' | 'businessName') => {
+  const handleExportCsv = () => {
+    const params = new URLSearchParams();
+    if (search.trim()) params.set('search', search.trim());
+    if (professionFilter !== 'ALL') params.set('profession', professionFilter);
+    if (statusFilter !== 'ALL') params.set('status', statusFilter);
+    if (websiteFilter !== 'ALL') params.set('websiteStatus', websiteFilter);
+    if (sourceFilter !== 'ALL') params.set('source', sourceFilter);
+    if (channelFilter !== 'ALL') params.set('channel', channelFilter);
+    if (sortBy) params.set('sortBy', sortBy);
+    if (sortOrder) params.set('sortOrder', sortOrder);
+    window.location.href = `/api/leads/export?${params.toString()}`;
+  };
+
+  const toggleSort = (field: 'opportunityScore' | 'createdAt' | 'businessName' | 'updatedAt') => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -186,7 +202,7 @@ export function LeadTable() {
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>Filters</span>
-            {(statusFilter !== 'ALL' || websiteFilter !== 'ALL' || professionFilter !== 'ALL') && (
+            {(statusFilter !== 'ALL' || websiteFilter !== 'ALL' || professionFilter !== 'ALL' || channelFilter !== 'ALL') && (
               <span className="w-2 h-2 rounded-full bg-primary" />
             )}
           </Button>
@@ -203,6 +219,17 @@ export function LeadTable() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            className="gap-1.5 h-9 text-xs border-emerald-600/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+            title="Export filtered leads to CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export CSV</span>
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -264,18 +291,17 @@ export function LeadTable() {
               >
                 <option value="ALL">All Statuses</option>
                 <option value="NEW">New</option>
-                <option value="RESEARCHING">Researching</option>
                 <option value="QUALIFIED">Qualified</option>
-                <option value="DEMO_GENERATED">Demo Ready</option>
-                <option value="OUTREACH_PENDING">Approval Needed</option>
+                <option value="DEMO_GENERATED">Demo Generated</option>
+                <option value="UNDER_REVIEW">Under Review</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
                 <option value="CONTACTED">Contacted</option>
-                <option value="REPLIED">Replied</option>
+                <option value="RESPONDED">Responded</option>
                 <option value="INTERESTED">Interested</option>
+                <option value="CONVERTED">Converted</option>
                 <option value="NOT_INTERESTED">Not Interested</option>
-                <option value="DO_NOT_CONTACT">DO NOT CONTACT</option>
-                <option value="PROPOSAL">Proposal</option>
-                <option value="CUSTOMER">Customer</option>
-                <option value="LOST">Lost</option>
+                <option value="DO_NOT_CONTACT">Do Not Contact</option>
               </select>
             </div>
 
@@ -348,6 +374,24 @@ export function LeadTable() {
             </div>
 
             <div className="flex items-center gap-2">
+              <span className="font-semibold text-muted-foreground">Outreach Channel:</span>
+              <select
+                value={channelFilter}
+                onChange={(e) => {
+                  setChannelFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="ALL">All Channels</option>
+                <option value="EMAIL">Email</option>
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="PHONE">Phone</option>
+                <option value="SMS">SMS</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
               <span className="font-semibold text-muted-foreground">Page Size:</span>
               <select
                 value={pageSize}
@@ -363,7 +407,7 @@ export function LeadTable() {
               </select>
             </div>
 
-            {(statusFilter !== 'ALL' || websiteFilter !== 'ALL' || professionFilter !== 'ALL' || sourceFilter !== 'ALL' || demoFilter !== 'ALL' || contactFilter !== 'ANY') && (
+            {(statusFilter !== 'ALL' || websiteFilter !== 'ALL' || professionFilter !== 'ALL' || sourceFilter !== 'ALL' || demoFilter !== 'ALL' || contactFilter !== 'ANY' || channelFilter !== 'ALL') && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -374,6 +418,7 @@ export function LeadTable() {
                   setSourceFilter('ALL');
                   setDemoFilter('ALL');
                   setContactFilter('ANY');
+                  setChannelFilter('ALL');
                   setPage(1);
                 }}
                 className="h-8 text-xs text-muted-foreground hover:text-foreground"
@@ -408,27 +453,16 @@ export function LeadTable() {
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
-                <th className="py-3 px-3">Profession</th>
-                <th className="py-3 px-3">Location</th>
-                <th className="py-3 px-3">Website</th>
-                <th className="py-3 px-3">Website Status</th>
-                <th
-                  className="py-3 px-3 cursor-pointer hover:text-foreground select-none"
-                  onClick={() => toggleSort('opportunityScore')}
-                >
-                  <div className="flex items-center gap-1">
-                    <span>Opportunity</span>
-                    <ArrowUpDown className="w-3 h-3" />
-                  </div>
-                </th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-3">Contact</th>
+                <th className="py-3 px-3">City</th>
+                <th className="py-3 px-3">Qualification</th>
+                <th className="py-3 px-3">Demo</th>
+                <th className="py-3 px-3">Sales Status</th>
                 <th
                   className="py-3 px-4 cursor-pointer hover:text-foreground select-none"
                   onClick={() => toggleSort('createdAt')}
                 >
                   <div className="flex items-center gap-1">
-                    <span>Created</span>
+                    <span>Last Activity</span>
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                 </th>
@@ -439,7 +473,7 @@ export function LeadTable() {
             <tbody className="divide-y divide-border">
               {loading && !data && (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
                     <div className="flex items-center justify-center gap-2">
                       <RefreshCw className="w-4 h-4 animate-spin text-primary" />
                       <span>Loading leads...</span>
@@ -450,7 +484,7 @@ export function LeadTable() {
 
               {!loading && data && data.leads.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={7} className="py-12 text-center text-muted-foreground">
                     No matching leads found in this organization.
                   </td>
                 </tr>
@@ -458,7 +492,7 @@ export function LeadTable() {
 
               {data &&
                 data.leads.map((lead) => {
-                  const primaryContact = lead.contacts?.find((c) => c.isPrimary) || lead.contacts?.[0];
+                  const activeDemo = lead.websiteDemos?.find((d) => d.isActive) || lead.websiteDemos?.[0];
 
                   return (
                     <tr
@@ -478,86 +512,79 @@ export function LeadTable() {
                             {lead.isDemoData && <DemoBadge size="sm" />}
                           </div>
                           <div className="text-[11px] text-muted-foreground truncate max-w-[220px]">
-                            {lead.address}
+                            {lead.profession} • {lead.address}
                           </div>
                         </div>
                       </td>
 
-                      {/* Profession */}
-                      <td className="py-3 px-3 text-muted-foreground font-medium">
-                        {lead.profession}
-                      </td>
-
-                      {/* Location */}
+                      {/* City */}
                       <td className="py-3 px-3 font-medium text-foreground">
                         {lead.city}
                       </td>
 
-                      {/* Website */}
-                      <td className="py-3 px-3">
-                        {lead.website ? (
-                          <a
-                            href={lead.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:underline flex items-center gap-1 truncate max-w-[140px]"
-                            title={lead.website}
-                          >
-                            <span>{lead.website.replace(/^https?:\/\//, '')}</span>
-                            <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground italic">None</span>
-                        )}
-                      </td>
-
-                      {/* Website Status */}
+                      {/* Qualification */}
                       <td className="py-3 px-3">
                         <WebsiteStatusBadge status={lead.websiteStatus} />
                       </td>
 
-                      {/* Opportunity */}
+                      {/* Demo */}
                       <td className="py-3 px-3">
-                        <OpportunityScoreBadge score={lead.opportunityScore} />
+                        {activeDemo ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                              v{activeDemo.version}
+                            </span>
+                            {activeDemo.approvalStatus === 'APPROVED' ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                                Approved
+                              </span>
+                            ) : activeDemo.approvalStatus === 'REJECTED' ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                                Rejected
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                Pending Review
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic text-[11px]">None</span>
+                        )}
                       </td>
 
-                      {/* Status */}
+                      {/* Sales Status */}
                       <td className="py-3 px-3">
                         <LeadStatusBadge status={lead.leadStatus} />
                       </td>
 
-                      {/* Contact */}
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          {primaryContact ? (
-                            <>
-                              <div className="font-medium text-foreground">{primaryContact.name}</div>
-                              <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                {primaryContact.email && <Mail className="w-2.5 h-2.5" />}
-                                <span>{primaryContact.email || primaryContact.phone || 'No direct contact'}</span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-muted-foreground flex items-center gap-1">
-                              {lead.publicPhone && <Phone className="w-2.5 h-2.5" />}
-                              <span>{lead.publicEmail || lead.publicPhone || 'Public Directory'}</span>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Created */}
+                      {/* Last Activity */}
                       <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
-                        {formatDate(lead.createdAt)}
+                        {formatDate(lead.updatedAt || lead.createdAt)}
                       </td>
 
                       {/* Actions */}
                       <td className="py-3 px-4 text-right">
-                        <Link href={`/leads/${lead.id}`}>
-                          <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
-                            Inspect
-                          </Button>
-                        </Link>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Link href={`/leads/${lead.id}`}>
+                            <Button variant="outline" size="sm" className="h-7 text-xs px-2.5">
+                              Inspect
+                            </Button>
+                          </Link>
+                          {activeDemo && (
+                            <Link href={`/demo/${lead.id}`} target="_blank">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2 text-primary hover:text-primary/80 gap-1"
+                                title="Open Demo in new tab"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                <span>Demo</span>
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

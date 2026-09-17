@@ -49,6 +49,25 @@ export async function PATCH(
 
     const body = await request.json();
 
+    if (body.action === 'APPROVE') {
+      const result = await WebsiteDemoRepository.approveDemo(
+        orgId,
+        id,
+        body.actor || 'Sales Specialist'
+      );
+      return NextResponse.json({ success: true, ...result });
+    }
+
+    if (body.action === 'REJECT') {
+      const result = await WebsiteDemoRepository.rejectDemo(
+        orgId,
+        id,
+        body.reason || 'Design not suitable',
+        body.actor || 'Sales Specialist'
+      );
+      return NextResponse.json({ success: true, ...result });
+    }
+
     const parsed = UpdateDemoRequestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

@@ -10,6 +10,7 @@ const GenerateDemoRequestSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required'),
   templateId: z.string().optional(),
   themeId: z.string().optional(),
+  layout: z.enum(['MODERN_CORPORATE', 'PREMIUM_PROFESSIONAL', 'TRADITIONAL_CA']).optional(),
   useAiEnrichment: z.boolean().optional(),
 });
 
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { leadId, templateId, themeId, useAiEnrichment } = parsed.data;
+    const { leadId, templateId, themeId, layout, useAiEnrichment } = parsed.data;
 
     // Fetch lead with organization isolation
     const lead = await LeadRepository.getLeadById(leadId, orgId);
@@ -80,6 +81,7 @@ export async function POST(request: NextRequest) {
     const demo = await WebsiteDemoGeneratorService.generateDemo(lead, {
       templateId,
       themeId,
+      layout,
       organizationId: orgId,
       version: nextVersion,
       useAiEnrichment,

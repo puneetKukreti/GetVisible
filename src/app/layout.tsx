@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'LeadForge AI - Website Agency Lead & Pipeline OS',
-  description: 'Discover legitimate business leads, analyze digital presence, and manage client pipelines with strict anti-spam and compliance safeguards.',
+  title: 'GetVisible - Get your business seen online',
+  description: 'GetVisible helps professional service firms and businesses build a modern, high-converting digital presence with personalized website concepts and human-in-the-loop sales workflows.',
 };
 
 export default function RootLayout({

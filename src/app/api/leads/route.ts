@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { z } from 'zod';
-import { LeadFilterParams, LeadStatus, WebsiteStatus } from '@/types';
+import { LeadFilterParams, LeadStatus, WebsiteStatus, Channel } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +43,10 @@ export async function GET(request: NextRequest) {
           ? false
           : undefined,
       hasContact: (searchParams.get('hasContact') as 'ANY' | 'EMAIL' | 'PHONE' | 'BOTH') || undefined,
-      sortBy: (searchParams.get('sortBy') as 'opportunityScore' | 'createdAt' | 'businessName') || 'createdAt',
+      channel: (searchParams.get('channel') as Channel | 'ALL') || undefined,
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
+      sortBy: (searchParams.get('sortBy') as 'opportunityScore' | 'createdAt' | 'businessName' | 'updatedAt') || 'createdAt',
       sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
       page: searchParams.get('page') ? parseInt(searchParams.get('page')!, 10) : 1,
       pageSize: searchParams.get('pageSize') ? parseInt(searchParams.get('pageSize')!, 10) : 10,

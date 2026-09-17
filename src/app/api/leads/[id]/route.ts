@@ -43,15 +43,31 @@ export async function PATCH(
     const body = await request.json();
 
 
+    let updatedLead = null;
+
+    if (body.note) {
+      await LeadRepository.addNote(
+        orgId,
+        params.id,
+        body.note,
+        body.actor || 'Sales Rep'
+      );
+    }
+
     if (body.leadStatus) {
-      const updated = await LeadRepository.updateLeadStatus(
+      updatedLead = await LeadRepository.updateLeadStatus(
         params.id,
         body.leadStatus as LeadStatus,
         orgId,
         body.actor || 'Agency User',
         body.reason
       );
-      return NextResponse.json(updated);
+    } else {
+      updatedLead = await LeadRepository.getLeadById(params.id, orgId);
+    }
+
+    if (updatedLead) {
+      return NextResponse.json(updatedLead);
     }
 
     return NextResponse.json({ error: 'No valid update parameters supplied' }, { status: 400 });

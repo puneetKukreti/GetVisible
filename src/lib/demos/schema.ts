@@ -17,6 +17,33 @@ export const ContentProvenanceSchema: z.ZodType<ContentProvenance> = z.enum([
   'NEUTRAL_PLACEHOLDER',
 ]);
 
+export const WebsiteLayoutSchema = z.enum([
+  'EDITORIAL_FINANCE',
+  'MODERN_FINTECH',
+  'LUXURY_PROFESSIONAL',
+  'SWISS_MINIMAL',
+  'MODERN_INDIAN',
+  'MODERN_CORPORATE',
+  'PREMIUM_PROFESSIONAL',
+  'TRADITIONAL_CA',
+]);
+
+export const WebsiteSectionTypeSchema = z.enum([
+  'HERO',
+  'TRUST',
+  'SERVICES',
+  'ABOUT',
+  'EXPERTISE',
+  'PROCESS',
+  'WHY_CHOOSE_US',
+  'INDUSTRIES',
+  'TESTIMONIALS',
+  'FAQ',
+  'CONTACT',
+  'CTA',
+  'LOCATION',
+]);
+
 export const WebsiteThemeSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
@@ -26,6 +53,45 @@ export const WebsiteThemeSchema = z.object({
   fontFamily: z.enum(['sans', 'serif']),
   style: z.enum(['corporate', 'modern', 'minimal']),
   borderRadius: z.enum(['none', 'sm', 'md', 'lg']),
+});
+
+export const WebsiteDesignSchema = z.object({
+  layout: WebsiteLayoutSchema,
+  theme: WebsiteThemeSchema,
+  sectionOrder: z.array(WebsiteSectionTypeSchema),
+});
+
+export const WebsiteProcessStepSchema = z.object({
+  number: z.string().min(1).max(10),
+  title: z.string().min(2).max(80),
+  description: z.string().min(5).max(300),
+});
+
+export const WebsiteTrustBadgeSchema = z.object({
+  title: z.string().min(2).max(80),
+  description: z.string().min(5).max(250),
+  iconName: z.string().optional(),
+});
+
+export const WebsiteExpertiseItemSchema = z.object({
+  title: z.string().min(2).max(80),
+  description: z.string().min(5).max(300),
+  tags: z.array(z.string().min(2).max(40)).optional(),
+});
+
+export const WebsiteCtaBannerSchema = z.object({
+  title: z.string().min(5).max(120),
+  subtitle: z.string().min(5).max(250),
+  primaryCta: z.object({
+    label: z.string().min(2).max(40),
+    href: safeUrlSchema,
+  }),
+  secondaryCta: z
+    .object({
+      label: z.string().min(2).max(40),
+      href: safeUrlSchema,
+    })
+    .optional(),
 });
 
 export const WebsiteNavigationItemSchema = z.object({
@@ -72,6 +138,7 @@ export const WebsiteContentSchema = z.object({
     provenance: ContentProvenanceSchema,
   }),
   theme: WebsiteThemeSchema,
+  design: WebsiteDesignSchema.optional(),
   navigation: z.object({
     items: z.array(WebsiteNavigationItemSchema),
     ctaText: z.string().min(2).max(40),
@@ -113,6 +180,27 @@ export const WebsiteContentSchema = z.object({
     sectionSubtitle: z.string().min(5).max(200),
     points: z.array(WhyChooseUsPointSchema).min(1).max(8),
   }),
+  process: z
+    .object({
+      sectionTitle: z.string().min(2).max(80),
+      sectionSubtitle: z.string().min(5).max(200),
+      steps: z.array(WebsiteProcessStepSchema).min(1).max(8),
+    })
+    .optional(),
+  trust: z
+    .object({
+      sectionTitle: z.string().min(2).max(80),
+      badges: z.array(WebsiteTrustBadgeSchema).min(1).max(8),
+    })
+    .optional(),
+  expertise: z
+    .object({
+      sectionTitle: z.string().min(2).max(80),
+      sectionSubtitle: z.string().min(5).max(200),
+      items: z.array(WebsiteExpertiseItemSchema).min(1).max(12),
+    })
+    .optional(),
+  ctaBanner: WebsiteCtaBannerSchema.optional(),
   industries: z.object({
     enabled: z.boolean(),
     sectionTitle: z.string().min(2).max(80),

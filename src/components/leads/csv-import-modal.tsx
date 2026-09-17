@@ -139,7 +139,7 @@ export function CsvImportModal({ isOpen, onClose, onImportComplete }: CsvImportM
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'leadforge_leads_sample.csv');
+    link.setAttribute('download', 'getvisible_leads_sample.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -202,7 +202,7 @@ export function CsvImportModal({ isOpen, onClose, onImportComplete }: CsvImportM
                 Import Leads via CSV
               </h3>
               <p className="text-xs text-slate-500">
-                Upload legitimate business records into your LeadForge CRM
+                Upload legitimate business records into your GetVisible CRM
               </p>
             </div>
           </div>

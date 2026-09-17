@@ -13,19 +13,20 @@ export const authOptions: NextAuthOptions = {
     CredentialsProvider({
       name: 'Credentials',
       credentials: {
-        email: { label: 'Email', type: 'email', placeholder: 'admin@leadforge.example' },
+        email: { label: 'Email', type: 'email', placeholder: 'admin@getvisible.example' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Explicit demo login or credential validation
+        // Explicit demo login or credential validation (supports both GetVisible and legacy LeadForge)
         if (
-          credentials?.email === 'admin@leadforge.example' &&
+          (credentials?.email === 'admin@getvisible.example' ||
+            credentials?.email === 'admin@leadforge.example') &&
           credentials?.password === 'demo123'
         ) {
           return {
             id: 'demo-user-admin',
             name: 'Demo Admin',
-            email: 'admin@leadforge.example',
+            email: credentials.email,
             role: 'ADMIN',
             organizationId: DEMO_ORGANIZATION_ID,
             organizationName: 'Gurgaon CA Agency HQ',
@@ -96,33 +97,53 @@ export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET || 'leadforge-production-fallback-secret-development-only',
 };
 
+import {
+  PILOT_ORGANIZATION_ID,
+  getDefaultOrganizationId,
+  getActiveWorkspaceMode,
+} from './workspace';
+
 /**
  * Resolves the active organization context across Server Components, Route Handlers, and internal services.
  *
  * 1. Checks explicit 'x-organization-id' request header if provided or available in next/headers.
- * 2. Checks active authenticated NextAuth session (session.user.organizationId).
- * 3. In explicit DEMO_MODE=true, falls back to DEMO_ORGANIZATION_ID.
- * 4. In production mode without an authenticated session or explicit authorized header, returns null.
+ * 2. Checks explicit 'x-workspace-mode' header or 'leadforge_workspace_mode' cookie.
+ * 3. Checks active authenticated NextAuth session (session.user.organizationId).
+ * 4. Fallback to active workspace mode (PILOT_ORGANIZATION_ID in pilot mode, DEMO_ORGANIZATION_ID in demo mode).
  */
 export async function getResolvedOrganizationId(
   requestOrHeaders?: Request | Headers | { headers: Headers | { get(name: string): string | null } } | null
 ): Promise<string | null> {
   // 1. Check explicit header if passed
   let headerOrgId: string | null = null;
+  let workspaceModeHeader: string | null = null;
+
   if (requestOrHeaders) {
     if ('headers' in requestOrHeaders && requestOrHeaders.headers && typeof requestOrHeaders.headers.get === 'function') {
       headerOrgId = requestOrHeaders.headers.get('x-organization-id');
+      workspaceModeHeader = requestOrHeaders.headers.get('x-workspace-mode');
     } else if (typeof (requestOrHeaders as Headers).get === 'function') {
       headerOrgId = (requestOrHeaders as Headers).get('x-organization-id');
+      workspaceModeHeader = (requestOrHeaders as Headers).get('x-workspace-mode');
     }
   }
 
   // 1b. If not passed, check next/headers in Server Component / RSC contexts
   if (!headerOrgId) {
     try {
-      const { headers } = await import('next/headers');
+      const { headers, cookies } = await import('next/headers');
       const h = headers();
       headerOrgId = h.get('x-organization-id');
+      if (!workspaceModeHeader) {
+        workspaceModeHeader = h.get('x-workspace-mode');
+      }
+      if (!headerOrgId && !workspaceModeHeader) {
+        const c = cookies();
+        const cookieMode =
+          c.get('getvisible_workspace_mode')?.value || c.get('leadforge_workspace_mode')?.value;
+        if (cookieMode === 'pilot' || cookieMode === 'real') return PILOT_ORGANIZATION_ID;
+        if (cookieMode === 'demo') return DEMO_ORGANIZATION_ID;
+      }
     } catch {
       // Outside Next.js request lifecycle / in tests
     }
@@ -130,6 +151,13 @@ export async function getResolvedOrganizationId(
 
   if (headerOrgId && headerOrgId.trim().length > 0) {
     return headerOrgId.trim();
+  }
+
+  if (workspaceModeHeader === 'pilot' || workspaceModeHeader === 'real') {
+    return PILOT_ORGANIZATION_ID;
+  }
+  if (workspaceModeHeader === 'demo') {
+    return DEMO_ORGANIZATION_ID;
   }
 
   // 2. Check NextAuth session
@@ -146,12 +174,7 @@ export async function getResolvedOrganizationId(
     // Outside active HTTP session context
   }
 
-  // 3. Fallback for DEMO_MODE
-  if (isExplicitDemoMode()) {
-    return DEMO_ORGANIZATION_ID;
-  }
-
-  // 4. Production mode: strictly null if no organization can be authenticated
-  return null;
+  // 3. Dynamic workspace fallback (resolves to PILOT_ORGANIZATION_ID or DEMO_ORGANIZATION_ID)
+  return getDefaultOrganizationId();
 }
 

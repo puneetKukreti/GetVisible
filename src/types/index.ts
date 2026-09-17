@@ -1,13 +1,18 @@
 export type LeadStatus =
   | 'NEW'
-  | 'RESEARCHING'
   | 'QUALIFIED'
   | 'DEMO_GENERATED'
-  | 'OUTREACH_PENDING'
+  | 'UNDER_REVIEW'
+  | 'APPROVED'
+  | 'REJECTED'
   | 'CONTACTED'
-  | 'REPLIED'
+  | 'RESPONDED'
   | 'INTERESTED'
+  | 'CONVERTED'
   | 'NOT_INTERESTED'
+  | 'RESEARCHING'
+  | 'OUTREACH_PENDING'
+  | 'REPLIED'
   | 'DO_NOT_CONTACT'
   | 'PROPOSAL'
   | 'CUSTOMER'
@@ -146,6 +151,77 @@ export interface WebsiteTheme {
   borderRadius: 'none' | 'sm' | 'md' | 'lg';
 }
 
+export type WebsiteTemplate =
+  | 'EDITORIAL_FINANCE'
+  | 'MODERN_FINTECH'
+  | 'LUXURY_PROFESSIONAL'
+  | 'SWISS_MINIMAL'
+  | 'MODERN_INDIAN';
+
+export type WebsiteLayout =
+  | WebsiteTemplate
+  | 'MODERN_CORPORATE'
+  | 'PREMIUM_PROFESSIONAL'
+  | 'TRADITIONAL_CA';
+
+export type WebsiteSectionType =
+  | 'HERO'
+  | 'TRUST'
+  | 'SERVICES'
+  | 'ABOUT'
+  | 'EXPERTISE'
+  | 'PROCESS'
+  | 'WHY_CHOOSE_US'
+  | 'INDUSTRIES'
+  | 'TESTIMONIALS'
+  | 'FAQ'
+  | 'CONTACT'
+  | 'CTA'
+  | 'LOCATION';
+
+export interface WebsiteDesign {
+  layout: WebsiteLayout;
+  template?: WebsiteTemplate;
+  theme: WebsiteTheme;
+  sectionOrder: WebsiteSectionType[];
+  heroLayout?: string;
+  servicesLayout?: string;
+  features?: {
+    showVisualArtwork?: boolean;
+    floatingHeader?: boolean;
+    hairlineBorders?: boolean;
+    monochromeGrid?: boolean;
+    showLocationHighlight?: boolean;
+    [key: string]: any;
+  };
+  contentDensity?: 'compact' | 'comfortable' | 'spacious';
+}
+
+export interface WebsiteProcessStep {
+  number: string;
+  title: string;
+  description: string;
+}
+
+export interface WebsiteTrustBadge {
+  title: string;
+  description: string;
+  iconName?: string;
+}
+
+export interface WebsiteExpertiseItem {
+  title: string;
+  description: string;
+  tags?: string[];
+}
+
+export interface WebsiteCtaBanner {
+  title: string;
+  subtitle: string;
+  primaryCta: { label: string; href: string };
+  secondaryCta?: { label: string; href: string };
+}
+
 export interface WebsiteNavigationItem {
   label: string;
   href: string;
@@ -164,6 +240,7 @@ export interface WebsiteContent {
     provenance: ContentProvenance;
   };
   theme: WebsiteTheme;
+  design?: WebsiteDesign;
   navigation: {
     items: WebsiteNavigationItem[];
     ctaText: string;
@@ -204,6 +281,21 @@ export interface WebsiteContent {
       iconName?: string;
     }[];
   };
+  process?: {
+    sectionTitle: string;
+    sectionSubtitle: string;
+    steps: WebsiteProcessStep[];
+  };
+  trust?: {
+    sectionTitle: string;
+    badges: WebsiteTrustBadge[];
+  };
+  expertise?: {
+    sectionTitle: string;
+    sectionSubtitle: string;
+    items: WebsiteExpertiseItem[];
+  };
+  ctaBanner?: WebsiteCtaBanner;
   industries: {
     enabled: boolean;
     sectionTitle: string;
@@ -247,6 +339,8 @@ export interface WebsiteContent {
   };
 }
 
+export type DemoApprovalStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+
 export interface WebsiteDemoData {
   id: string;
   leadId: string;
@@ -254,8 +348,18 @@ export interface WebsiteDemoData {
   templateId: string;
   version: number;
   generationStatus: 'QUEUED' | 'GENERATING' | 'COMPLETED' | 'FAILED';
+  approvalStatus?: DemoApprovalStatus;
+  isActive?: boolean;
+  rejectionReason?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  publicToken?: string | null;
+  viewCount?: number;
+  firstViewedAt?: string | null;
+  lastViewedAt?: string | null;
   content: WebsiteContent;
   theme: WebsiteTheme;
+  design?: WebsiteDesign;
   error?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -323,6 +427,32 @@ export interface JobData {
   completedAt?: string | null;
 }
 
+export interface LeadNoteData {
+  id: string;
+  text: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface OutreachMessage {
+  subject?: string;
+  message: string;
+  personalizationReason: string;
+}
+
+export interface OutreachInput {
+  businessName: string;
+  profession: string;
+  city: string;
+  contactName?: string;
+  publicEmail?: string | null;
+  publicPhone?: string | null;
+  demoUrl: string;
+  templateName?: string;
+  themeName?: string;
+  opportunityReason?: string;
+}
+
 export interface LeadData {
   id: string;
   businessName: string;
@@ -360,6 +490,8 @@ export interface LeadData {
   suppressionRecords?: SuppressionRecordData[];
   jobs?: JobData[];
   websiteDemos?: WebsiteDemoData[];
+  notes?: LeadNoteData[];
+  contactChannel?: Channel | null;
 }
 
 export interface LeadFilterParams {
@@ -372,12 +504,15 @@ export interface LeadFilterParams {
   isDemoData?: boolean | 'ALL';
   verificationStatus?: WebsiteVerificationStatus | 'ALL';
   hasContact?: 'ANY' | 'EMAIL' | 'PHONE' | 'BOTH';
+  channel?: Channel | 'ALL';
   minScore?: number;
   maxScore?: number;
-  sortBy?: 'opportunityScore' | 'createdAt' | 'businessName';
+  sortBy?: 'opportunityScore' | 'createdAt' | 'businessName' | 'updatedAt';
   sortOrder?: 'asc' | 'desc';
   page?: number;
   pageSize?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 export interface PaginatedLeads {
@@ -393,10 +528,138 @@ export interface DashboardMetrics {
   newLeads: number;
   qualifiedLeads: number;
   demos: number;
+  demosApproved: number;
   contacted: number;
   replies: number;
   interested: number;
+  converted: number;
   customers: number;
   suppressionCount: number;
   activeJobsCount: number;
+}
+
+// Phase 6 — Sales Analytics & Funnel Intelligence Types
+export type DateRangeOption =
+  | 'TODAY'
+  | 'LAST_7_DAYS'
+  | 'LAST_30_DAYS'
+  | 'LAST_90_DAYS'
+  | 'ALL_TIME'
+  | 'CUSTOM';
+
+export interface DateRangeFilter {
+  preset: DateRangeOption;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface SalesFunnelStage {
+  id: string;
+  label: string;
+  count: number;
+  percentOfPrevious: number;
+  percentOfTotal: number;
+}
+
+export interface SalesFunnelData {
+  totalLeads: number;
+  qualified: number;
+  demosGenerated: number;
+  demosApproved: number;
+  contacted: number;
+  responded: number;
+  interested: number;
+  converted: number;
+  stages: SalesFunnelStage[];
+}
+
+export interface ConversionRates {
+  qualificationRate: number;
+  demoGenerationRate: number;
+  demoApprovalRate: number;
+  contactRate: number;
+  responseRate: number;
+  interestRate: number;
+  conversionRate: number;
+  overallLeadToCustomerRate: number;
+}
+
+export interface ActivityTrendPoint {
+  period: string; // e.g. YYYY-MM-DD or Week label
+  leadsAdded: number;
+  qualified: number;
+  demosGenerated: number;
+  demosApproved: number;
+  contacted: number;
+  responded: number;
+  interested: number;
+  converted: number;
+}
+
+export interface BreakdownMetric {
+  name: string;
+  leads: number;
+  qualified: number;
+  demos: number;
+  approved: number;
+  contacted: number;
+  responded: number;
+  interested: number;
+  converted: number;
+}
+
+export interface LeadAgingBucket {
+  stage: LeadStatus;
+  stageLabel: string;
+  count: number;
+  averageDaysInStage: number;
+  staleCount: number; // Untouched in stage for 7+ days
+  staleLeadIds: string[];
+}
+
+export type ActionQueueType =
+  | 'NEED_DEMO_REVIEW'
+  | 'APPROVED_NOT_CONTACTED'
+  | 'CONTACTED_NO_RESPONSE'
+  | 'INTERESTED_FOLLOWUP';
+
+export interface ActionQueueItem {
+  id: string;
+  type: ActionQueueType;
+  title: string;
+  description: string;
+  count: number;
+  leadIds: string[];
+  actionLabel: string;
+  actionUrl: string;
+}
+
+export interface OperationalScoreRule {
+  id: string;
+  label: string;
+  points: number;
+  satisfied: boolean;
+  explanation: string;
+}
+
+export interface OperationalLeadScore {
+  score: number;
+  maxScore: number;
+  rules: OperationalScoreRule[];
+  summary: string;
+}
+
+export interface SalesAnalyticsResponse {
+  dateRange: DateRangeFilter;
+  funnel: SalesFunnelData;
+  rates: ConversionRates;
+  trends: ActivityTrendPoint[];
+  templates: BreakdownMetric[];
+  themes: BreakdownMetric[];
+  channels: BreakdownMetric[];
+  sources: BreakdownMetric[];
+  professions: BreakdownMetric[];
+  geographies: BreakdownMetric[];
+  aging: LeadAgingBucket[];
+  actionQueue: ActionQueueItem[];
 }

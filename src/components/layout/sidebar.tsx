@@ -31,15 +31,8 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { title: 'Leads', href: '/leads', icon: Users },
-  { title: 'Discovery', href: '/discovery', icon: Search, phase2: true },
-  { title: 'Website Analyzer', href: '/website-analyzer', icon: Globe2, phase2: true },
-  { title: 'Demos', href: '/demos', icon: FileCode, phase2: true },
-  { title: 'Campaigns', href: '/campaigns', icon: Send, phase2: true },
-  { title: 'Inbox', href: '/inbox', icon: Inbox, phase2: true },
-  { title: 'Proposals', href: '/proposals', icon: FileSpreadsheet, phase2: true },
-  { title: 'Clients', href: '/clients', icon: Building2, phase2: true },
-  { title: 'Websites', href: '/websites', icon: Laptop, phase2: true },
-  { title: 'Analytics', href: '/analytics', icon: BarChart3, phase2: true },
+  { title: 'Discovery', href: '/discovery', icon: Search },
+  { title: 'Demos', href: '/demos', icon: FileCode },
   { title: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -55,10 +48,10 @@ export function Sidebar() {
             <Zap className="w-4 h-4" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-sm tracking-tight text-foreground flex items-center gap-1">
-              LeadForge <span className="text-primary text-xs">AI</span>
+            <span className="font-bold text-sm tracking-tight text-foreground flex items-center gap-0.5">
+              Get<span className="text-primary">Visible</span>
             </span>
-            <span className="text-[10px] text-muted-foreground font-medium">Agency Operating System</span>
+            <span className="text-[10px] text-muted-foreground font-medium">Get your business seen online</span>
           </div>
         </Link>
       </div>

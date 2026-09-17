@@ -10,7 +10,7 @@ import { DemoBadge } from '@/components/ui/demo-badge';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@leadforge.example');
+  const [email, setEmail] = useState('admin@getvisible.example');
   const [password, setPassword] = useState('demo123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +20,8 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    // In explicit demo mode or test credentials:
-    if (email === 'admin@leadforge.example' && password === 'demo123') {
+    // In explicit demo mode or test credentials (supports both GetVisible and legacy LeadForge):
+    if ((email === 'admin@getvisible.example' || email === 'admin@leadforge.example') && password === 'demo123') {
       setTimeout(() => {
         router.push('/dashboard');
       }, 300);
@@ -43,10 +43,10 @@ export default function LoginPage() {
             <Zap className="w-5 h-5" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            LeadForge <span className="text-primary">AI</span>
+            Get<span className="text-primary">Visible</span>
           </h1>
           <p className="text-xs text-muted-foreground">
-            Website Agency Lead Discovery & Pipeline Operating System
+            Get your business seen online.
           </p>
         </div>
 
@@ -77,7 +77,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@leadforge.example"
+                  placeholder="admin@getvisible.example"
                   required
                 />
               </div>
@@ -108,7 +108,7 @@ export default function LoginPage() {
                   <span className="text-[10px] text-primary">ADMIN</span>
                 </div>
                 <div className="text-muted-foreground text-[11px]">
-                  Email: <code className="text-foreground">admin@leadforge.example</code>
+                  Email: <code className="text-foreground">admin@getvisible.example</code>
                 </div>
                 <div className="text-muted-foreground text-[11px]">
                   Password: <code className="text-foreground">demo123</code>
@@ -126,7 +126,7 @@ export default function LoginPage() {
           <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
           <div className="text-[11px] leading-relaxed">
             <span className="font-semibold text-foreground">Ethical Discovery & Zero Spam: </span>
-            LeadForge strictly relies on legitimate public business registries. Automated bulk outreach without human approval is strictly disabled by system architecture.
+            GetVisible strictly relies on legitimate public business registries. Automated bulk outreach without human approval is strictly disabled by system architecture.
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ import {
   FileText,
   Award,
   XCircle,
+  Eye,
   Globe,
   AlertTriangle,
   ShieldX,
@@ -49,6 +50,24 @@ export function LeadStatusBadge({ status }: { status: LeadStatus }) {
           <FileCode2 className="w-3 h-3" /> Demo Ready
         </Badge>
       );
+    case 'UNDER_REVIEW':
+      return (
+        <Badge variant="outline" className="gap-1 border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 font-medium">
+          <Eye className="w-3 h-3" /> Under Review
+        </Badge>
+      );
+    case 'APPROVED':
+      return (
+        <Badge variant="outline" className="gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 font-bold">
+          <CheckCircle2 className="w-3 h-3" /> Approved
+        </Badge>
+      );
+    case 'REJECTED':
+      return (
+        <Badge variant="outline" className="gap-1 border-rose-500/40 text-rose-600 dark:text-rose-400 bg-rose-500/10 font-medium">
+          <XCircle className="w-3 h-3" /> Rejected
+        </Badge>
+      );
     case 'OUTREACH_PENDING':
       return (
         <Badge variant="outline" className="gap-1 border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/5">
@@ -62,9 +81,10 @@ export function LeadStatusBadge({ status }: { status: LeadStatus }) {
         </Badge>
       );
     case 'REPLIED':
+    case 'RESPONDED':
       return (
         <Badge variant="outline" className="gap-1 border-teal-500/30 text-teal-600 dark:text-teal-400 bg-teal-500/5">
-          <MessageSquare className="w-3 h-3" /> Replied
+          <MessageSquare className="w-3 h-3" /> Responded
         </Badge>
       );
     case 'INTERESTED':
@@ -92,9 +112,10 @@ export function LeadStatusBadge({ status }: { status: LeadStatus }) {
         </Badge>
       );
     case 'CUSTOMER':
+    case 'CONVERTED':
       return (
         <Badge variant="outline" className="gap-1 border-emerald-600 bg-emerald-600 text-white font-bold">
-          <Award className="w-3 h-3" /> Customer
+          <Award className="w-3 h-3" /> Converted
         </Badge>
       );
     case 'LOST':

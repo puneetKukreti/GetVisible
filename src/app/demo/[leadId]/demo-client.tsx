@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import { WebsiteDemoData, LeadData, WebsiteTheme } from '@/types';
+import { WebsiteDemoData, LeadData, WebsiteTheme, WebsiteLayout, WebsiteTemplate } from '@/types';
 import { WatermarkBanner } from '@/components/demo-renderer/watermark-banner';
 import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
 import { DemoEditorModal } from '@/components/demos/demo-editor-modal';
+import { CA_LAYOUTS } from '@/lib/demos/personalization';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
 
@@ -29,6 +30,9 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
       style: 'corporate',
       borderRadius: 'md',
     }
+  );
+  const [activeLayout, setActiveLayout] = useState<WebsiteLayout>(
+    initialDemos[0]?.design?.layout || 'MODERN_FINTECH'
   );
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -56,6 +60,9 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
       setDemos((prev) => [data.demo, ...prev]);
       setActiveVersion(data.demo.version);
       setActiveTheme(data.demo.theme);
+      if (data.demo.design?.layout) {
+        setActiveLayout(data.demo.design.layout);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error generating demo');
     } finally {
@@ -147,6 +154,8 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
         leadId={initialLead.id}
         businessName={initialLead.businessName}
         currentTheme={activeTheme}
+        layout={activeLayout}
+        onLayoutChange={(newLayout) => setActiveLayout(newLayout)}
         onThemeChange={(newTheme) => setActiveTheme(newTheme)}
         onOpenEditor={() => setIsEditorOpen(true)}
         version={activeVersion}
@@ -154,13 +163,28 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
         onSelectVersion={(v) => {
           setActiveVersion(v);
           const sel = demos.find((d) => d.version === v);
-          if (sel) setActiveTheme(sel.theme);
+          if (sel) {
+            setActiveTheme(sel.theme);
+            if (sel.design?.layout) {
+              setActiveLayout(sel.design.layout);
+            }
+          }
         }}
       />
 
       {/* Rendered Public Site Demonstration */}
       <div className="flex-1">
-        <DemoRenderer content={activeDemo.content} theme={activeTheme} />
+        <DemoRenderer
+          content={activeDemo.content}
+          theme={activeTheme}
+          design={{
+            ...activeDemo.design,
+            layout: activeLayout,
+            template: (activeLayout as WebsiteTemplate),
+            theme: activeTheme,
+            sectionOrder: CA_LAYOUTS[activeLayout]?.sectionOrder || activeDemo.design?.sectionOrder || [],
+          }}
+        />
       </div>
 
       {/* Human Review & Edit Modal */}

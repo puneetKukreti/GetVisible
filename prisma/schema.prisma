@@ -17,10 +17,15 @@ enum LeadStatus {
   RESEARCHING
   QUALIFIED
   DEMO_GENERATED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
   OUTREACH_PENDING
   CONTACTED
+  RESPONDED
   REPLIED
   INTERESTED
+  CONVERTED
   NOT_INTERESTED
   DO_NOT_CONTACT
   PROPOSAL
@@ -310,6 +315,14 @@ model WebsiteDemo {
   templateId       String       @default("CA_ACCOUNTING_PROFESSIONAL")
   version          Int          @default(1)
   generationStatus String       @default("COMPLETED")
+  approvalStatus   String?      @default("PENDING_REVIEW")
+  rejectionReason  String?
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  publicToken      String?      @unique
+  viewCount        Int          @default(0)
+  firstViewedAt    DateTime?
+  lastViewedAt     DateTime?
   content          Json
   theme            Json
   error            String?
@@ -322,6 +335,7 @@ model WebsiteDemo {
   @@index([leadId])
   @@index([organizationId])
   @@index([createdAt])
+  @@index([publicToken])
   @@map("website_demos")
 }
 

@@ -1,10 +1,12 @@
 'use client';
 
 import React from 'react';
-import { WebsiteContent, WebsiteTheme } from '@/types';
-import { HeroSection } from './hero-section';
+import { WebsiteContent, WebsiteTheme, WebsiteDesign, WebsiteSectionType, WebsiteLayout, WebsiteTemplate } from '@/types';
+import { TemplateHero } from './template-heroes';
+import { TemplateServices } from './template-services';
+import { TemplateHeader } from './template-headers';
+import { TemplateCta } from './template-ctas';
 import { AboutSection } from './about-section';
-import { ServicesSection } from './services-section';
 import { WhyChooseUsSection } from './why-choose-us-section';
 import { IndustriesSection } from './industries-section';
 import { TestimonialsSection } from './testimonials-section';
@@ -12,15 +14,79 @@ import { FaqSection } from './faq-section';
 import { ContactSection } from './contact-section';
 import { LocationSection } from './location-section';
 import { FooterSection } from './footer-section';
-import { Shield } from 'lucide-react';
+import { ProcessSection } from './process-section';
+import { TrustSection } from './trust-section';
+import { ExpertiseSection } from './expertise-section';
 
 interface DemoRendererProps {
   content: WebsiteContent;
   theme?: WebsiteTheme;
+  design?: WebsiteDesign;
 }
 
-export function DemoRenderer({ content, theme }: DemoRendererProps) {
-  const activeTheme: WebsiteTheme = theme || content.theme;
+const DEFAULT_SECTION_ORDER: WebsiteSectionType[] = [
+  'HERO',
+  'SERVICES',
+  'ABOUT',
+  'CONTACT',
+  'LOCATION',
+];
+
+const TEMPLATE_MAP: Record<string, WebsiteTemplate> = {
+  EDITORIAL_FINANCE: 'EDITORIAL_FINANCE',
+  MODERN_FINTECH: 'MODERN_FINTECH',
+  LUXURY_PROFESSIONAL: 'LUXURY_PROFESSIONAL',
+  SWISS_MINIMAL: 'SWISS_MINIMAL',
+  MODERN_INDIAN: 'MODERN_INDIAN',
+  MODERN_CORPORATE: 'MODERN_FINTECH',
+  PREMIUM_PROFESSIONAL: 'LUXURY_PROFESSIONAL',
+  TRADITIONAL_CA: 'SWISS_MINIMAL',
+};
+
+export function DemoRenderer({ content, theme, design }: DemoRendererProps) {
+  const activeDesign: WebsiteDesign | undefined = design || content.design;
+  const activeTheme: WebsiteTheme = theme || activeDesign?.theme || content.theme;
+  const layout: WebsiteLayout = activeDesign?.layout || 'MODERN_FINTECH';
+  const activeTemplate: WebsiteTemplate =
+    activeDesign?.template ||
+    TEMPLATE_MAP[layout] ||
+    'MODERN_FINTECH';
+  const sectionOrder: WebsiteSectionType[] = activeDesign?.sectionOrder || DEFAULT_SECTION_ORDER;
+
+  const renderSection = (sectionType: WebsiteSectionType) => {
+    switch (sectionType) {
+      case 'HERO':
+        return <TemplateHero key="hero" hero={content.hero} brand={brandData} theme={activeTheme} template={activeTemplate} />;
+      case 'TRUST':
+        return <TrustSection key="trust" trust={content.trust} brand={brandData} theme={activeTheme} layout={layout} />;
+      case 'SERVICES':
+        return <TemplateServices key="services" services={content.services} theme={activeTheme} template={activeTemplate} />;
+      case 'ABOUT':
+        return <AboutSection key="about" about={content.about} theme={activeTheme} template={activeTemplate} />;
+      case 'EXPERTISE':
+        return <ExpertiseSection key="expertise" expertise={content.expertise} theme={activeTheme} layout={layout} />;
+      case 'PROCESS':
+        return <ProcessSection key="process" process={content.process} theme={activeTheme} layout={layout} />;
+      case 'WHY_CHOOSE_US':
+        return <WhyChooseUsSection key="why-choose-us" whyChooseUs={content.whyChooseUs} theme={activeTheme} />;
+      case 'INDUSTRIES':
+        return <IndustriesSection key="industries" industries={content.industries} theme={activeTheme} />;
+      case 'TESTIMONIALS':
+        return <TestimonialsSection key="testimonials" testimonials={content.testimonials} theme={activeTheme} />;
+      case 'FAQ':
+        return <FaqSection key="faq" faq={content.faq} theme={activeTheme} />;
+      case 'CTA':
+        return <TemplateCta key="cta" ctaBanner={content.ctaBanner} brand={brandData} theme={activeTheme} template={activeTemplate} />;
+      case 'CONTACT':
+        return <ContactSection key="contact" contact={content.contact} theme={activeTheme} />;
+      case 'LOCATION':
+        return <LocationSection key="location" location={content.location} brand={brandData} theme={activeTheme} />;
+      default:
+        return null;
+    }
+  };
+
+  const brandData = content.brand;
 
   return (
     <div
@@ -35,52 +101,17 @@ export function DemoRenderer({ content, theme }: DemoRendererProps) {
         } as React.CSSProperties
       }
     >
-      {/* Public Site Navigation Header */}
-      <nav className="sticky top-[41px] z-40 w-full border-b border-slate-200/80 dark:border-slate-800/80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-6">
-          <a href="#hero" className="flex items-center gap-2 font-bold text-base tracking-tight text-slate-900 dark:text-white">
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white font-black text-sm"
-              style={{ backgroundColor: activeTheme.primaryColor }}
-            >
-              <Shield className="h-4 w-4" />
-            </div>
-            <span>{content.brand.businessName}</span>
-          </a>
+      {/* Template-Specific Navigation Header */}
+      <TemplateHeader
+        brand={content.brand}
+        navigation={content.navigation}
+        theme={activeTheme}
+        template={activeTemplate}
+      />
 
-          <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-600 dark:text-slate-300">
-            {content.navigation.items.map((item, idx) => (
-              <a
-                key={idx}
-                href={item.href}
-                className="hover:text-slate-900 dark:hover:text-white transition"
-              >
-                {item.label}
-              </a>
-            ))}
-          </div>
-
-          <a
-            href={content.navigation.ctaHref}
-            className="rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-xs hover:opacity-95 transition"
-            style={{ backgroundColor: activeTheme.primaryColor }}
-          >
-            {content.navigation.ctaText}
-          </a>
-        </div>
-      </nav>
-
-      {/* Main Sections */}
+      {/* Main Sections Ordered Dynamically by Template Configuration */}
       <main>
-        <HeroSection hero={content.hero} brand={content.brand} theme={activeTheme} />
-        <AboutSection about={content.about} theme={activeTheme} />
-        <ServicesSection services={content.services} theme={activeTheme} />
-        <WhyChooseUsSection whyChooseUs={content.whyChooseUs} theme={activeTheme} />
-        <IndustriesSection industries={content.industries} theme={activeTheme} />
-        <TestimonialsSection testimonials={content.testimonials} theme={activeTheme} />
-        <FaqSection faq={content.faq} theme={activeTheme} />
-        <ContactSection contact={content.contact} theme={activeTheme} />
-        <LocationSection location={content.location} brand={content.brand} theme={activeTheme} />
+        {sectionOrder.map((sectionType) => renderSection(sectionType))}
       </main>
 
       {/* Footer */}

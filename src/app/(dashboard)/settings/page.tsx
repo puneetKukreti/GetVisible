@@ -16,10 +16,15 @@ import {
 } from 'lucide-react';
 import { formatDateTime } from '@/lib/utils';
 
+import { getResolvedOrganizationId } from '@/lib/auth';
+import { getDefaultOrganizationId, isPilotMode, WORKSPACE_CONFIGS } from '@/lib/workspace';
+
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
-  const orgId = DEMO_ORGANIZATION_ID;
+  const orgId = (await getResolvedOrganizationId()) || getDefaultOrganizationId();
+  const pilotActive = isPilotMode();
+  const config = WORKSPACE_CONFIGS[pilotActive ? 'pilot' : 'demo'];
   const providerStatuses = getAllProviderStatuses();
 
   let auditLogs: import('@/types').AuditLogData[] = [];
@@ -35,7 +40,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
           Organization & System Settings
-          <DemoBadge size="sm" />
+          <DemoBadge size="sm" variant={pilotActive ? 'pilot' : 'demo'} />
         </h1>
         <p className="text-xs text-muted-foreground mt-0.5">
           Manage agency tenancy, compliance suppression lists, and provider integration statuses.
@@ -56,16 +61,18 @@ export default async function SettingsPage() {
         <CardContent className="space-y-3 text-xs">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3 rounded-md bg-muted/30 border border-border">
-              <span className="text-muted-foreground text-[11px] block">Agency Name</span>
-              <span className="font-semibold text-foreground">Gurgaon CA Agency HQ</span>
+              <span className="text-muted-foreground text-[11px] block">Workspace Name</span>
+              <span className="font-semibold text-foreground">{config.name}</span>
             </div>
             <div className="p-3 rounded-md bg-muted/30 border border-border">
               <span className="text-muted-foreground text-[11px] block">Tenant Organization ID</span>
-              <span className="font-mono text-foreground">{DEMO_ORGANIZATION_ID}</span>
+              <span className="font-mono text-foreground">{orgId}</span>
             </div>
             <div className="p-3 rounded-md bg-muted/30 border border-border">
-              <span className="text-muted-foreground text-[11px] block">Active Role</span>
-              <span className="font-semibold text-emerald-600">ADMIN</span>
+              <span className="text-muted-foreground text-[11px] block">Active Environment</span>
+              <span className={`font-semibold ${pilotActive ? 'text-emerald-600' : 'text-amber-600'}`}>
+                {pilotActive ? 'REAL SALES PILOT' : 'DEMO SANDBOX'}
+              </span>
             </div>
           </div>
         </CardContent>

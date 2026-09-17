@@ -9,6 +9,8 @@ export interface CreateAuditLogParams {
     | 'CONTACT_UPDATED'
     | 'AI_ANALYSIS_REQUESTED'
     | 'DEMO_GENERATED'
+    | 'DEMO_APPROVED'
+    | 'DEMO_REJECTED'
     | 'OUTREACH_APPROVED'
     | 'OUTREACH_REJECTED'
     | 'CONSENT_UPDATED'
