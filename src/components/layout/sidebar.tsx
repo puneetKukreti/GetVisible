@@ -18,6 +18,7 @@ import {
   Settings,
   ShieldCheck,
   Zap,
+  Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,7 +33,8 @@ const NAV_ITEMS: NavItem[] = [
   { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { title: 'Leads', href: '/leads', icon: Users },
   { title: 'Discovery', href: '/discovery', icon: Search },
-  { title: 'Demos', href: '/demos', icon: FileCode },
+  { title: 'Demos Hub', href: '/demos', icon: FileCode },
+  { title: 'CA Templates (7)', href: '/demo-preview/templates', icon: Award },
   { title: 'Settings', href: '/settings', icon: Settings },
 ];
 

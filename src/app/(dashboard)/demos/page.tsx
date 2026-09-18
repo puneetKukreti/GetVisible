@@ -17,7 +17,9 @@ import {
   Search,
   Filter,
   FileCode,
+  Award,
 } from 'lucide-react';
+import { INDIAN_CA_ARCHETYPES } from '@/lib/demos/ca-archetypes';
 
 export default function DemosPage() {
   const [demos, setDemos] = useState<WebsiteDemoData[]>([]);
@@ -124,14 +126,86 @@ export default function DemosPage() {
         <Card className="border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase">
-              Active Template
+              CA Practice Archetypes
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-base font-bold text-foreground">CA & Corporate Advisory</div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">4 Themes • Extensible Architecture</p>
+            <div className="text-2xl font-bold text-foreground">7 Templates</div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">8 Themes • Statutory Grounded</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* 7 Authentic Indian CA Practice Archetypes Showcase */}
+      <div className="space-y-4 pt-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+          <div>
+            <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+              <Award className="w-4 h-4 text-amber-500" />
+              <span>7 Authentic Indian CA Practice Templates</span>
+              <Badge className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[10px] font-mono">
+                ICAI COMPLIANT
+              </Badge>
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Specialized website architectures tailored to distinct Indian CA domains, replacing generic boilerplate with authentic statutory compliance.
+            </p>
+          </div>
+          <Link href="/demo-preview/templates">
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10 shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Interactive Template Showcase</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+            </Button>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {INDIAN_CA_ARCHETYPES.map((arch, idx) => (
+            <Card key={arch.id} className="border-border hover:border-amber-500/40 transition flex flex-col justify-between p-4 bg-card/60 shadow-xs hover:shadow-md">
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="text-[10px] font-mono bg-amber-500/5 text-amber-600 dark:text-amber-400 border-amber-500/20">
+                    #{idx + 1} {arch.shortName}
+                  </Badge>
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    {arch.defaultLayout}
+                  </span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground line-clamp-1">{arch.name}</h3>
+                  <p className="text-[11px] text-muted-foreground line-clamp-2 mt-1 leading-relaxed">
+                    {arch.description}
+                  </p>
+                </div>
+                <div className="space-y-1 pt-1">
+                  <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                    Key Statutory Regulations:
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {arch.keyRegulations.slice(0, 3).map((reg, rIdx) => (
+                      <span key={rIdx} className="text-[10px] font-mono bg-muted text-foreground/80 px-1.5 py-0.5 rounded border border-border/60">
+                        {reg}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 mt-3 border-t border-border/50 flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">
+                  {arch.targetAudience}
+                </span>
+                <Link href={`/demo-preview/templates?archetype=${arch.id}`}>
+                  <Button size="sm" variant="ghost" className="h-7 px-2.5 text-xs text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 gap-1 font-semibold">
+                    <span>Preview Site</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Button>
+                </Link>
+              </div>
+            </Card>
+          ))}
+        </div>
       </div>
 
       {/* Search Bar */}

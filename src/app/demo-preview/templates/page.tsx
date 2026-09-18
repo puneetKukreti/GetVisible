@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { WebsiteTheme, WebsiteTemplate, WebsiteDesign, WebsiteLayout } from '@/types';
 import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
 import { CA_LAYOUTS, CA_THEMES } from '@/lib/demos/personalization';
@@ -54,12 +55,31 @@ const VISUAL_LAYOUT_META: Record<string, LayoutMeta> = {
   },
 };
 
-export default function TemplatesPreviewPage() {
+function TemplatesPreviewContent() {
+  const searchParams = useSearchParams();
+  const archetypeParam = searchParams.get('archetype');
+
   const [viewMode, setViewMode] = useState<'archetypes' | 'layouts'>('archetypes');
-  const [selectedArchetypeId, setSelectedArchetypeId] = useState<string>('CORPORATE_TRANSFER_PRICING');
+  const [selectedArchetypeId, setSelectedArchetypeId] = useState<string>(
+    archetypeParam && INDIAN_CA_ARCHETYPES.some((a) => a.id === archetypeParam)
+      ? archetypeParam
+      : 'CORPORATE_TRANSFER_PRICING'
+  );
   const [selectedLayoutKey, setSelectedLayoutKey] = useState<string>('EDITORIAL_FINANCE');
   const [selectedThemeId, setSelectedThemeId] = useState<string>('executive-navy');
   const [isMobileView, setIsMobileView] = useState<boolean>(false);
+
+  // Sync if URL search params change
+  useEffect(() => {
+    if (archetypeParam && INDIAN_CA_ARCHETYPES.some((a) => a.id === archetypeParam)) {
+      setSelectedArchetypeId(archetypeParam);
+      setViewMode('archetypes');
+      const found = INDIAN_CA_ARCHETYPES.find((a) => a.id === archetypeParam);
+      if (found) {
+        setSelectedThemeId(found.defaultThemeId);
+      }
+    }
+  }, [archetypeParam]);
 
   const activeArchetype: CAArchetypeMeta =
     INDIAN_CA_ARCHETYPES.find((a) => a.id === selectedArchetypeId) || INDIAN_CA_ARCHETYPES[0];
@@ -89,7 +109,10 @@ export default function TemplatesPreviewPage() {
 
   const content = templateBuilder.buildContent(
     {
-      businessName: viewMode === 'archetypes' ? `Singhal & Associates, Chartered Accountants` : 'Sharma & Associates, Chartered Accountants',
+      businessName:
+        viewMode === 'archetypes'
+          ? `Singhal & Associates, Chartered Accountants`
+          : 'Sharma & Associates, Chartered Accountants',
       profession: 'Chartered Accountant',
       city: 'Gurugram',
       address: 'DLF Cyber City, Tower B, Sector 24, Gurugram, Haryana 122002',
@@ -108,10 +131,10 @@ export default function TemplatesPreviewPage() {
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
-              href="/leads"
+              href="/demos"
               className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 transition"
             >
-              ← Back to CRM
+              ← Back to Demos Hub
             </Link>
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -308,5 +331,19 @@ export default function TemplatesPreviewPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function TemplatesPreviewPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 text-xs">
+          Loading Templates Showcase...
+        </div>
+      }
+    >
+      <TemplatesPreviewContent />
+    </Suspense>
   );
 }

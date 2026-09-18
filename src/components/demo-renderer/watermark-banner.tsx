@@ -28,14 +28,30 @@ const LAYOUT_NAMES: Record<string, string> = {
   MODERN_CORPORATE: 'Modern Corporate',
   PREMIUM_PROFESSIONAL: 'Premium Professional',
   TRADITIONAL_CA: 'Traditional CA',
+  CORPORATE_TRANSFER_PRICING: 'Corporate Tax & Transfer Pricing',
+  MANUFACTURING_GST_LITIGATION: 'Manufacturing & GST Litigation',
+  VIRTUAL_CFO_STARTUP: 'Virtual CFO & Startup Growth',
+  INSTITUTIONAL_AUDIT_ASSURANCE: 'Institutional Statutory Audit',
+  NRI_CROSS_BORDER_TAX: 'NRI Wealth & Cross-Border Tax',
+  DIRECT_TAX_LITIGATION: 'Direct Tax Litigator & Scrutiny',
+  FAMILY_OFFICE_ESTATE: 'Family Office & Estate Succession',
 };
 
 const TEMPLATE_OPTIONS: { id: WebsiteLayout; label: string }[] = [
-  { id: 'EDITORIAL_FINANCE', label: 'Editorial Finance' },
-  { id: 'MODERN_FINTECH', label: 'Modern Fintech' },
-  { id: 'LUXURY_PROFESSIONAL', label: 'Luxury Professional' },
-  { id: 'SWISS_MINIMAL', label: 'Swiss Minimal' },
-  { id: 'MODERN_INDIAN', label: 'Modern Indian' },
+  // 7 Authentic Indian CA Practice Archetypes
+  { id: 'CORPORATE_TRANSFER_PRICING', label: '1. Corporate Transfer Pricing' },
+  { id: 'MANUFACTURING_GST_LITIGATION', label: '2. Manufacturing GST Litigation' },
+  { id: 'VIRTUAL_CFO_STARTUP', label: '3. Virtual CFO & Startups' },
+  { id: 'INSTITUTIONAL_AUDIT_ASSURANCE', label: '4. Institutional Statutory Audit' },
+  { id: 'NRI_CROSS_BORDER_TAX', label: '5. NRI Cross-Border Tax' },
+  { id: 'DIRECT_TAX_LITIGATION', label: '6. Direct Tax Scrutiny' },
+  { id: 'FAMILY_OFFICE_ESTATE', label: '7. Family Office & Estate' },
+  // Presentation Styles
+  { id: 'EDITORIAL_FINANCE', label: 'Style: Editorial Finance' },
+  { id: 'MODERN_FINTECH', label: 'Style: Modern Fintech' },
+  { id: 'LUXURY_PROFESSIONAL', label: 'Style: Luxury Professional' },
+  { id: 'SWISS_MINIMAL', label: 'Style: Swiss Minimal' },
+  { id: 'MODERN_INDIAN', label: 'Style: Modern Indian' },
 ];
 
 export function WatermarkBanner({

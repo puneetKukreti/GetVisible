@@ -6,6 +6,8 @@ import { WatermarkBanner } from '@/components/demo-renderer/watermark-banner';
 import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
 import { DemoEditorModal } from '@/components/demos/demo-editor-modal';
 import { CA_LAYOUTS } from '@/lib/demos/personalization';
+import { INDIAN_CA_ARCHETYPES } from '@/lib/demos/ca-archetypes';
+import { getTemplate } from '@/lib/demos/templates';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
 
@@ -32,8 +34,9 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
     }
   );
   const [activeLayout, setActiveLayout] = useState<WebsiteLayout>(
-    initialDemos[0]?.design?.layout || 'MODERN_FINTECH'
+    initialDemos[0]?.design?.layout || 'CORPORATE_TRANSFER_PRICING'
   );
+  const [selectedArchetype, setSelectedArchetype] = useState<string>('CORPORATE_TRANSFER_PRICING');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +53,8 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
         body: JSON.stringify({
           leadId: initialLead.id,
           themeId: activeTheme.id,
+          templateId: selectedArchetype,
+          layout: selectedArchetype,
         }),
       });
       const data = await res.json();
@@ -69,6 +74,37 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
       setGenerating(false);
     }
   };
+
+  // Live content adaptation when switching between the 7 CA archetypes in the top banner
+  const renderedContent = React.useMemo(() => {
+    if (!activeDemo) return null;
+    if (INDIAN_CA_ARCHETYPES.some((a) => a.id === activeLayout)) {
+      const archetypeBuilder = getTemplate(activeLayout);
+      return archetypeBuilder.buildContent(
+        {
+          businessName: initialLead.businessName,
+          profession: initialLead.profession,
+          city: initialLead.city,
+          address: initialLead.address,
+          publicEmail: initialLead.publicEmail,
+          publicPhone: initialLead.publicPhone,
+          source: initialLead.source,
+        },
+        activeTheme,
+        {
+          layout: activeLayout,
+          template: (activeLayout as WebsiteTemplate),
+          theme: activeTheme,
+          sectionOrder: CA_LAYOUTS[activeLayout]?.sectionOrder || CA_LAYOUTS.MODERN_INDIAN.sectionOrder,
+          heroLayout: CA_LAYOUTS[activeLayout]?.heroLayout,
+          servicesLayout: CA_LAYOUTS[activeLayout]?.servicesLayout,
+          features: CA_LAYOUTS[activeLayout]?.features,
+          contentDensity: CA_LAYOUTS[activeLayout]?.contentDensity,
+        }
+      );
+    }
+    return activeDemo.content;
+  }, [activeLayout, activeTheme, activeDemo, initialLead]);
 
   const handleDemoSaved = (updatedDemo: WebsiteDemoData) => {
     setDemos((prev) =>
@@ -103,6 +139,27 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
 
           {initialLead.websiteStatus === 'NO_WEBSITE' ? (
             <div className="space-y-3">
+              <div className="text-left space-y-1.5 bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                  <span>Select CA Practice Archetype:</span>
+                  <span className="text-[10px] text-amber-400 font-mono">7 Authentic Models</span>
+                </label>
+                <select
+                  value={selectedArchetype}
+                  onChange={(e) => setSelectedArchetype(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-amber-400"
+                >
+                  {INDIAN_CA_ARCHETYPES.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.shortName})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-slate-400 leading-snug">
+                  {INDIAN_CA_ARCHETYPES.find((a) => a.id === selectedArchetype)?.description}
+                </p>
+              </div>
+
               <button
                 onClick={handleGenerate}
                 disabled={generating}
@@ -175,7 +232,7 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
       {/* Rendered Public Site Demonstration */}
       <div className="flex-1">
         <DemoRenderer
-          content={activeDemo.content}
+          content={renderedContent || activeDemo.content}
           theme={activeTheme}
           design={{
             ...activeDemo.design,
