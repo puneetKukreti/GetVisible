@@ -86,7 +86,34 @@ export function LeadTable() {
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || `HTTP ${res.status}`);
       }
-      const json: PaginatedLeads = await res.json();
+      let json: PaginatedLeads = await res.json();
+
+      // If in pilot workspace and server returned 0 leads (e.g. serverless cold start), auto-heal from backup
+      if (
+        json.total === 0 &&
+        typeof window !== 'undefined' &&
+        document.cookie.includes('getvisible_workspace_mode=pilot')
+      ) {
+        const backupCsv = localStorage.getItem('getvisible_pilot_csv_backup');
+        if (backupCsv && backupCsv.trim().length > 0) {
+          try {
+            const importRes = await fetch('/api/discovery/csv-import', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ csvContent: backupCsv }),
+            });
+            if (importRes.ok) {
+              const reloaded = await fetch(`/api/leads?${params.toString()}`);
+              if (reloaded.ok) {
+                json = await reloaded.json();
+              }
+            }
+          } catch {
+            // Non-blocking fallback
+          }
+        }
+      }
+
       setData(json);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));

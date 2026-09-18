@@ -130,7 +130,31 @@ export function LeadDetailClient({ leadId, initialLead }: LeadDetailClientProps)
       setIsNotFound(false);
       setLoadError(null);
       try {
-        const res = await fetch(`/api/leads/${encodeURIComponent(leadId)}`, { cache: 'no-store' });
+        let res = await fetch(`/api/leads/${encodeURIComponent(leadId)}`, { cache: 'no-store' });
+
+        // If 404 in pilot workspace, check if serverless cold-start wiped memory and auto-heal from backup
+        if (
+          res.status === 404 &&
+          typeof window !== 'undefined' &&
+          document.cookie.includes('getvisible_workspace_mode=pilot')
+        ) {
+          const backupCsv = localStorage.getItem('getvisible_pilot_csv_backup');
+          if (backupCsv && backupCsv.trim().length > 0) {
+            try {
+              const importRes = await fetch('/api/discovery/csv-import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ csvContent: backupCsv }),
+              });
+              if (importRes.ok) {
+                res = await fetch(`/api/leads/${encodeURIComponent(leadId)}`, { cache: 'no-store' });
+              }
+            } catch {
+              // Non-blocking
+            }
+          }
+        }
+
         if (res.status === 404) {
           if (isMounted) {
             setIsNotFound(true);

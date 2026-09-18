@@ -167,6 +167,15 @@ export function CsvImportModal({ isOpen, onClose, onImportComplete }: CsvImportM
         throw new Error(data.error || 'Failed to import CSV leads');
       }
 
+      // Persist backup in browser localStorage so serverless cold starts never lose user pilot leads
+      try {
+        if (typeof window !== 'undefined' && data.imported > 0) {
+          localStorage.setItem('getvisible_pilot_csv_backup', csvContent);
+        }
+      } catch {
+        // Safe ignore
+      }
+
       setResult(data);
       if (onImportComplete) {
         onImportComplete();
