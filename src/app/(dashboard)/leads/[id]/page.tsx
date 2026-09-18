@@ -17,16 +17,21 @@ export default async function LeadDetailPage({ params }: PageProps) {
   const leadId = rawId ? decodeURIComponent(rawId).trim() : '';
   const orgId = await getResolvedOrganizationId();
 
-  if (!orgId || !leadId) {
+  if (!leadId) {
     notFound();
   }
 
-  // Retrieve lead strictly scoped to active organization context
-  const lead = await LeadRepository.getLeadById(leadId, orgId);
-  if (!lead) {
-    notFound();
+  // Attempt server-side retrieval if available in current serverless execution context
+  let initialLead = null;
+  if (orgId) {
+    try {
+      initialLead = await LeadRepository.getLeadById(leadId, orgId);
+    } catch {
+      // In serverless environments, in-memory cache may miss in Page lambda;
+      // client component will gracefully retrieve the lead via /api/leads/[id].
+    }
   }
 
-  return <LeadDetailClient key={lead.id} initialLead={lead} />;
+  return <LeadDetailClient key={leadId} leadId={leadId} initialLead={initialLead} />;
 }
 

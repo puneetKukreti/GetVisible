@@ -5,16 +5,24 @@ import { LeadStatus } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
+interface RouteProps {
+  params: { id: string } | Promise<{ id: string }>;
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteProps
 ) {
   try {
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
     }
-    const lead = await LeadRepository.getLeadById(params.id, orgId);
+    const resolvedParams = await Promise.resolve(params);
+    const rawId = resolvedParams?.id;
+    const leadId = rawId ? decodeURIComponent(rawId).trim() : '';
+
+    const lead = await LeadRepository.getLeadById(leadId, orgId);
 
     if (!lead) {
       return NextResponse.json({ error: 'Lead not found in this organization' }, { status: 404 });
@@ -33,22 +41,24 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: RouteProps
 ) {
   try {
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
     }
+    const resolvedParams = await Promise.resolve(params);
+    const rawId = resolvedParams?.id;
+    const leadId = rawId ? decodeURIComponent(rawId).trim() : '';
     const body = await request.json();
-
 
     let updatedLead = null;
 
     if (body.note) {
       await LeadRepository.addNote(
         orgId,
-        params.id,
+        leadId,
         body.note,
         body.actor || 'Sales Rep'
       );
@@ -56,14 +66,14 @@ export async function PATCH(
 
     if (body.leadStatus) {
       updatedLead = await LeadRepository.updateLeadStatus(
-        params.id,
+        leadId,
         body.leadStatus as LeadStatus,
         orgId,
         body.actor || 'Agency User',
         body.reason
       );
     } else {
-      updatedLead = await LeadRepository.getLeadById(params.id, orgId);
+      updatedLead = await LeadRepository.getLeadById(leadId, orgId);
     }
 
     if (updatedLead) {

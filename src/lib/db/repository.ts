@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import {
   LeadData,
   LeadFilterParams,
@@ -31,6 +34,8 @@ export class DatabaseConnectionError extends Error {
   }
 }
 
+const DEMO_STORE_FILE = path.join(os.tmpdir(), 'getvisible_demo_store_v1.json');
+
 // In-memory demo store scoped strictly per organization when DEMO_MODE=true
 class DemoDataStore {
   private leads: Map<string, LeadData[]> = new Map();
@@ -39,9 +44,54 @@ class DemoDataStore {
   private suppressionRecords: Map<string, SuppressionRecordData[]> = new Map();
   private consentRecords: Map<string, ConsentRecordData[]> = new Map();
   private demos: Map<string, WebsiteDemoData[]> = new Map();
+  private lastLoadedMtime = 0;
 
   constructor() {
     this.initializeDemoOrg();
+    this.syncFromDisk();
+  }
+
+  syncFromDisk() {
+    if (process.env.NODE_ENV === 'test') return;
+    try {
+      if (fs.existsSync(DEMO_STORE_FILE)) {
+        const stat = fs.statSync(DEMO_STORE_FILE);
+        if (stat.mtimeMs > this.lastLoadedMtime) {
+          const raw = fs.readFileSync(DEMO_STORE_FILE, 'utf-8');
+          const data = JSON.parse(raw);
+          if (data && typeof data === 'object') {
+            if (Array.isArray(data.leads)) this.leads = new Map(data.leads);
+            if (Array.isArray(data.jobs)) this.jobs = new Map(data.jobs);
+            if (Array.isArray(data.auditLogs)) this.auditLogs = new Map(data.auditLogs);
+            if (Array.isArray(data.suppressionRecords)) this.suppressionRecords = new Map(data.suppressionRecords);
+            if (Array.isArray(data.consentRecords)) this.consentRecords = new Map(data.consentRecords);
+            if (Array.isArray(data.demos)) this.demos = new Map(data.demos);
+            this.lastLoadedMtime = stat.mtimeMs;
+          }
+        }
+      }
+    } catch {
+      // Ignore disk read error in restricted environments
+    }
+  }
+
+  saveToDisk() {
+    if (process.env.NODE_ENV === 'test') return;
+    try {
+      const data = {
+        leads: Array.from(this.leads.entries()),
+        jobs: Array.from(this.jobs.entries()),
+        auditLogs: Array.from(this.auditLogs.entries()),
+        suppressionRecords: Array.from(this.suppressionRecords.entries()),
+        consentRecords: Array.from(this.consentRecords.entries()),
+        demos: Array.from(this.demos.entries()),
+      };
+      fs.writeFileSync(DEMO_STORE_FILE, JSON.stringify(data), 'utf-8');
+      const stat = fs.statSync(DEMO_STORE_FILE);
+      this.lastLoadedMtime = stat.mtimeMs;
+    } catch {
+      // Ignore disk write error in restricted environments
+    }
   }
 
   private initializeDemoOrg() {
@@ -202,6 +252,7 @@ class DemoDataStore {
   }
 
   getOrgLeads(orgId: string): LeadData[] {
+    this.syncFromDisk();
     if (!this.leads.has(orgId)) {
       this.leads.set(orgId, []);
     }
@@ -209,6 +260,7 @@ class DemoDataStore {
   }
 
   getOrgJobs(orgId: string): JobData[] {
+    this.syncFromDisk();
     if (!this.jobs.has(orgId)) {
       this.jobs.set(orgId, []);
     }
@@ -216,6 +268,7 @@ class DemoDataStore {
   }
 
   getOrgAuditLogs(orgId: string): AuditLogData[] {
+    this.syncFromDisk();
     if (!this.auditLogs.has(orgId)) {
       this.auditLogs.set(orgId, []);
     }
@@ -223,6 +276,7 @@ class DemoDataStore {
   }
 
   getOrgSuppressions(orgId: string): SuppressionRecordData[] {
+    this.syncFromDisk();
     if (!this.suppressionRecords.has(orgId)) {
       this.suppressionRecords.set(orgId, []);
     }
@@ -230,6 +284,7 @@ class DemoDataStore {
   }
 
   getOrgConsents(orgId: string): ConsentRecordData[] {
+    this.syncFromDisk();
     if (!this.consentRecords.has(orgId)) {
       this.consentRecords.set(orgId, []);
     }
@@ -237,6 +292,7 @@ class DemoDataStore {
   }
 
   getOrgDemos(orgId: string): WebsiteDemoData[] {
+    this.syncFromDisk();
     if (!this.demos.has(orgId)) {
       this.demos.set(orgId, []);
     }
@@ -255,13 +311,16 @@ class DemoDataStore {
   }
 
   saveDemo(orgId: string, demo: WebsiteDemoData): WebsiteDemoData {
+    this.syncFromDisk();
     const list = this.getOrgDemos(orgId);
     const copy = JSON.parse(JSON.stringify(demo));
     list.unshift(copy);
+    this.saveToDisk();
     return copy;
   }
 
   updateDemo(orgId: string, id: string, updates: Partial<WebsiteDemoData>): WebsiteDemoData | null {
+    this.syncFromDisk();
     const list = this.getOrgDemos(orgId);
     const index = list.findIndex((d) => d.id === id);
     if (index === -1) return null;
@@ -270,10 +329,12 @@ class DemoDataStore {
       ...updates,
       updatedAt: new Date().toISOString(),
     };
+    this.saveToDisk();
     return JSON.parse(JSON.stringify(list[index]));
   }
 
   getDemoByPublicToken(token: string): WebsiteDemoData | null {
+    this.syncFromDisk();
     for (const demos of Array.from(this.demos.values())) {
       const found = demos.find((d: WebsiteDemoData) => d.publicToken === token);
       if (found) {
@@ -284,6 +345,7 @@ class DemoDataStore {
   }
 
   recordDemoView(orgId: string, demoId: string): WebsiteDemoData | null {
+    this.syncFromDisk();
     const list = this.getOrgDemos(orgId);
     const demo = list.find((d) => d.id === demoId);
     if (!demo) return null;
@@ -294,6 +356,7 @@ class DemoDataStore {
     }
     demo.lastViewedAt = now;
     demo.updatedAt = now;
+    this.saveToDisk();
     return JSON.parse(JSON.stringify(demo));
   }
 }
@@ -693,6 +756,7 @@ export class LeadRepository {
         details: { businessName: newLead.businessName, isDemoData: newLead.isDemoData },
       });
       demoStore.getOrgAuditLogs(organizationId).unshift(audit);
+      demoStore.saveToDisk();
 
       return newLead;
     }
@@ -812,6 +876,7 @@ export class LeadRepository {
         });
       }
 
+      demoStore.saveToDisk();
       return lead;
     }
 
@@ -912,6 +977,7 @@ export class LeadRepository {
         createdAt: new Date().toISOString(),
       });
 
+      demoStore.saveToDisk();
       return note;
     }
 
@@ -965,6 +1031,7 @@ export class LeadRepository {
         if (!lead.activities) lead.activities = [];
         lead.activities.unshift(newActivity);
       }
+      demoStore.saveToDisk();
       return newActivity;
     }
 

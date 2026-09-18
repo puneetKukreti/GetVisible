@@ -44,7 +44,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { formatDate, formatDateTime } from '@/lib/utils';
-import { calculateOperationalLeadScore } from '@/lib/analytics/service';
+import { calculateOperationalLeadScore } from '@/lib/analytics/scoring';
 import {
   canPrepareOutreach,
   getNextActionRecommendation,
@@ -53,7 +53,8 @@ import {
 import { getPublicDemoUrl } from '@/lib/demos/public';
 
 interface LeadDetailClientProps {
-  initialLead: LeadData;
+  leadId: string;
+  initialLead?: LeadData | null;
 }
 
 const REJECTION_REASONS = [
@@ -72,13 +73,16 @@ const NOTE_PRESETS = [
   'Not interested at this time',
 ];
 
-export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
+export function LeadDetailClient({ leadId, initialLead }: LeadDetailClientProps) {
   const router = useRouter();
-  const [lead, setLead] = useState<LeadData>(initialLead);
+  const [lead, setLead] = useState<LeadData | null>(initialLead ?? null);
+  const [loading, setLoading] = useState<boolean>(!initialLead);
+  const [isNotFound, setIsNotFound] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [generatingDemo, setGeneratingDemo] = useState(false);
   const [statusReason, setStatusReason] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState<LeadStatus | ''>(initialLead.leadStatus);
+  const [selectedStatus, setSelectedStatus] = useState<LeadStatus | ''>(initialLead?.leadStatus ?? '');
   const [showStatusModal, setShowStatusModal] = useState(false);
 
   // Outreach workspace state
@@ -111,15 +115,58 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
   const [newNoteText, setNewNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
 
-  // Sync if prop changes
+  // Synchronize or load lead details
   useEffect(() => {
-    setLead(initialLead);
-    setSelectedStatus(initialLead.leadStatus);
-  }, [initialLead]);
+    if (initialLead) {
+      setLead(initialLead);
+      setSelectedStatus(initialLead.leadStatus);
+      setLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    async function loadLead() {
+      setLoading(true);
+      setIsNotFound(false);
+      setLoadError(null);
+      try {
+        const res = await fetch(`/api/leads/${encodeURIComponent(leadId)}`, { cache: 'no-store' });
+        if (res.status === 404) {
+          if (isMounted) {
+            setIsNotFound(true);
+            setLoading(false);
+          }
+          return;
+        }
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || `HTTP ${res.status}`);
+        }
+        const data: LeadData = await res.json();
+        if (isMounted) {
+          setLead(data);
+          setSelectedStatus(data.leadStatus);
+          setLoading(false);
+        }
+      } catch (err: unknown) {
+        if (isMounted) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to retrieve lead data');
+          setLoading(false);
+        }
+      }
+    }
+
+    loadLead();
+    return () => {
+      isMounted = false;
+    };
+  }, [leadId, initialLead]);
 
   const refetchLead = useCallback(async () => {
+    const idToFetch = lead?.id || leadId;
+    if (!idToFetch) return;
     try {
-      const res = await fetch(`/api/leads/${lead.id}`, { cache: 'no-store' });
+      const res = await fetch(`/api/leads/${encodeURIComponent(idToFetch)}`, { cache: 'no-store' });
       if (res.ok) {
         const updated: LeadData = await res.json();
         setLead(updated);
@@ -128,9 +175,10 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
     } catch {
       // Ignore background refetch failure
     }
-  }, [lead.id]);
+  }, [lead?.id, leadId]);
 
   const handleStatusChange = async (newStatus: LeadStatus, customReason?: string) => {
+    if (!lead) return;
     setUpdating(true);
     try {
       const res = await fetch(`/api/leads/${lead.id}`, {
@@ -160,6 +208,7 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
   };
 
   const handleGenerateDemo = async () => {
+    if (!lead) return;
     setGeneratingDemo(true);
     try {
       const res = await fetch('/api/demos', {
@@ -181,6 +230,7 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
   };
 
   const handleApproveDemo = async (demoId: string) => {
+    if (!lead) return;
     setApprovingDemo(true);
     try {
       const res = await fetch(`/api/demos/${demoId}`, {
@@ -202,6 +252,7 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
   };
 
   const handleRejectDemo = async (demoId: string) => {
+    if (!lead) return;
     setRejectingDemo(true);
     try {
       const effectiveReason =
@@ -234,6 +285,7 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
   };
 
   const handleGenerateOutreach = async () => {
+    if (!lead) return;
     setGeneratingOutreach(true);
     try {
       const activeDemo = lead.websiteDemos?.[0];
@@ -270,6 +322,7 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
   };
 
   const handleMarkContacted = async () => {
+    if (!lead) return;
     setMarkingContacted(true);
     try {
       const activeDemo = lead.websiteDemos?.[0];
@@ -299,6 +352,7 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
   };
 
   const handleAddNote = async (text?: string) => {
+    if (!lead) return;
     const note = (text || newNoteText).trim();
     if (!note) return;
 
@@ -321,6 +375,68 @@ export function LeadDetailClient({ initialLead }: LeadDetailClientProps) {
       setSavingNote(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="space-y-6 max-w-6xl mx-auto pb-16 font-sans">
+        <div className="flex items-center gap-3 border-b border-border pb-4">
+          <Link href="/leads">
+            <Button variant="outline" size="sm" className="h-8 px-2.5">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </Link>
+          <div className="h-5 w-44 bg-muted animate-pulse rounded" />
+        </div>
+        <Card className="p-12 text-center border-border">
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold text-foreground">Loading Lead Workspace...</h3>
+              <p className="text-xs text-muted-foreground">
+                Connecting to sales pipeline and retrieving prospect profile...
+              </p>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isNotFound || !lead) {
+    return (
+      <div className="space-y-6 max-w-6xl mx-auto pb-16 font-sans">
+        <div className="flex items-center gap-3 border-b border-border pb-4">
+          <Link href="/leads">
+            <Button variant="outline" size="sm" className="h-8 px-2.5">
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </Link>
+          <span className="text-xs font-medium text-muted-foreground">Back to Leads Pipeline</span>
+        </div>
+        <Card className="p-12 text-center border-border">
+          <div className="flex flex-col items-center justify-center space-y-4 max-w-md mx-auto">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-foreground">Lead Not Found in Active Workspace</h3>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Could not find prospect <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-xs">{leadId}</code> in your current organization scope. It may belong to another workspace or has not been synced yet.
+              </p>
+              {loadError && (
+                <p className="text-xs text-rose-500 font-mono mt-1">{loadError}</p>
+              )}
+            </div>
+            <Link href="/leads">
+              <Button className="mt-2 text-xs">
+                Return to Leads Pipeline
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   const activeDemo: WebsiteDemoData | null =
     lead.websiteDemos && lead.websiteDemos.length > 0 ? lead.websiteDemos[0] : null;
