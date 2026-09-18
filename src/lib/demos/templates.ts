@@ -20,49 +20,8 @@ export interface ProfessionTemplate {
   buildContent(facts: LeadFacts, theme?: WebsiteTheme, design?: WebsiteDesign): WebsiteContent;
 }
 
-// Predefined professional themes
-export const THEMES: Record<string, WebsiteTheme> = {
-  executiveNavy: {
-    id: 'executive-navy',
-    name: 'Executive Navy',
-    primaryColor: '#1e3a8a',
-    secondaryColor: '#1e293b',
-    accentColor: '#2563eb',
-    fontFamily: 'sans',
-    style: 'corporate',
-    borderRadius: 'md',
-  },
-  corporateSlate: {
-    id: 'corporate-slate',
-    name: 'Corporate Slate',
-    primaryColor: '#0f172a',
-    secondaryColor: '#334155',
-    accentColor: '#0284c7',
-    fontFamily: 'sans',
-    style: 'corporate',
-    borderRadius: 'md',
-  },
-  emeraldPrestige: {
-    id: 'emerald-prestige',
-    name: 'Emerald Prestige',
-    primaryColor: '#064e3b',
-    secondaryColor: '#134e4a',
-    accentColor: '#059669',
-    fontFamily: 'sans',
-    style: 'corporate',
-    borderRadius: 'sm',
-  },
-  classicBurgundy: {
-    id: 'classic-burgundy',
-    name: 'Classic Burgundy',
-    primaryColor: '#4c0519',
-    secondaryColor: '#27272a',
-    accentColor: '#e11d48',
-    fontFamily: 'serif',
-    style: 'corporate',
-    borderRadius: 'sm',
-  },
-};
+export { THEMES } from './themes';
+import { THEMES } from './themes';
 
 export const CA_ACCOUNTING_TEMPLATE: ProfessionTemplate = {
   id: 'CA_ACCOUNTING_PROFESSIONAL',
@@ -395,14 +354,59 @@ export const CA_ACCOUNTING_TEMPLATE: ProfessionTemplate = {
   },
 };
 
+import {
+  CORPORATE_TRANSFER_PRICING_TEMPLATE,
+  MANUFACTURING_GST_TEMPLATE,
+  VIRTUAL_CFO_STARTUP_TEMPLATE,
+  INSTITUTIONAL_AUDIT_TEMPLATE,
+  NRI_CROSS_BORDER_TEMPLATE,
+  DIRECT_TAX_LITIGATION_TEMPLATE,
+  FAMILY_OFFICE_ESTATE_TEMPLATE,
+  INDIAN_CA_ARCHETYPES,
+  inferCAArchetype,
+  type CAArchetypeMeta,
+} from './ca-archetypes';
+
+export {
+  CORPORATE_TRANSFER_PRICING_TEMPLATE,
+  MANUFACTURING_GST_TEMPLATE,
+  VIRTUAL_CFO_STARTUP_TEMPLATE,
+  INSTITUTIONAL_AUDIT_TEMPLATE,
+  NRI_CROSS_BORDER_TEMPLATE,
+  DIRECT_TAX_LITIGATION_TEMPLATE,
+  FAMILY_OFFICE_ESTATE_TEMPLATE,
+  INDIAN_CA_ARCHETYPES,
+  inferCAArchetype,
+  type CAArchetypeMeta,
+};
+
 // Extensible template registry
 const TEMPLATE_REGISTRY: Record<string, ProfessionTemplate> = {
   [CA_ACCOUNTING_TEMPLATE.id]: CA_ACCOUNTING_TEMPLATE,
+  [CORPORATE_TRANSFER_PRICING_TEMPLATE.id]: CORPORATE_TRANSFER_PRICING_TEMPLATE,
+  [MANUFACTURING_GST_TEMPLATE.id]: MANUFACTURING_GST_TEMPLATE,
+  [VIRTUAL_CFO_STARTUP_TEMPLATE.id]: VIRTUAL_CFO_STARTUP_TEMPLATE,
+  [INSTITUTIONAL_AUDIT_TEMPLATE.id]: INSTITUTIONAL_AUDIT_TEMPLATE,
+  [NRI_CROSS_BORDER_TEMPLATE.id]: NRI_CROSS_BORDER_TEMPLATE,
+  [DIRECT_TAX_LITIGATION_TEMPLATE.id]: DIRECT_TAX_LITIGATION_TEMPLATE,
+  [FAMILY_OFFICE_ESTATE_TEMPLATE.id]: FAMILY_OFFICE_ESTATE_TEMPLATE,
 };
 
-export function getTemplate(templateId?: string, profession?: string): ProfessionTemplate {
+export function getTemplate(
+  templateId?: string,
+  profession?: string,
+  facts?: LeadFacts
+): ProfessionTemplate {
   if (templateId && TEMPLATE_REGISTRY[templateId]) {
     return TEMPLATE_REGISTRY[templateId];
+  }
+
+  // If facts are provided, infer best-fitting archetype
+  if (facts) {
+    const inferredId = inferCAArchetype(facts);
+    if (TEMPLATE_REGISTRY[inferredId]) {
+      return TEMPLATE_REGISTRY[inferredId];
+    }
   }
 
   // Fallback matching by profession
@@ -411,7 +415,7 @@ export function getTemplate(templateId?: string, profession?: string): Professio
     return CA_ACCOUNTING_TEMPLATE;
   }
 
-  // Default to CA template for MVP
+  // Default to CA template
   return CA_ACCOUNTING_TEMPLATE;
 }
 

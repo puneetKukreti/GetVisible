@@ -74,9 +74,6 @@ export class WebsiteDemoGeneratorService {
       }
     );
 
-    const template = getTemplate(options.templateId, lead.profession);
-    const selectedTheme: WebsiteTheme = design.theme;
-
     const leadFacts: LeadFacts = {
       businessName: lead.businessName,
       profession: lead.profession,
@@ -86,6 +83,10 @@ export class WebsiteDemoGeneratorService {
       publicPhone: lead.publicPhone,
       source: lead.source,
     };
+
+    const requestedTemplateId = options.templateId || options.layout;
+    const template = getTemplate(requestedTemplateId, lead.profession, leadFacts);
+    const selectedTheme: WebsiteTheme = design.theme;
 
     // Synthesize factual baseline content tailored to design and facts
     let content: WebsiteContent = template.buildContent(leadFacts, selectedTheme, design);

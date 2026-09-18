@@ -1,17 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { WebsiteTheme, WebsiteTemplate, WebsiteDesign } from '@/types';
+import { WebsiteTheme, WebsiteTemplate, WebsiteDesign, WebsiteLayout } from '@/types';
 import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
 import { CA_LAYOUTS, CA_THEMES } from '@/lib/demos/personalization';
 import { getTemplate } from '@/lib/demos/templates';
-import { Sparkles, Layers, Palette, Monitor, Smartphone, CheckCircle, Info } from 'lucide-react';
+import { INDIAN_CA_ARCHETYPES, CAArchetypeMeta } from '@/lib/demos/ca-archetypes';
+import { Sparkles, Layers, Palette, Monitor, Smartphone, CheckCircle, Info, Briefcase, Award } from 'lucide-react';
 import Link from 'next/link';
 
-const TEMPLATE_META: Record<
-  WebsiteTemplate,
-  { name: string; tag: string; description: string; highlights: string[] }
-> = {
+interface LayoutMeta {
+  name: string;
+  tag: string;
+  description: string;
+  highlights: string[];
+}
+
+const VISUAL_LAYOUT_META: Record<string, LayoutMeta> = {
   EDITORIAL_FINANCE: {
     name: 'Editorial Finance',
     tag: 'Asymmetric & Typographic',
@@ -44,23 +49,32 @@ const TEMPLATE_META: Record<
     name: 'Modern Indian CA',
     tag: 'Regional & Practice-Focused',
     description:
-      'Tailored specifically for Indian accounting practices. Prominent ICAI firm profile badge, large practice area cards (GST, Direct Tax, Statutory Audit), and Gurugram location card.',
+      'Tailored specifically for Indian accounting practices. Prominent ICAI firm profile badge, large practice area cards (GST, Direct Tax, Statutory Audit), and localized address card.',
     highlights: ['ICAI compliance credentials card', 'Prominent practice cards', 'Localized address card'],
   },
 };
 
 export default function TemplatesPreviewPage() {
-  const [selectedTemplate, setSelectedTemplate] = useState<WebsiteTemplate>('EDITORIAL_FINANCE');
+  const [viewMode, setViewMode] = useState<'archetypes' | 'layouts'>('archetypes');
+  const [selectedArchetypeId, setSelectedArchetypeId] = useState<string>('CORPORATE_TRANSFER_PRICING');
+  const [selectedLayoutKey, setSelectedLayoutKey] = useState<string>('EDITORIAL_FINANCE');
   const [selectedThemeId, setSelectedThemeId] = useState<string>('executive-navy');
   const [isMobileView, setIsMobileView] = useState<boolean>(false);
 
+  const activeArchetype: CAArchetypeMeta =
+    INDIAN_CA_ARCHETYPES.find((a) => a.id === selectedArchetypeId) || INDIAN_CA_ARCHETYPES[0];
+
   const activeTheme: WebsiteTheme =
     CA_THEMES.find((t: WebsiteTheme) => t.id === selectedThemeId) || CA_THEMES[0];
-  const layoutConfig = CA_LAYOUTS[selectedTemplate];
+
+  // Determine active layout configuration
+  const activeLayoutKey: WebsiteLayout =
+    viewMode === 'archetypes' ? activeArchetype.defaultLayout : (selectedLayoutKey as WebsiteLayout);
+  const layoutConfig = CA_LAYOUTS[activeLayoutKey] || CA_LAYOUTS['MODERN_INDIAN'];
 
   const design: WebsiteDesign = {
-    layout: selectedTemplate,
-    template: selectedTemplate,
+    layout: activeLayoutKey,
+    template: layoutConfig.template || (activeLayoutKey as WebsiteTemplate),
     theme: activeTheme,
     heroLayout: layoutConfig.heroLayout,
     servicesLayout: layoutConfig.servicesLayout,
@@ -69,15 +83,18 @@ export default function TemplatesPreviewPage() {
     contentDensity: layoutConfig.contentDensity,
   };
 
-  const templateBuilder = getTemplate('CA_ACCOUNTING_PROFESSIONAL');
+  // Build authentic content
+  const templateBuilderId = viewMode === 'archetypes' ? activeArchetype.id : 'CA_ACCOUNTING_PROFESSIONAL';
+  const templateBuilder = getTemplate(templateBuilderId);
+
   const content = templateBuilder.buildContent(
     {
-      businessName: 'Sharma & Associates, Chartered Accountants',
+      businessName: viewMode === 'archetypes' ? `Singhal & Associates, Chartered Accountants` : 'Sharma & Associates, Chartered Accountants',
       profession: 'Chartered Accountant',
       city: 'Gurugram',
       address: 'DLF Cyber City, Tower B, Sector 24, Gurugram, Haryana 122002',
-      publicEmail: 'contact@sharma-associates-ca.in',
-      publicPhone: '+91 98112 34567',
+      publicEmail: 'partner@singhal-associates-ca.in',
+      publicPhone: '+91 124 4991100',
       source: 'ICAI Directory',
     },
     activeTheme,
@@ -87,7 +104,7 @@ export default function TemplatesPreviewPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Top QA Showcase Bar */}
-      <header className="sticky top-0 z-50 bg-slate-900/90 backdrop-blur border-b border-slate-800 px-4 py-3">
+      <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link
@@ -100,12 +117,34 @@ export default function TemplatesPreviewPage() {
               <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               <h1 className="text-sm font-bold text-white flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4 text-amber-400" />
-                Phase 4.2 Template Showcase
+                Indian CA Website Showcase
               </h1>
             </div>
-            <span className="hidden sm:inline-block text-[11px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded border border-slate-700">
-              5 Distinct CA Designs
-            </span>
+            {/* View Mode Pill Toggle */}
+            <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-xs">
+              <button
+                onClick={() => setViewMode('archetypes')}
+                className={`px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1.5 ${
+                  viewMode === 'archetypes'
+                    ? 'bg-amber-400 text-slate-950 font-bold shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Award className="h-3 w-3" />
+                <span>7 CA Archetypes</span>
+              </button>
+              <button
+                onClick={() => setViewMode('layouts')}
+                className={`px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1.5 ${
+                  viewMode === 'layouts'
+                    ? 'bg-amber-400 text-slate-950 font-bold shadow'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Layers className="h-3 w-3" />
+                <span>5 Visual Styles</span>
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -150,55 +189,109 @@ export default function TemplatesPreviewPage() {
           </div>
         </div>
 
-        {/* Template Selector Tabs */}
+        {/* Dynamic Selector Tabs */}
         <div className="max-w-7xl mx-auto mt-3 pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1 mr-1">
-            <Layers className="h-3.5 w-3.5 text-amber-400" />
-            Select Template:
-          </span>
-          {(Object.keys(TEMPLATE_META) as WebsiteTemplate[]).map((tmplKey) => {
-            const isSelected = selectedTemplate === tmplKey;
-            const meta = TEMPLATE_META[tmplKey];
-            return (
-              <button
-                key={tmplKey}
-                onClick={() => setSelectedTemplate(tmplKey)}
-                className={`text-xs px-3.5 py-1.5 rounded-lg font-medium transition shrink-0 flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
-                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
-                }`}
-              >
-                <span>{meta.name}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded font-normal ${
-                    isSelected ? 'bg-slate-900/20 text-slate-950' : 'text-slate-400'
-                  }`}
-                >
-                  {meta.tag}
-                </span>
-              </button>
-            );
-          })}
+          {viewMode === 'archetypes' ? (
+            <>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1 mr-1">
+                <Briefcase className="h-3.5 w-3.5 text-amber-400" />
+                Select CA Archetype:
+              </span>
+              {INDIAN_CA_ARCHETYPES.map((arch) => {
+                const isSelected = selectedArchetypeId === arch.id;
+                return (
+                  <button
+                    key={arch.id}
+                    onClick={() => {
+                      setSelectedArchetypeId(arch.id);
+                      setSelectedThemeId(arch.defaultThemeId);
+                    }}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition shrink-0 flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
+                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
+                    }`}
+                  >
+                    <span>{arch.shortName}</span>
+                  </button>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1 mr-1">
+                <Layers className="h-3.5 w-3.5 text-amber-400" />
+                Select Visual Style:
+              </span>
+              {Object.keys(VISUAL_LAYOUT_META).map((tmplKey) => {
+                const isSelected = selectedLayoutKey === tmplKey;
+                const meta = VISUAL_LAYOUT_META[tmplKey];
+                return (
+                  <button
+                    key={tmplKey}
+                    onClick={() => setSelectedLayoutKey(tmplKey)}
+                    className={`text-xs px-3.5 py-1.5 rounded-lg font-medium transition shrink-0 flex items-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
+                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
+                    }`}
+                  >
+                    <span>{meta.name}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded font-normal ${
+                        isSelected ? 'bg-slate-900/20 text-slate-950' : 'text-slate-400'
+                      }`}
+                    >
+                      {meta.tag}
+                    </span>
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       </header>
 
-      {/* Template Info Card */}
-      <div className="bg-slate-900/60 border-b border-slate-800/60 px-4 py-2.5">
+      {/* Info & Regulatory Context Card */}
+      <div className="bg-slate-900/80 border-b border-slate-800/80 px-4 py-2.5">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
-          <div className="flex items-center gap-2">
-            <Info className="h-4 w-4 text-amber-400 shrink-0" />
-            <span className="font-semibold text-white">{TEMPLATE_META[selectedTemplate].name}:</span>
-            <span className="text-slate-400">{TEMPLATE_META[selectedTemplate].description}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {TEMPLATE_META[selectedTemplate].highlights.map((hl, idx) => (
-              <span key={idx} className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-                <CheckCircle className="h-3 w-3 text-emerald-400" />
-                {hl}
-              </span>
-            ))}
-          </div>
+          {viewMode === 'archetypes' ? (
+            <>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="font-semibold text-white">{activeArchetype.name}:</span>
+                <span className="text-slate-400">{activeArchetype.tagline}</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] text-slate-400 font-mono">Key Regulations:</span>
+                {activeArchetype.keyRegulations.map((reg, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 text-[10px] font-mono bg-slate-800 text-amber-300 px-2 py-0.5 rounded border border-slate-700"
+                  >
+                    <CheckCircle className="h-2.5 w-2.5 text-emerald-400" />
+                    {reg}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Info className="h-4 w-4 text-amber-400 shrink-0" />
+                <span className="font-semibold text-white">{VISUAL_LAYOUT_META[selectedLayoutKey]?.name}:</span>
+                <span className="text-slate-400">{VISUAL_LAYOUT_META[selectedLayoutKey]?.description}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                {VISUAL_LAYOUT_META[selectedLayoutKey]?.highlights.map((hl, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                    <CheckCircle className="h-3 w-3 text-emerald-400" />
+                    {hl}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

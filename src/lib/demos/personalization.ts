@@ -213,6 +213,170 @@ export const CA_LAYOUTS: Record<WebsiteLayout, CALayoutDefinition> = {
     },
     contentDensity: 'compact',
   },
+  // 7 Authentic Indian CA Practice Archetypes
+  CORPORATE_TRANSFER_PRICING: {
+    layout: 'CORPORATE_TRANSFER_PRICING',
+    template: 'EDITORIAL_FINANCE',
+    name: 'Corporate Tax & Transfer Pricing Advisory',
+    description:
+      'Asymmetric editorial layout with numbered manifesto services, economic benchmarking tables, and transfer pricing governance.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'ABOUT',
+      'EXPERTISE',
+      'CTA',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'asymmetric-editorial',
+    servicesLayout: 'numbered-manifesto',
+    features: {
+      showVisualArtwork: true,
+      hairlineBorders: false,
+      floatingHeader: false,
+    },
+    contentDensity: 'comfortable',
+  },
+  MANUFACTURING_GST_LITIGATION: {
+    layout: 'MANUFACTURING_GST_LITIGATION',
+    template: 'SWISS_MINIMAL',
+    name: 'Regional Manufacturing & GST Litigator',
+    description:
+      'High-contrast 1px Swiss grid layout emphasizing plant-level audit defense, SCN rebuttals, and GSTAT appellate practice.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'ABOUT',
+      'EXPERTISE',
+      'WHY_CHOOSE_US',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'swiss-grid',
+    servicesLayout: 'swiss-grid',
+    features: {
+      monochromeGrid: true,
+      showVisualArtwork: true,
+    },
+    contentDensity: 'compact',
+  },
+  VIRTUAL_CFO_STARTUP: {
+    layout: 'VIRTUAL_CFO_STARTUP',
+    template: 'MODERN_FINTECH',
+    name: 'Virtual CFO & Startup Growth Architect',
+    description:
+      'Modern fintech/SaaS styling with floating glass header, compliance dashboard widget, and cap-table/burn-rate feature cards.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'PROCESS',
+      'TRUST',
+      'CTA',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'split-fintech',
+    servicesLayout: 'cards-glow',
+    features: {
+      floatingHeader: true,
+      showVisualArtwork: false,
+    },
+    contentDensity: 'comfortable',
+  },
+  INSTITUTIONAL_AUDIT_ASSURANCE: {
+    layout: 'INSTITUTIONAL_AUDIT_ASSURANCE',
+    template: 'SWISS_MINIMAL',
+    name: 'Institutional Statutory Audit & BFSI Assurance',
+    description:
+      'Authoritative Swiss grid corporate layout emphasizing Standards on Auditing, ICFR controls, and ICAI Peer Review credentials.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'ABOUT',
+      'EXPERTISE',
+      'WHY_CHOOSE_US',
+      'FAQ',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'swiss-grid',
+    servicesLayout: 'swiss-grid',
+    features: {
+      monochromeGrid: true,
+      showVisualArtwork: true,
+    },
+    contentDensity: 'compact',
+  },
+  NRI_CROSS_BORDER_TAX: {
+    layout: 'NRI_CROSS_BORDER_TAX',
+    template: 'MODERN_INDIAN',
+    name: 'NRI Wealth & Cross-Border Remittance Specialist',
+    description:
+      'Warm, trustworthy modern Indian practice styling with prominent FEMA credentials, Form 15CA/CB highlights, and digital NRI consultation badges.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'PROCESS',
+      'WHY_CHOOSE_US',
+      'LOCATION',
+      'CTA',
+      'CONTACT',
+    ],
+    heroLayout: 'modern-indian',
+    servicesLayout: 'practice-cards',
+    features: {
+      showLocationHighlight: true,
+      showVisualArtwork: true,
+    },
+    contentDensity: 'comfortable',
+  },
+  DIRECT_TAX_LITIGATION: {
+    layout: 'DIRECT_TAX_LITIGATION',
+    template: 'EDITORIAL_FINANCE',
+    name: 'Direct Tax Litigator & Scrutiny Specialist',
+    description:
+      'Stately editorial layout emphasizing legal draftsmanship, faceless assessment defense, and ITAT courtroom advocacy.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'ABOUT',
+      'EXPERTISE',
+      'CTA',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'asymmetric-editorial',
+    servicesLayout: 'numbered-manifesto',
+    features: {
+      showVisualArtwork: true,
+      hairlineBorders: true,
+    },
+    contentDensity: 'comfortable',
+  },
+  FAMILY_OFFICE_ESTATE: {
+    layout: 'FAMILY_OFFICE_ESTATE',
+    template: 'LUXURY_PROFESSIONAL',
+    name: 'Boutique Family Office & Estate Succession',
+    description:
+      'Ultra-refined private wealth aesthetic with serif display typography, dramatic whitespace, and horizontal luxury rows for private trusts and HUF charters.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'ABOUT',
+      'EXPERTISE',
+      'CTA',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'minimal-serif',
+    servicesLayout: 'luxury-rows',
+    features: {
+      hairlineBorders: true,
+      showVisualArtwork: true,
+    },
+    contentDensity: 'spacious',
+  },
 };
 
 export const TEMPLATE_KEYS: WebsiteTemplate[] = [
@@ -221,6 +385,16 @@ export const TEMPLATE_KEYS: WebsiteTemplate[] = [
   'LUXURY_PROFESSIONAL',
   'SWISS_MINIMAL',
   'MODERN_INDIAN',
+];
+
+export const INDIAN_CA_ARCHETYPE_KEYS: WebsiteTemplate[] = [
+  'CORPORATE_TRANSFER_PRICING',
+  'MANUFACTURING_GST_LITIGATION',
+  'VIRTUAL_CFO_STARTUP',
+  'INSTITUTIONAL_AUDIT_ASSURANCE',
+  'NRI_CROSS_BORDER_TAX',
+  'DIRECT_TAX_LITIGATION',
+  'FAMILY_OFFICE_ESTATE',
 ];
 
 export const CA_THEMES: WebsiteTheme[] = Object.values(THEMES);
