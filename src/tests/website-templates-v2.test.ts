@@ -154,5 +154,9 @@ describe('Phase 4.2: Modern Website Template System for CA Firms', () => {
     demo.content.whyChooseUs.points.forEach((item) => {
       expect(item.description).not.toMatch(/100%|guaranteed|#1 ranked|award winning/i);
     });
+
+    // 6. Prospect firm name is preserved as the primary brand visual identity
+    expect(demo.content.brand.businessName).toBe(sampleLead.businessName);
+    expect(demo.content.footer.copyright).toContain(sampleLead.businessName);
   });
 });

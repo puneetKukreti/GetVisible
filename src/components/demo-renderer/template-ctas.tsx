@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { WebsiteContent, WebsiteTheme, WebsiteTemplate } from '@/types';
-import { ArrowRight, ArrowUpRight, Calendar, Phone } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Calendar } from 'lucide-react';
+import { getCtaTitle, categorizeFirmName } from '@/lib/demos/brand-typography';
 
 interface CtaProps {
   ctaBanner?: WebsiteContent['ctaBanner'];
@@ -14,27 +15,37 @@ interface CtaProps {
 export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTECH' }: CtaProps) {
   if (!ctaBanner) return null;
 
+  const firmName = brand?.businessName || '';
+  const title = getCtaTitle(firmName, template, ctaBanner.title);
+  const category = categorizeFirmName(firmName);
+
   // 1. Template 1: Editorial Finance — Full-width Editorial Statement
   if (template === 'EDITORIAL_FINANCE') {
     return (
-      <section id="cta" className="py-24 lg:py-32 bg-slate-900 text-white border-b border-slate-800">
-        <div className="mx-auto max-w-5xl px-6 text-center space-y-8">
+      <section id="cta" className="py-20 sm:py-24 lg:py-32 bg-slate-900 text-white border-b border-slate-800">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 text-center space-y-6 sm:space-y-8">
           <span className="font-mono text-xs uppercase tracking-widest text-slate-400">
             {"// Confidential Advisory Inquiry"}
           </span>
 
-          <h2 className="text-3xl sm:text-5xl lg:text-6xl font-serif font-bold tracking-tight text-white leading-tight">
-            {ctaBanner.title}
+          <h2 className={`${
+            category === 'VERY_LONG'
+              ? 'text-2xl sm:text-4xl lg:text-5xl'
+              : category === 'LONG'
+              ? 'text-3xl sm:text-5xl lg:text-5xl'
+              : 'text-3xl sm:text-5xl lg:text-6xl'
+          } font-serif font-bold tracking-tight text-white leading-tight break-words max-w-4xl mx-auto`}>
+            {title}
           </h2>
 
           <p className="text-base sm:text-lg font-serif text-slate-300 max-w-2xl mx-auto leading-relaxed">
             {ctaBanner.subtitle}
           </p>
 
-          <div className="pt-6">
+          <div className="pt-4 sm:pt-6">
             <a
               href={ctaBanner.primaryCta.href}
-              className="inline-flex items-center gap-3 border-b-2 border-white text-white font-mono text-base font-bold pb-2 hover:opacity-80 transition"
+              className="inline-flex items-center gap-3 border-b-2 border-white text-white font-mono text-sm sm:text-base font-bold pb-2 hover:opacity-80 transition"
             >
               <span>{ctaBanner.primaryCta.label}</span>
               <ArrowUpRight className="h-5 w-5" />
@@ -48,9 +59,9 @@ export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTEC
   // 2. Template 2: Modern Fintech / SaaS — Rounded Card with Subtle Glow
   if (template === 'MODERN_FINTECH') {
     return (
-      <section id="cta" className="py-20 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
+      <section id="cta" className="py-16 sm:py-20 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <div className="relative rounded-3xl p-10 sm:p-14 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white shadow-2xl overflow-hidden text-center">
+          <div className="relative rounded-3xl p-8 sm:p-12 lg:p-14 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white shadow-2xl overflow-hidden text-center">
             <div
               className="absolute -top-32 -left-32 w-64 h-64 rounded-full blur-3xl opacity-30"
               style={{ backgroundColor: theme.primaryColor }}
@@ -60,17 +71,23 @@ export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTEC
               style={{ backgroundColor: theme.accentColor }}
             />
 
-            <div className="relative space-y-6 max-w-2xl mx-auto">
+            <div className="relative space-y-6 max-w-3xl mx-auto">
               <span className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-semibold bg-white/10 text-slate-200 border border-white/10">
                 <Calendar className="h-3.5 w-3.5 text-amber-400" />
                 <span>Confidential Consultation</span>
               </span>
 
-              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight">
-                {ctaBanner.title}
+              <h2 className={`${
+                category === 'VERY_LONG'
+                  ? 'text-2xl sm:text-3xl lg:text-4xl'
+                  : category === 'LONG'
+                  ? 'text-2xl sm:text-4xl'
+                  : 'text-3xl sm:text-4xl'
+              } font-extrabold tracking-tight text-white leading-tight break-words`}>
+                {title}
               </h2>
 
-              <p className="text-base text-slate-300 leading-relaxed">
+              <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-xl mx-auto">
                 {ctaBanner.subtitle}
               </p>
 
@@ -101,14 +118,20 @@ export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTEC
   // 3. Template 3: Luxury Professional — Private Advisory Statement
   if (template === 'LUXURY_PROFESSIONAL') {
     return (
-      <section id="cta" className="py-28 bg-slate-950 text-white border-b border-slate-800">
-        <div className="mx-auto max-w-4xl px-6 text-center space-y-8">
+      <section id="cta" className="py-20 sm:py-28 bg-slate-950 text-white border-b border-slate-800">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6 sm:space-y-8">
           <span className="text-[11px] font-mono tracking-[0.3em] uppercase text-slate-400">
             PRIVATE ENGAGEMENT
           </span>
 
-          <h2 className="text-3xl sm:text-5xl font-serif font-light text-white leading-tight">
-            {ctaBanner.title}
+          <h2 className={`${
+            category === 'VERY_LONG'
+              ? 'text-2xl sm:text-4xl'
+              : category === 'LONG'
+              ? 'text-3xl sm:text-4xl lg:text-5xl'
+              : 'text-3xl sm:text-5xl'
+          } font-serif font-light text-white leading-tight break-words max-w-3xl mx-auto`}>
+            {title}
           </h2>
 
           <div className="w-16 h-px mx-auto my-6 opacity-60" style={{ backgroundColor: theme.primaryColor }} />
@@ -134,14 +157,20 @@ export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTEC
   // 4. Template 4: Swiss Minimal — Strict Grid Box
   if (template === 'SWISS_MINIMAL') {
     return (
-      <section id="cta" className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-b-2 border-slate-900 dark:border-slate-100 p-10 sm:p-16">
+      <section id="cta" className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-b-2 border-slate-900 dark:border-slate-100 p-8 sm:p-14 lg:p-16">
         <div className="mx-auto max-w-5xl flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
           <div className="space-y-4 max-w-2xl">
             <span className="font-mono text-xs uppercase tracking-widest text-slate-400 dark:text-slate-600">
               [ACTION / CONSULTATION]
             </span>
-            <h2 className="text-3xl sm:text-5xl font-black uppercase tracking-tighter leading-none font-mono">
-              {ctaBanner.title}
+            <h2 className={`${
+              category === 'VERY_LONG'
+                ? 'text-2xl sm:text-3xl lg:text-4xl'
+                : category === 'LONG'
+                ? 'text-2xl sm:text-4xl'
+                : 'text-3xl sm:text-5xl'
+            } font-black uppercase tracking-tighter leading-tight font-mono break-words`}>
+              {title}
             </h2>
             <p className="text-sm font-mono text-slate-300 dark:text-slate-700">
               {ctaBanner.subtitle}
@@ -150,7 +179,7 @@ export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTEC
 
           <a
             href={ctaBanner.primaryCta.href}
-            className="shrink-0 font-mono text-xs font-bold uppercase bg-white text-slate-900 dark:bg-slate-900 dark:text-white px-8 py-4 hover:opacity-90 transition"
+            className="shrink-0 font-mono text-xs font-bold uppercase bg-white text-slate-900 dark:bg-slate-900 dark:text-white px-6 sm:px-8 py-3.5 sm:py-4 hover:opacity-90 transition"
           >
             {ctaBanner.primaryCta.label} →
           </a>
@@ -161,7 +190,7 @@ export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTEC
 
   // 5. Template 5: Modern Indian Professional — High Conversion Panel
   return (
-    <section id="cta" className="py-16 lg:py-20 border-b border-slate-200 dark:border-slate-800" style={{ backgroundColor: `${theme.primaryColor}08` }}>
+    <section id="cta" className="py-14 sm:py-16 lg:py-20 border-b border-slate-200 dark:border-slate-800" style={{ backgroundColor: `${theme.primaryColor}08` }}>
       <div className="mx-auto max-w-5xl px-4 sm:px-6 text-center">
         <div className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-semibold mb-4 border bg-white dark:bg-slate-900 shadow-2xs"
           style={{ borderColor: `${theme.primaryColor}30`, color: theme.primaryColor }}
@@ -170,8 +199,14 @@ export function TemplateCta({ ctaBanner, brand, theme, template = 'MODERN_FINTEC
           <span>Introductory Consultation</span>
         </div>
 
-        <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4 text-slate-900 dark:text-slate-100">
-          {ctaBanner.title}
+        <h2 className={`${
+          category === 'VERY_LONG'
+            ? 'text-2xl sm:text-3xl'
+            : category === 'LONG'
+            ? 'text-2xl sm:text-3xl lg:text-4xl'
+            : 'text-3xl sm:text-4xl'
+        } font-extrabold tracking-tight mb-4 text-slate-900 dark:text-slate-100 break-words max-w-3xl mx-auto`}>
+          {title}
         </h2>
 
         <p className="mx-auto max-w-2xl text-base sm:text-lg mb-8 text-slate-600 dark:text-slate-400 leading-relaxed">

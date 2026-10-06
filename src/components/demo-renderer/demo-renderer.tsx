@@ -128,7 +128,7 @@ export function DemoRenderer({ content, theme, design }: DemoRendererProps) {
         ) : null;
       case 'ABOUT':
         return safeContent.about ? (
-          <AboutSection key="about" about={safeContent.about} theme={safeTheme} template={activeTemplate} />
+          <AboutSection key="about" about={safeContent.about} brand={brandData} theme={safeTheme} template={activeTemplate} />
         ) : null;
       case 'EXPERTISE':
         return safeContent.expertise ? (

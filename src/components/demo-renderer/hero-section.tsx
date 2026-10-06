@@ -2,7 +2,8 @@
 
 import React from 'react';
 import { WebsiteContent, WebsiteTheme, WebsiteLayout } from '@/types';
-import { ArrowRight, FileCheck2, Shield, CheckCircle2, Building, Scale, Lock } from 'lucide-react';
+import { ArrowRight, FileCheck2, Shield, CheckCircle2, Building, Scale } from 'lucide-react';
+import { categorizeFirmName, splitFirmName } from '@/lib/demos/brand-typography';
 
 interface HeroSectionProps {
   hero: WebsiteContent['hero'];
@@ -12,6 +13,10 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ hero, brand, theme, layout = 'MODERN_CORPORATE' }: HeroSectionProps) {
+  const firmName = brand?.businessName || 'Chartered Accountants';
+  const category = categorizeFirmName(firmName);
+  const split = splitFirmName(firmName);
+
   // 1. Layout A — Modern Corporate: Dynamic 2-column composition with practice highlights card
   if (layout === 'MODERN_CORPORATE') {
     return (
@@ -20,25 +25,43 @@ export function HeroSection({ hero, brand, theme, layout = 'MODERN_CORPORATE' }:
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Column: Copy & Actions */}
             <div className="lg:col-span-7 space-y-6 text-left">
-              {hero.badge && (
-                <div
-                  className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-semibold border shadow-2xs"
-                  style={{
-                    backgroundColor: `${theme.primaryColor}12`,
-                    color: theme.primaryColor,
-                    borderColor: `${theme.primaryColor}30`,
-                  }}
-                >
-                  <FileCheck2 className="h-3.5 w-3.5" />
-                  <span>{hero.badge}</span>
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {hero.badge && (
+                  <div
+                    className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-semibold border shadow-2xs"
+                    style={{
+                      backgroundColor: `${theme.primaryColor}12`,
+                      color: theme.primaryColor,
+                      borderColor: `${theme.primaryColor}30`,
+                    }}
+                  >
+                    <FileCheck2 className="h-3.5 w-3.5" />
+                    <span>{hero.badge}</span>
+                  </div>
+                )}
+                {split.hasSuffix && (
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {split.suffix}
+                  </span>
+                )}
+              </div>
 
-              <h1 className={`text-4xl sm:text-5xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-[1.15] ${
+              {/* Primary Visual Identity: Firm Name as Hero Title */}
+              <h1 className={`${
+                category === 'VERY_LONG'
+                  ? 'text-3xl sm:text-4xl lg:text-5xl'
+                  : category === 'LONG'
+                  ? 'text-3xl sm:text-5xl lg:text-5xl'
+                  : 'text-4xl sm:text-6xl lg:text-6xl'
+              } font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-tight break-words ${
                 theme.fontFamily === 'serif' ? 'font-serif' : 'font-sans'
               }`}>
-                {hero.headline}
+                {firmName}
               </h1>
+
+              <p className="text-lg sm:text-xl font-medium text-slate-800 dark:text-slate-200 leading-snug">
+                {hero.headline}
+              </p>
 
               <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
                 {hero.subheadline}
@@ -96,7 +119,7 @@ export function HeroSection({ hero, brand, theme, layout = 'MODERN_CORPORATE' }:
                     </div>
                     <div>
                       <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                        {brand.businessName}
+                        {firmName}
                       </h4>
                       <p className="text-[11px] text-slate-500">Chartered Practice Profile</p>
                     </div>
@@ -148,7 +171,7 @@ export function HeroSection({ hero, brand, theme, layout = 'MODERN_CORPORATE' }:
         <div className="relative mx-auto max-w-4xl px-4 sm:px-6 text-center">
           {hero.badge && (
             <div
-              className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold mb-8 border backdrop-blur-md"
+              className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold mb-6 border backdrop-blur-md"
               style={{
                 backgroundColor: 'rgba(255, 255, 255, 0.07)',
                 color: '#f1f5f9',
@@ -160,8 +183,15 @@ export function HeroSection({ hero, brand, theme, layout = 'MODERN_CORPORATE' }:
             </div>
           )}
 
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-white leading-tight font-serif">
-            {hero.headline}
+          {/* Primary Visual Identity: Firm Name */}
+          <h1 className={`${
+            category === 'VERY_LONG'
+              ? 'text-3xl sm:text-5xl lg:text-5xl'
+              : category === 'LONG'
+              ? 'text-3xl sm:text-5xl lg:text-6xl'
+              : 'text-4xl sm:text-6xl lg:text-7xl'
+          } font-bold tracking-tight text-white leading-tight font-serif break-words`}>
+            {firmName}
           </h1>
 
           <div
@@ -169,7 +199,11 @@ export function HeroSection({ hero, brand, theme, layout = 'MODERN_CORPORATE' }:
             style={{ backgroundColor: theme.primaryColor }}
           />
 
-          <p className="mx-auto max-w-2xl text-lg text-slate-300 leading-relaxed font-light">
+          <p className="mx-auto max-w-2xl text-xl text-slate-200 leading-snug font-serif">
+            {hero.headline}
+          </p>
+
+          <p className="mx-auto max-w-2xl text-base text-slate-300 leading-relaxed font-light mt-3">
             {hero.subheadline}
           </p>
 
@@ -214,13 +248,24 @@ export function HeroSection({ hero, brand, theme, layout = 'MODERN_CORPORATE' }:
             </div>
           )}
 
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-slate-900 dark:text-slate-100 font-serif leading-snug">
-            {hero.headline}
+          {/* Primary Visual Identity: Firm Name */}
+          <h1 className={`${
+            category === 'VERY_LONG'
+              ? 'text-3xl sm:text-4xl lg:text-4xl'
+              : category === 'LONG'
+              ? 'text-3xl sm:text-4xl lg:text-5xl'
+              : 'text-4xl sm:text-5xl lg:text-6xl'
+          } font-bold tracking-tight text-slate-900 dark:text-slate-100 font-serif leading-tight break-words`}>
+            {firmName}
           </h1>
 
-          <div className="w-16 h-0.5 mx-auto my-6 bg-slate-300 dark:bg-slate-700" />
+          <div className="w-16 h-0.5 mx-auto my-5 bg-slate-300 dark:bg-slate-700" />
 
-          <p className="mx-auto max-w-2xl text-base sm:text-lg text-slate-700 dark:text-slate-300 leading-relaxed">
+          <p className="mx-auto max-w-2xl text-lg font-serif font-medium text-slate-800 dark:text-slate-200 leading-snug">
+            {hero.headline}
+          </p>
+
+          <p className="mx-auto max-w-2xl text-base text-slate-700 dark:text-slate-300 leading-relaxed mt-3">
             {hero.subheadline}
           </p>
 

@@ -7,7 +7,8 @@ import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
 import { CA_LAYOUTS, CA_THEMES } from '@/lib/demos/personalization';
 import { getTemplate } from '@/lib/demos/templates';
 import { INDIAN_CA_ARCHETYPES, CAArchetypeMeta } from '@/lib/demos/ca-archetypes';
-import { Sparkles, Layers, Palette, Monitor, Smartphone, CheckCircle, Info, Briefcase, Award } from 'lucide-react';
+import { categorizeFirmName } from '@/lib/demos/brand-typography';
+import { Sparkles, Layers, Palette, Monitor, Smartphone, CheckCircle, Info, Briefcase, Award, Type } from 'lucide-react';
 import Link from 'next/link';
 
 interface LayoutMeta {
@@ -55,6 +56,31 @@ const VISUAL_LAYOUT_META: Record<string, LayoutMeta> = {
   },
 };
 
+type NameTestProfile = 'short' | 'medium' | 'long' | 'very_long';
+
+const NAME_TEST_PROFILES: Record<NameTestProfile, { label: string; name: string; tag: string }> = {
+  short: {
+    label: 'Short Name',
+    name: 'Singhi & Co.',
+    tag: '12 chars',
+  },
+  medium: {
+    label: 'Medium Name',
+    name: 'Batra Singhal & Associates',
+    tag: '26 chars',
+  },
+  long: {
+    label: 'Long Name',
+    name: 'Kalyaniwalla & Mistry LLP Chartered Accountants',
+    tag: '47 chars',
+  },
+  very_long: {
+    label: 'Very Long Name',
+    name: 'Singhal Batra & Associates Chartered Accountants LLP',
+    tag: '52 chars',
+  },
+};
+
 function TemplatesPreviewContent() {
   const searchParams = useSearchParams();
   const archetypeParam = searchParams.get('archetype');
@@ -67,6 +93,7 @@ function TemplatesPreviewContent() {
   );
   const [selectedLayoutKey, setSelectedLayoutKey] = useState<string>('EDITORIAL_FINANCE');
   const [selectedThemeId, setSelectedThemeId] = useState<string>('executive-navy');
+  const [nameProfile, setNameProfile] = useState<NameTestProfile>('medium');
   const [isMobileView, setIsMobileView] = useState<boolean>(false);
 
   // Sync if URL search params change
@@ -103,20 +130,20 @@ function TemplatesPreviewContent() {
     contentDensity: layoutConfig.contentDensity,
   };
 
-  // Build authentic content
+  // Build authentic content with the dynamically chosen firm name
   const templateBuilderId = viewMode === 'archetypes' ? activeArchetype.id : 'CA_ACCOUNTING_PROFESSIONAL';
   const templateBuilder = getTemplate(templateBuilderId);
 
+  const chosenFirmName = NAME_TEST_PROFILES[nameProfile].name;
+  const nameCategory = categorizeFirmName(chosenFirmName);
+
   const content = templateBuilder.buildContent(
     {
-      businessName:
-        viewMode === 'archetypes'
-          ? `Singhal & Associates, Chartered Accountants`
-          : 'Sharma & Associates, Chartered Accountants',
+      businessName: chosenFirmName,
       profession: 'Chartered Accountant',
       city: 'Gurugram',
       address: 'DLF Cyber City, Tower B, Sector 24, Gurugram, Haryana 122002',
-      publicEmail: 'partner@singhal-associates-ca.in',
+      publicEmail: 'partner@practice-ca.in',
       publicPhone: '+91 124 4991100',
       source: 'ICAI Directory',
     },
@@ -170,7 +197,24 @@ function TemplatesPreviewContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Firm Name Length Selector */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+              <Type className="h-3.5 w-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Firm Name:</span>
+              <select
+                value={nameProfile}
+                onChange={(e) => setNameProfile(e.target.value as NameTestProfile)}
+                className="bg-slate-800 border border-slate-700 text-slate-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 font-medium"
+              >
+                {(Object.keys(NAME_TEST_PROFILES) as NameTestProfile[]).map((key) => (
+                  <option key={key} value={key}>
+                    {NAME_TEST_PROFILES[key].label} ({NAME_TEST_PROFILES[key].tag})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Theme Selector */}
             <div className="flex items-center gap-1.5 text-xs text-slate-400">
               <Palette className="h-3.5 w-3.5" />
@@ -246,14 +290,22 @@ function TemplatesPreviewContent() {
                 <Layers className="h-3.5 w-3.5 text-amber-400" />
                 Select Visual Style:
               </span>
-              {Object.keys(VISUAL_LAYOUT_META).map((tmplKey) => {
-                const isSelected = selectedLayoutKey === tmplKey;
-                const meta = VISUAL_LAYOUT_META[tmplKey];
+              {(
+                [
+                  'EDITORIAL_FINANCE',
+                  'MODERN_FINTECH',
+                  'LUXURY_PROFESSIONAL',
+                  'SWISS_MINIMAL',
+                  'MODERN_INDIAN',
+                ] as const
+              ).map((layoutKey) => {
+                const isSelected = selectedLayoutKey === layoutKey;
+                const meta = VISUAL_LAYOUT_META[layoutKey];
                 return (
                   <button
-                    key={tmplKey}
-                    onClick={() => setSelectedLayoutKey(tmplKey)}
-                    className={`text-xs px-3.5 py-1.5 rounded-lg font-medium transition shrink-0 flex items-center gap-1.5 ${
+                    key={layoutKey}
+                    onClick={() => setSelectedLayoutKey(layoutKey)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition shrink-0 flex items-center gap-2 ${
                       isSelected
                         ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
                         : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
@@ -278,16 +330,19 @@ function TemplatesPreviewContent() {
       {/* Info & Regulatory Context Card */}
       <div className="bg-slate-900/80 border-b border-slate-800/80 px-4 py-2.5">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
-          {viewMode === 'archetypes' ? (
-            <>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-amber-400 shrink-0" />
-                <span className="font-semibold text-white">{activeArchetype.name}:</span>
-                <span className="text-slate-400">{activeArchetype.tagline}</span>
-              </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-white">Active Firm Identity:</span>
+            <span className="text-amber-300 font-bold font-mono">&ldquo;{chosenFirmName}&rdquo;</span>
+            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
+              {nameCategory} ({chosenFirmName.length} chars)
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {viewMode === 'archetypes' ? (
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-slate-400 font-mono">Key Regulations:</span>
-                {activeArchetype.keyRegulations.map((reg, idx) => (
+                <span className="text-[11px] text-slate-400 font-mono">Regulations:</span>
+                {activeArchetype.keyRegulations.slice(0, 3).map((reg, idx) => (
                   <span
                     key={idx}
                     className="inline-flex items-center gap-1 text-[10px] font-mono bg-slate-800 text-amber-300 px-2 py-0.5 rounded border border-slate-700"
@@ -297,24 +352,13 @@ function TemplatesPreviewContent() {
                   </span>
                 ))}
               </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2">
-                <Info className="h-4 w-4 text-amber-400 shrink-0" />
-                <span className="font-semibold text-white">{VISUAL_LAYOUT_META[selectedLayoutKey]?.name}:</span>
-                <span className="text-slate-400">{VISUAL_LAYOUT_META[selectedLayoutKey]?.description}</span>
+            ) : (
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <Info className="h-3.5 w-3.5 text-amber-400" />
+                <span>{VISUAL_LAYOUT_META[selectedLayoutKey]?.tag}</span>
               </div>
-              <div className="flex items-center gap-3">
-                {VISUAL_LAYOUT_META[selectedLayoutKey]?.highlights.map((hl, idx) => (
-                  <span key={idx} className="inline-flex items-center gap-1 text-[11px] text-slate-400">
-                    <CheckCircle className="h-3 w-3 text-emerald-400" />
-                    {hl}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

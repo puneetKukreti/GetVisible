@@ -3,30 +3,42 @@
 import React from 'react';
 import { WebsiteContent, WebsiteTheme, WebsiteTemplate } from '@/types';
 import { CheckCircle2 } from 'lucide-react';
+import { getAboutHeading, categorizeFirmName } from '@/lib/demos/brand-typography';
 
 interface AboutSectionProps {
   about: WebsiteContent['about'];
+  brand?: WebsiteContent['brand'];
   theme: WebsiteTheme;
   template?: WebsiteTemplate;
 }
 
-export function AboutSection({ about, theme, template = 'MODERN_FINTECH' }: AboutSectionProps) {
+export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH' }: AboutSectionProps) {
+  const firmName = brand?.businessName || '';
+  const heading = getAboutHeading(firmName, template, about.title);
+  const category = categorizeFirmName(firmName);
+
   // 1. Template 1: Editorial Finance — Asymmetric Editorial Storytelling
   if (template === 'EDITORIAL_FINANCE') {
     return (
-      <section id="about" className="py-24 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-            <div className="lg:col-span-4">
+      <section id="about" className="py-20 sm:py-24 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
+            <div className="lg:col-span-4 space-y-2">
               <span className="text-xs font-mono uppercase tracking-widest text-slate-500">
                 {"// Foundation & Philosophy"}
               </span>
-              <h2 className="text-3xl sm:text-4xl font-serif font-bold text-slate-900 dark:text-white mt-2">
-                {about.title}
+              <h2 className={`${
+                category === 'VERY_LONG'
+                  ? 'text-2xl sm:text-3xl'
+                  : category === 'LONG'
+                  ? 'text-2xl sm:text-4xl'
+                  : 'text-3xl sm:text-4xl'
+              } font-serif font-bold text-slate-900 dark:text-white leading-tight break-words`}>
+                {heading}
               </h2>
             </div>
             <div className="lg:col-span-8 space-y-6">
-              <p className="text-xl sm:text-2xl font-serif text-slate-900 dark:text-slate-100 leading-relaxed">
+              <p className="text-lg sm:text-xl font-serif text-slate-900 dark:text-slate-100 leading-relaxed">
                 {about.leadParagraph}
               </p>
               <div className="w-12 h-0.5 bg-slate-900 dark:bg-slate-100 opacity-30" />
@@ -56,17 +68,23 @@ export function AboutSection({ about, theme, template = 'MODERN_FINTECH' }: Abou
   // 2. Template 3: Luxury Professional — Private Advisory Narrative
   if (template === 'LUXURY_PROFESSIONAL') {
     return (
-      <section id="about" className="py-28 bg-slate-950 text-white border-b border-slate-800">
-        <div className="mx-auto max-w-5xl px-6 text-center space-y-8">
+      <section id="about" className="py-20 sm:py-28 bg-slate-950 text-white border-b border-slate-800">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6 text-center space-y-6 sm:space-y-8">
           <span className="text-[11px] font-mono tracking-[0.3em] uppercase text-slate-400">
             PRACTICE HERITAGE
           </span>
-          <h2 className="text-3xl sm:text-4xl font-serif font-light text-white">
-            {about.title}
+          <h2 className={`${
+            category === 'VERY_LONG'
+              ? 'text-2xl sm:text-3xl'
+              : category === 'LONG'
+              ? 'text-2xl sm:text-4xl'
+              : 'text-3xl sm:text-4xl'
+          } font-serif font-light text-white leading-tight break-words max-w-3xl mx-auto`}>
+            {heading}
           </h2>
           <div className="w-12 h-px mx-auto opacity-50" style={{ backgroundColor: theme.primaryColor }} />
 
-          <p className="text-lg sm:text-xl font-serif text-slate-300 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-base sm:text-xl font-serif text-slate-300 max-w-3xl mx-auto leading-relaxed">
             {about.leadParagraph}
           </p>
 
@@ -74,7 +92,7 @@ export function AboutSection({ about, theme, template = 'MODERN_FINTECH' }: Abou
             {about.body}
           </p>
 
-          <div className="pt-12 grid grid-cols-2 sm:grid-cols-4 gap-6 border-t border-slate-800">
+          <div className="pt-10 sm:pt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 border-t border-slate-800">
             {about.highlights.map((item, idx) => (
               <div key={idx} className="p-4 rounded-sm border border-slate-800/80 bg-slate-900/40 text-left">
                 <h4 className="font-serif text-sm font-normal text-white mb-1">
@@ -96,17 +114,23 @@ export function AboutSection({ about, theme, template = 'MODERN_FINTECH' }: Abou
     return (
       <section id="about" className="bg-white dark:bg-slate-950 border-b-2 border-slate-900 dark:border-slate-100">
         <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-12">
-          <div className="lg:col-span-5 p-8 sm:p-12 border-b lg:border-b-0 lg:border-r-2 border-slate-900 dark:border-slate-100 space-y-4">
+          <div className="lg:col-span-5 p-6 sm:p-10 lg:p-12 border-b lg:border-b-0 lg:border-r-2 border-slate-900 dark:border-slate-100 space-y-4">
             <span className="font-mono text-xs uppercase tracking-widest text-slate-500">[03 / ABOUT]</span>
-            <h2 className="text-4xl sm:text-5xl font-black uppercase tracking-tighter text-slate-900 dark:text-slate-100 font-mono leading-tight">
-              {about.title}
+            <h2 className={`${
+              category === 'VERY_LONG'
+                ? 'text-2xl sm:text-3xl lg:text-4xl'
+                : category === 'LONG'
+                ? 'text-3xl sm:text-4xl lg:text-5xl'
+                : 'text-4xl sm:text-5xl'
+            } font-black uppercase tracking-tighter text-slate-900 dark:text-slate-100 font-mono leading-tight break-words`}>
+              {heading}
             </h2>
-            <p className="text-base font-mono font-bold text-slate-800 dark:text-slate-200 pt-4">
+            <p className="text-sm sm:text-base font-mono font-bold text-slate-800 dark:text-slate-200 pt-4">
               {about.leadParagraph}
             </p>
           </div>
 
-          <div className="lg:col-span-7 p-8 sm:p-12 space-y-8 flex flex-col justify-between">
+          <div className="lg:col-span-7 p-6 sm:p-10 lg:p-12 space-y-6 sm:space-y-8 flex flex-col justify-between">
             <p className="text-sm font-mono text-slate-700 dark:text-slate-300 leading-relaxed">
               {about.body}
             </p>
@@ -131,22 +155,28 @@ export function AboutSection({ about, theme, template = 'MODERN_FINTECH' }: Abou
 
   // 4. Modern Fintech & Modern Indian (Default 2-Column with Highlight Grid)
   return (
-    <section id="about" className="py-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+    <section id="about" className="py-16 sm:py-20 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-          <div className="lg:col-span-6 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
+          <div className="lg:col-span-6 space-y-5 sm:space-y-6">
             <div className="inline-block rounded px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-100 dark:bg-slate-800">
-              Overview
+              About The Practice
             </div>
-            <h2 className={`text-3xl sm:text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 ${
+            <h2 className={`${
+              category === 'VERY_LONG'
+                ? 'text-2xl sm:text-3xl'
+                : category === 'LONG'
+                ? 'text-2xl sm:text-3xl lg:text-4xl'
+                : 'text-3xl sm:text-4xl'
+            } font-bold tracking-tight text-slate-900 dark:text-slate-100 leading-tight break-words ${
               theme.fontFamily === 'serif' ? 'font-serif' : 'font-sans'
             }`}>
-              {about.title}
+              {heading}
             </h2>
-            <p className="text-lg font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+            <p className="text-base sm:text-lg font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
               {about.leadParagraph}
             </p>
-            <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
+            <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
               {about.body}
             </p>
           </div>
@@ -177,4 +207,3 @@ export function AboutSection({ about, theme, template = 'MODERN_FINTECH' }: Abou
     </section>
   );
 }
-

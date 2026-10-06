@@ -9,6 +9,7 @@ import {
   SwissGridVisual,
   IndianGeometricMotif,
 } from './visual-artworks';
+import { getHeroTypographyConfig, splitFirmName } from '@/lib/demos/brand-typography';
 
 interface HeroProps {
   hero: WebsiteContent['hero'];
@@ -18,26 +19,46 @@ interface HeroProps {
 }
 
 export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }: HeroProps) {
+  const firmName = brand?.businessName || 'Chartered Accountants';
+  const typo = getHeroTypographyConfig(firmName, template);
+  const split = splitFirmName(firmName);
+
   // 1. Template 1: Editorial Finance — Asymmetric large editorial statement + artwork
   if (template === 'EDITORIAL_FINANCE') {
     return (
-      <section id="hero" className="relative py-20 lg:py-28 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 overflow-hidden">
-        <div className="mx-auto max-w-7xl px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-7 space-y-8">
-              <div className="text-xs font-mono uppercase tracking-widest text-slate-500">
-                {`// ${hero.badge || 'Chartered Accountancy Practice'}`}
+      <section id="hero" className="relative py-16 sm:py-20 lg:py-28 bg-white dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 overflow-hidden">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            <div className={`lg:col-span-7 space-y-6 sm:space-y-8 ${typo.containerClass}`}>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-mono uppercase tracking-widest text-slate-500">
+                <span>{`// ${hero.badge || 'Chartered Accountancy Practice'}`}</span>
+                {split.hasSuffix && (
+                  <span className="inline-block px-2 py-0.5 text-[10px] rounded bg-slate-100 dark:bg-slate-800 font-mono text-slate-600 dark:text-slate-300">
+                    {split.suffix}
+                  </span>
+                )}
               </div>
 
-              <h1 className="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tighter text-slate-900 dark:text-white font-serif leading-[1.05]">
-                {hero.headline}
+              {/* Primary Visual Identity: Firm Name as Hero Title */}
+              <h1 className={typo.titleClass}>
+                {firmName}
               </h1>
 
-              <p className="text-lg sm:text-xl text-slate-600 dark:text-slate-400 font-serif leading-relaxed max-w-xl">
+              {/* Practice Philosophy / Value Headline as Editorial Thesis */}
+              <div
+                className="border-l-2 pl-4 py-1"
+                style={{ borderColor: theme.primaryColor }}
+              >
+                <p className="text-xl sm:text-2xl font-serif text-slate-800 dark:text-slate-200 leading-snug">
+                  {hero.headline}
+                </p>
+              </div>
+
+              <p className={typo.subheadlineClass}>
                 {hero.subheadline}
               </p>
 
-              <div className="pt-4 flex flex-wrap items-center gap-6">
+              <div className="pt-2 sm:pt-4 flex flex-wrap items-center gap-6">
                 <a
                   href={hero.primaryCta.href}
                   className="inline-flex items-center gap-3 border-b-2 font-mono text-sm font-bold pb-1 hover:opacity-75 transition"
@@ -68,29 +89,42 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
   // 2. Template 2: Modern Fintech / SaaS — 2-Column with Dashboard Widget
   if (template === 'MODERN_FINTECH') {
     return (
-      <section id="hero" className="relative py-16 lg:py-24 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-200 dark:border-slate-800 overflow-hidden">
+      <section id="hero" className="relative py-14 sm:py-16 lg:py-24 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-200 dark:border-slate-800 overflow-hidden">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            <div className="lg:col-span-7 space-y-6">
-              {hero.badge && (
-                <div
-                  className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-semibold border shadow-2xs"
-                  style={{
-                    backgroundColor: `${theme.primaryColor}12`,
-                    color: theme.primaryColor,
-                    borderColor: `${theme.primaryColor}30`,
-                  }}
-                >
-                  <Shield className="h-3.5 w-3.5" />
-                  <span>{hero.badge}</span>
-                </div>
-              )}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
+            <div className={`lg:col-span-7 space-y-5 sm:space-y-6 ${typo.containerClass}`}>
+              <div className="flex flex-wrap items-center gap-2">
+                {hero.badge && (
+                  <div
+                    className="inline-flex items-center gap-2 rounded-full px-3.5 py-1 text-xs font-semibold border shadow-2xs"
+                    style={{
+                      backgroundColor: `${theme.primaryColor}12`,
+                      color: theme.primaryColor,
+                      borderColor: `${theme.primaryColor}30`,
+                    }}
+                  >
+                    <Shield className="h-3.5 w-3.5 shrink-0" />
+                    <span>{hero.badge}</span>
+                  </div>
+                )}
+                {split.hasSuffix && (
+                  <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    {split.suffix}
+                  </span>
+                )}
+              </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-tight">
-                {hero.headline}
+              {/* Primary Visual Identity: Firm Name as Hero Title */}
+              <h1 className={typo.titleClass}>
+                {firmName}
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
+              {/* Value Proposition Headline */}
+              <p className="text-lg sm:text-xl font-semibold tracking-tight text-slate-800 dark:text-slate-200 leading-snug">
+                {hero.headline}
+              </p>
+
+              <p className={typo.subheadlineClass}>
                 {hero.subheadline}
               </p>
 
@@ -124,26 +158,37 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
   // 3. Template 3: Luxury Professional — Private Advisory Minimalist Hero
   if (template === 'LUXURY_PROFESSIONAL') {
     return (
-      <section id="hero" className="relative py-28 lg:py-36 bg-slate-950 text-white border-b border-slate-800 overflow-hidden">
-        <div className="mx-auto max-w-4xl px-6 text-center space-y-8">
-          <div className="text-[11px] font-mono tracking-[0.3em] uppercase text-slate-400">
-            {hero.badge || 'CHARTERED ACCOUNTANTS & CORPORATE ADVISORS'}
+      <section id="hero" className="relative py-20 sm:py-28 lg:py-36 bg-slate-950 text-white border-b border-slate-800 overflow-hidden">
+        <div className={`mx-auto max-w-4xl px-4 sm:px-6 text-center space-y-6 sm:space-y-8 ${typo.containerClass}`}>
+          <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono tracking-[0.25em] uppercase text-slate-400">
+            <span>{hero.badge || 'CHARTERED ACCOUNTANTS & CORPORATE ADVISORS'}</span>
+            {split.hasSuffix && (
+              <span className="tracking-widest text-slate-500">
+                • {split.suffix}
+              </span>
+            )}
           </div>
 
-          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-light tracking-tight text-white font-serif leading-[1.1]">
-            {hero.headline}
+          {/* Primary Visual Identity: Firm Name as Hero Title */}
+          <h1 className={typo.titleClass}>
+            {firmName}
           </h1>
 
           <div
-            className="w-16 h-px mx-auto my-8 opacity-60"
+            className="w-16 h-px mx-auto my-6 sm:my-8 opacity-60"
             style={{ backgroundColor: theme.primaryColor }}
           />
 
-          <p className="mx-auto max-w-2xl text-base sm:text-lg text-slate-300 font-serif leading-relaxed">
+          {/* Practice Focus Headline */}
+          <p className="text-lg sm:text-2xl font-serif font-light text-slate-200 max-w-2xl mx-auto leading-relaxed">
+            {hero.headline}
+          </p>
+
+          <p className={typo.subheadlineClass}>
             {hero.subheadline}
           </p>
 
-          <div className="pt-6 flex flex-wrap items-center justify-center gap-6">
+          <div className="pt-4 sm:pt-6 flex flex-wrap items-center justify-center gap-4 sm:gap-6">
             <a
               href={hero.primaryCta.href}
               className="rounded-sm px-8 py-3.5 text-xs font-semibold tracking-widest uppercase text-white transition transform hover:-translate-y-0.5 shadow-lg"
@@ -169,20 +214,31 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
       <section id="hero" className="relative bg-white dark:bg-slate-950 border-b-2 border-slate-900 dark:border-slate-100">
         <div className="mx-auto max-w-7xl grid grid-cols-1 lg:grid-cols-12">
           {/* Left Block: Massive Swiss Typography */}
-          <div className="lg:col-span-8 p-8 sm:p-14 lg:p-16 border-b lg:border-b-0 lg:border-r-2 border-slate-900 dark:border-slate-100 space-y-6">
-            <div className="font-mono text-xs font-bold text-slate-500 uppercase tracking-widest">
-              [PRACTICE DIRECTORY / 2026]
+          <div className={`lg:col-span-8 p-6 sm:p-12 lg:p-16 border-b lg:border-b-0 lg:border-r-2 border-slate-900 dark:border-slate-100 space-y-6 ${typo.containerClass}`}>
+            <div className="flex flex-wrap items-center gap-2 font-mono text-xs font-bold text-slate-500 uppercase tracking-widest">
+              <span>[PRACTICE DIRECTORY / {new Date().getFullYear()}]</span>
+              {split.hasSuffix && (
+                <span className="border border-slate-900 dark:border-slate-100 px-2 py-0.5 text-[10px] font-mono text-slate-900 dark:text-slate-100">
+                  {split.suffix}
+                </span>
+              )}
             </div>
 
-            <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tighter uppercase text-slate-900 dark:text-slate-100 leading-none">
-              {hero.headline}
+            {/* Primary Visual Identity: Firm Name as Hero Title */}
+            <h1 className={typo.titleClass}>
+              {firmName}
             </h1>
 
-            <p className="text-base sm:text-lg font-mono text-slate-600 dark:text-slate-400 max-w-2xl">
+            {/* Practice Specialization Index Line */}
+            <div className="font-mono text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 border-l-2 border-slate-900 dark:border-slate-100 pl-3">
+              {`// ${hero.headline}`}
+            </div>
+
+            <p className={typo.subheadlineClass}>
               {hero.subheadline}
             </p>
 
-            <div className="pt-4 flex flex-wrap items-center gap-4 font-mono text-xs">
+            <div className="pt-2 sm:pt-4 flex flex-wrap items-center gap-4 font-mono text-xs">
               <a
                 href={hero.primaryCta.href}
                 className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 font-bold px-6 py-3 uppercase tracking-wider hover:opacity-90 transition"
@@ -209,20 +265,33 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
 
   // 5. Template 5: Modern Indian Professional — Left Headline + Credential Panel
   return (
-    <section id="hero" className="relative py-16 lg:py-24 bg-gradient-to-b from-white via-slate-50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-200 dark:border-slate-800">
+    <section id="hero" className="relative py-14 sm:py-16 lg:py-24 bg-gradient-to-b from-white via-slate-50 to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b border-slate-200 dark:border-slate-800">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-          <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
-              <Scale className="h-3.5 w-3.5" />
-              <span>{hero.badge || 'Chartered Accountancy & Corporate Advisory'}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+          <div className={`lg:col-span-7 space-y-5 sm:space-y-6 ${typo.containerClass}`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
+                <Scale className="h-3.5 w-3.5 shrink-0" />
+                <span>{hero.badge || 'Chartered Accountancy & Corporate Advisory'}</span>
+              </div>
+              {split.hasSuffix && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                  {split.suffix}
+                </span>
+              )}
             </div>
 
-            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-tight">
-              {hero.headline}
+            {/* Primary Visual Identity: Firm Name as Hero Title */}
+            <h1 className={typo.titleClass}>
+              {firmName}
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl">
+            {/* Core Practice Focus Headline */}
+            <p className="text-lg sm:text-xl font-bold tracking-tight text-slate-800 dark:text-slate-200 leading-snug">
+              {hero.headline}
+            </p>
+
+            <p className={typo.subheadlineClass}>
               {hero.subheadline}
             </p>
 
