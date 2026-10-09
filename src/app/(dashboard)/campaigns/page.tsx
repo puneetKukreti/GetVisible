@@ -41,7 +41,7 @@ type PageTab = 'queue' | 'compliance';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const READY_STATUSES: LeadStatus[] = ['APPROVED', 'OUTREACH_PENDING'];
+export type QueueFilter = 'READY' | 'ALL' | 'QUALIFIED' | 'DEMO_READY';
 
 const DEFAULT_INTENT =
   'We have created a personalized website concept for your CA practice. We would love to show you a 5-minute preview.';
@@ -409,17 +409,59 @@ interface OutreachQueueTabProps {
   leads: LeadData[];
   loading: boolean;
   error: string;
+  onRefresh: () => void;
 }
 
-function OutreachQueueTab({ leads, loading, error }: OutreachQueueTabProps) {
+function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTabProps) {
   const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
   const [contactedIds, setContactedIds] = useState<Set<string>>(new Set());
+  const [filterMode, setFilterMode] = useState<'ALL' | 'READY' | 'PHONE'>('ALL');
+  const [approvingAll, setApprovingAll] = useState(false);
 
   const handleContacted = useCallback((leadId: string) => {
     setContactedIds((prev) => new Set([...Array.from(prev), leadId]));
   }, []);
 
-  const displayLeads = leads.filter((l) => !contactedIds.has(l.id));
+  const uncontacted = leads.filter((l) => !contactedIds.has(l.id));
+
+  const displayLeads = uncontacted.filter((l) => {
+    if (filterMode === 'READY') {
+      return l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING';
+    }
+    if (filterMode === 'PHONE') {
+      return Boolean(l.publicPhone);
+    }
+    return true; // ALL
+  });
+
+  const readyCount = uncontacted.filter(
+    (l) => l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING'
+  ).length;
+
+  const handleQuickApproveAll = async () => {
+    setApprovingAll(true);
+    try {
+      const leadsToApprove = uncontacted.filter(
+        (l) => l.leadStatus !== 'APPROVED' && l.leadStatus !== 'CONTACTED' && l.leadStatus !== 'DO_NOT_CONTACT'
+      );
+      for (const l of leadsToApprove) {
+        await fetch(`/api/leads/${l.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leadStatus: 'APPROVED',
+            reason: 'Batch approved for automated outreach campaign',
+            actor: 'Agency Campaign Specialist',
+          }),
+        });
+      }
+      onRefresh();
+    } catch {
+      // Non-blocking
+    } finally {
+      setApprovingAll(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -441,7 +483,7 @@ function OutreachQueueTab({ leads, loading, error }: OutreachQueueTabProps) {
     );
   }
 
-  if (displayLeads.length === 0) {
+  if (leads.length === 0) {
     return (
       <Card className="border-border/60 shadow-none">
         <CardContent className="p-10 flex flex-col items-center gap-4 text-center">
@@ -449,16 +491,15 @@ function OutreachQueueTab({ leads, loading, error }: OutreachQueueTabProps) {
             <Users className="w-6 h-6 text-muted-foreground" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold text-foreground">No leads ready for outreach</h3>
+            <h3 className="text-sm font-semibold text-foreground">Your CRM has zero leads</h3>
             <p className="text-xs text-muted-foreground max-w-xs">
-              Leads with status <strong>APPROVED</strong> or <strong>OUTREACH PENDING</strong> will appear here.
-              Review and approve leads on the Leads page first.
+              Go to the Discovery page to run an automated search or drag-and-drop a CSV file of CA firms.
             </p>
           </div>
-          <Link href="/leads">
+          <Link href="/discovery">
             <Button size="sm" className="gap-2 text-xs">
               <ArrowRight className="w-3.5 h-3.5" />
-              Go to Leads Pipeline
+              Go to Lead Discovery
             </Button>
           </Link>
         </CardContent>
@@ -485,15 +526,63 @@ function OutreachQueueTab({ leads, loading, error }: OutreachQueueTabProps) {
         />
       )}
 
-      {/* Summary bar */}
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{displayLeads.length}</span> lead
-          {displayLeads.length !== 1 ? 's' : ''} ready for outreach
-        </p>
-        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <Clock className="w-3 h-3" />
-          Manual dispatch only
+      {/* Filter and Action Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+        <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-md border border-border/60">
+          <button
+            onClick={() => setFilterMode('ALL')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+              filterMode === 'ALL'
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            All Pipeline Leads ({uncontacted.length})
+          </button>
+          <button
+            onClick={() => setFilterMode('READY')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+              filterMode === 'READY'
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Approved / Ready ({readyCount})
+          </button>
+          <button
+            onClick={() => setFilterMode('PHONE')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+              filterMode === 'PHONE'
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            WhatsApp Ready ({uncontacted.filter((l) => Boolean(l.publicPhone)).length})
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {readyCount < uncontacted.length && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={approvingAll}
+              onClick={handleQuickApproveAll}
+              className="h-8 text-xs gap-1.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+            >
+              {approvingAll ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              {approvingAll ? 'Approving All…' : '1-Click Approve All Leads'}
+            </Button>
+          )}
+          <Link href="/discovery">
+            <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5">
+              + Discover More Leads
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -732,31 +821,32 @@ function ComplianceShieldTab() {
 
 export default function CampaignsPage() {
   const [activeTab, setActiveTab] = useState<PageTab>('queue');
-  const [leads, setLeads] = useState<LeadData[]>([]);
+  const [allLeads, setAllLeads] = useState<LeadData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    const fetchLeads = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const res = await fetch('/api/leads?pageSize=200');
-        if (!res.ok) throw new Error(`Failed to load leads (${res.status})`);
-        const data = await res.json();
-        const allLeads: LeadData[] = data.leads ?? [];
-        const ready = allLeads.filter((l) =>
-          READY_STATUSES.includes(l.leadStatus as LeadStatus)
-        );
-        setLeads(ready);
-      } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to load leads.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLeads();
+  const fetchLeads = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/leads?pageSize=200');
+      if (!res.ok) throw new Error(`Failed to load leads (${res.status})`);
+      const data = await res.json();
+      setAllLeads(data.leads ?? []);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load leads.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLeads();
+  }, [fetchLeads]);
+
+  const readyCount = allLeads.filter(
+    (l) => l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING'
+  ).length;
 
   const tabs: { id: PageTab; label: string; icon: React.ElementType }[] = [
     { id: 'queue', label: 'Outreach Queue', icon: Send },
@@ -772,14 +862,18 @@ export default function CampaignsPage() {
             Campaigns &amp; Outreach
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Compliance-gated, 1-to-1 personalised outreach to CA firms. Every message requires human
-            review.
+            Compliance-gated, 1-to-1 personalised outreach to CA firms with automated website screenshots and direct WhatsApp delivery.
           </p>
         </div>
-        {!loading && leads.length > 0 && (
-          <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            {leads.length} lead{leads.length !== 1 ? 's' : ''} ready
+        {!loading && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              Total in CRM: <strong>{allLeads.length}</strong>
+            </span>
+            <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {readyCount} approved / ready
+            </div>
           </div>
         )}
       </div>
@@ -804,7 +898,7 @@ export default function CampaignsPage() {
 
       {/* Tab Content */}
       {activeTab === 'queue' ? (
-        <OutreachQueueTab leads={leads} loading={loading} error={error} />
+        <OutreachQueueTab leads={allLeads} loading={loading} error={error} onRefresh={fetchLeads} />
       ) : (
         <ComplianceShieldTab />
       )}
