@@ -62,3 +62,4 @@ export * from './website-analyzer.provider';
 export * from './ai.provider';
 export * from './email.provider';
 export * from './deployment.provider';
+export * from './screenshot.provider';

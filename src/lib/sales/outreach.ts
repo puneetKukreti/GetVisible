@@ -62,19 +62,42 @@ export function generateDeterministicOutreach(input: OutreachInput): OutreachMes
 
   const subject = `Website Concept Prepared for ${input.businessName}`;
 
-  const message = `${contactSalutation},
+  let message = `${contactSalutation},
 
 I came across ${input.businessName}${citySuffix} while researching established ${professionLabel} practices.
 
 Recognizing that your firm currently does not maintain an active website, I put together a functional, personalized website concept tailored specifically for your practice areas and client inquiries.
 
 You can preview the live concept here:
-${input.demoUrl}
+${input.demoUrl}`;
 
-The concept highlights your core advisory services, compliance credibility, and secure contact channels. If you find this helpful, I would be glad to adjust the layout and sections according to your specific preferences.
+  if (input.screenshotUrl) {
+    message += `\n\nPreview Snapshot:\n${input.screenshotUrl}`;
+  }
+
+  message += `\n\nThe concept highlights your core advisory services, compliance credibility, and secure contact channels. If you find this helpful, I would be glad to adjust the layout and sections according to your specific preferences.
 
 Best regards,
 GetVisible Digital Team`;
+
+  // WhatsApp optimized message (concise, emoji-bulleted, includes live link & preview)
+  const cleanPhone = (input.publicPhone || '').replace(/[^0-9]/g, '');
+  const waRecipient = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+  const whatsappMessage = `*Hello ${input.businessName} Team*,
+
+We put together a tailored, live digital presence concept for your ${professionLabel} practice in ${input.city || 'Delhi NCR'}:
+
+🔗 *Live Interactive Demo:*
+${input.demoUrl}
+
+Designed with modern client intake, mobile responsiveness, and practice credibility. Would you like to review this together?
+
+- *GetVisible Team*`;
+
+  const encodedWaText = encodeURIComponent(whatsappMessage);
+  const whatsappShareUrl = waRecipient
+    ? `https://api.whatsapp.com/send?phone=${waRecipient}&text=${encodedWaText}`
+    : `https://api.whatsapp.com/send?text=${encodedWaText}`;
 
   const personalizationReason = `Referenced ${input.businessName}, ${professionLabel} specialization, ${input.city} location, and direct demo link.`;
 
@@ -82,6 +105,9 @@ GetVisible Digital Team`;
     subject,
     message,
     personalizationReason,
+    screenshotUrl: input.screenshotUrl,
+    whatsappMessage,
+    whatsappShareUrl,
   };
 }
 
@@ -124,6 +150,8 @@ export class OutreachGeneratorService {
         ? getPublicDemoUrl(activeDemo.publicToken, base)
         : `${base}/demo/${lead.id}`;
 
+    const screenshotUrl = activeDemo?.screenshotUrl || null;
+
     const input: OutreachInput = {
       businessName: lead.businessName,
       profession: lead.profession,
@@ -132,6 +160,7 @@ export class OutreachGeneratorService {
       publicEmail: lead.publicEmail,
       publicPhone: lead.publicPhone,
       demoUrl,
+      screenshotUrl,
       templateName: activeDemo?.design?.layout || activeDemo?.templateId,
       themeName: activeDemo?.theme?.name || activeDemo?.theme?.id,
       opportunityReason: lead.opportunityReason,
@@ -151,11 +180,21 @@ export class OutreachGeneratorService {
               finalMessage += `\n\nPreview the concept: ${demoUrl}`;
             }
 
+            const cleanPhone = (input.publicPhone || '').replace(/[^0-9]/g, '');
+            const waRecipient = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+            const waText = `*Hello ${input.businessName} Team*,\n\nWe prepared a custom digital presence preview for your practice:\n${demoUrl}\n\n- GetVisible Team`;
+            const waShareUrl = waRecipient
+              ? `https://api.whatsapp.com/send?phone=${waRecipient}&text=${encodeURIComponent(waText)}`
+              : `https://api.whatsapp.com/send?text=${encodeURIComponent(waText)}`;
+
             return {
               success: true,
               outreach: {
                 ...result.data,
                 message: finalMessage,
+                screenshotUrl,
+                whatsappMessage: waText,
+                whatsappShareUrl: waShareUrl,
               },
               isAiGenerated: true,
             };

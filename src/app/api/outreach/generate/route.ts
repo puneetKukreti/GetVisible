@@ -58,6 +58,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      draft: result.outreach.message,
+      subject: result.outreach.subject,
+      screenshotUrl: result.outreach.screenshotUrl,
+      whatsappMessage: result.outreach.whatsappMessage,
+      whatsappShareUrl: result.outreach.whatsappShareUrl,
       outreach: result.outreach,
       isAiGenerated: result.isAiGenerated,
       demoUrl: publicUrl,

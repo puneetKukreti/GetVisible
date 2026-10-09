@@ -367,6 +367,8 @@ export interface WebsiteDemoData {
   content: WebsiteContent;
   theme: WebsiteTheme;
   design?: WebsiteDesign;
+  screenshotUrl?: string | null;
+  screenshotTakenAt?: string | null;
   error?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -445,6 +447,9 @@ export interface OutreachMessage {
   subject?: string;
   message: string;
   personalizationReason: string;
+  screenshotUrl?: string | null;
+  whatsappMessage?: string;
+  whatsappShareUrl?: string;
 }
 
 export interface OutreachInput {
@@ -455,6 +460,7 @@ export interface OutreachInput {
   publicEmail?: string | null;
   publicPhone?: string | null;
   demoUrl: string;
+  screenshotUrl?: string | null;
   templateName?: string;
   themeName?: string;
   opportunityReason?: string;
