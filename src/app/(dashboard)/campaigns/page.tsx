@@ -98,10 +98,13 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [whatsappShareUrl, setWhatsappShareUrl] = useState<string | null>(null);
+  const [draftSubject, setDraftSubject] = useState('');
   const [draftLoading, setDraftLoading] = useState(false);
   const [draftError, setDraftError] = useState('');
   const [contactedLoading, setContactedLoading] = useState(false);
   const [contactedDone, setContactedDone] = useState(false);
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [notes, setNotes] = useState('');
 
   // Auto-fetch or capture demo screenshot when opening drawer
@@ -147,14 +150,46 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || `Server error ${res.status}`);
       }
-      const data: DraftResult = await res.json();
+      const data = await res.json();
       setDraft(data.draft);
+      if (data.subject) setDraftSubject(data.subject);
       if (data.screenshotUrl) setScreenshotUrl(data.screenshotUrl);
       if (data.whatsappShareUrl) setWhatsappShareUrl(data.whatsappShareUrl);
     } catch (err: unknown) {
       setDraftError(err instanceof Error ? err.message : 'Failed to generate draft.');
     } finally {
       setDraftLoading(false);
+    }
+  };
+
+  const sendEmail = async () => {
+    if (!lead.publicEmail) {
+      setDraftError('Lead has no public email address.');
+      return;
+    }
+    setEmailSending(true);
+    setDraftError('');
+    try {
+      const res = await fetch('/api/outreach/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          subject: draftSubject || `Website Concept Prepared for ${lead.businessName}`,
+          message: draft,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to dispatch email.');
+      }
+      setEmailSent(true);
+      setContactedDone(true);
+      onContacted(lead.id);
+    } catch (err: unknown) {
+      setDraftError(err instanceof Error ? err.message : 'Failed to dispatch email.');
+    } finally {
+      setEmailSending(false);
     }
   };
 
@@ -375,25 +410,48 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
 
       {/* Footer actions */}
       <div className="px-5 py-4 border-t border-border bg-muted/20 space-y-2">
-        {contactedDone ? (
+        {emailSent ? (
+          <div className="flex items-center gap-2 justify-center py-2 text-emerald-600 dark:text-emerald-400 text-sm font-semibold">
+            <CheckCircle2 className="w-4 h-4" />
+            Email Dispatched to {lead.publicEmail}
+          </div>
+        ) : contactedDone ? (
           <div className="flex items-center gap-2 justify-center py-2 text-emerald-600 dark:text-emerald-400 text-sm font-semibold">
             <CheckCircle2 className="w-4 h-4" />
             Marked as Contacted
           </div>
         ) : (
-          <Button
-            variant="outline"
-            className="w-full gap-2 text-xs h-9 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
-            onClick={markContacted}
-            disabled={contactedLoading}
-          >
-            {contactedLoading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5" />
+          <>
+            {channel === 'EMAIL' && draft && lead.publicEmail && (
+              <Button
+                variant="default"
+                className="w-full gap-2 text-xs h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={sendEmail}
+                disabled={emailSending}
+              >
+                {emailSending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Mail className="w-3.5 h-3.5" />
+                )}
+                {emailSending ? 'Sending Email…' : `Send Email to ${lead.publicEmail} (w/ Screenshot)`}
+              </Button>
             )}
-            {contactedLoading ? 'Saving…' : 'Mark as Contacted'}
-          </Button>
+
+            <Button
+              variant="outline"
+              className="w-full gap-2 text-xs h-9 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10"
+              onClick={markContacted}
+              disabled={contactedLoading || emailSending}
+            >
+              {contactedLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              )}
+              {contactedLoading ? 'Saving…' : 'Mark as Contacted (Manual)'}
+            </Button>
+          </>
         )}
         <Button variant="ghost" className="w-full text-xs h-8" onClick={onClose}>
           Close
