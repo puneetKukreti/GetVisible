@@ -40,8 +40,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isDemoMode = process.env.DEMO_MODE === 'true';
-    const emailProvider = isDemoMode ? new MockEmailProvider() : new ProductionEmailProvider();
+    // If RESEND_API_KEY is present, always use ProductionEmailProvider so real emails get dispatched!
+    const hasResend = Boolean(process.env.RESEND_API_KEY);
+    const emailProvider = hasResend ? new ProductionEmailProvider() : new MockEmailProvider();
 
     const sendResult = await emailProvider.sendOutreachEmail({
       to: lead.publicEmail,
