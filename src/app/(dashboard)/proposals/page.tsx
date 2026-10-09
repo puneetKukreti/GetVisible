@@ -668,7 +668,7 @@ export default function ProposalsPage() {
             CA Website Packages
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Three tiered offerings covering every stage of a CA practice's digital journey.
+            Three tiered offerings covering every stage of a CA practice&apos;s digital journey.
           </p>
         </div>
         <PackageCards selected={selectedPackage} onSelect={setSelectedPackage} />
