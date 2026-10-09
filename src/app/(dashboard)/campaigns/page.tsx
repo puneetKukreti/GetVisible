@@ -312,15 +312,15 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
         </div>
 
         {/* Generate Button */}
-        {/* Visual Demo Screenshot Thumbnail */}
+        {/* Visual Real Website Screenshot Thumbnail */}
         <div className="space-y-1.5 rounded-lg border border-border bg-muted/10 p-3">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              Live Demo Snapshot
+              {lead.website ? 'Live Website Screenshot' : 'Live Website Concept Screenshot'}
             </p>
             {screenshotLoading && (
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Capturing…
+                <Loader2 className="w-3 h-3 animate-spin" /> Capturing Real Screenshot…
               </span>
             )}
           </div>

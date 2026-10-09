@@ -55,15 +55,24 @@ export async function GET(
       });
     }
 
-    // 2. Build target URL
-    const baseUrl = getAppBaseUrl(request.nextUrl.origin);
-    const targetUrl = demo?.publicToken
-      ? getPublicDemoUrl(demo.publicToken, baseUrl)
-      : `${baseUrl}/demo/${leadId}`;
+    const lead = leadId ? await LeadRepository.getLeadById(leadId, orgId) : null;
 
-    // 3. Capture screenshot
-    const isDemoMode = process.env.DEMO_MODE === 'true';
-    const provider = isDemoMode ? new MockScreenshotProvider() : new CloudScreenshotProvider();
+    // 2. Build target URL
+    // Can screenshot their live existing website (e.g. ?type=website) or their generated concept
+    const screenshotType = request.nextUrl.searchParams.get('type');
+    const baseUrl = getAppBaseUrl(request.nextUrl.origin);
+
+    let targetUrl: string;
+    if (screenshotType === 'website' && lead?.website) {
+      targetUrl = lead.website.startsWith('http') ? lead.website : `https://${lead.website}`;
+    } else {
+      targetUrl = demo?.publicToken
+        ? getPublicDemoUrl(demo.publicToken, baseUrl)
+        : `${baseUrl}/demo/${leadId}`;
+    }
+
+    // 3. Capture real screenshot via CloudScreenshotProvider (Microlink / ScreenshotOne)
+    const provider = new CloudScreenshotProvider();
 
     const result = await provider.captureWebsite(targetUrl, {
       width: 1280,
