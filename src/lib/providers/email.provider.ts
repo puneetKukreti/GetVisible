@@ -105,21 +105,30 @@ ${cleanBodyText}
 export class GmailSmtpProvider implements IEmailProvider {
   name = 'GmailSmtpProvider';
 
-  private user = process.env.GMAIL_USER || 'govisibleonweb@gmail.com';
-  private pass = (process.env.GMAIL_APP_PASSWORD || 'wibanibxxhrbewwk').replace(/\s+/g, '');
+  private getCredentials() {
+    const rawUser = process.env.GMAIL_USER || 'govisibleonweb@gmail.com';
+    const rawPass = process.env.GMAIL_APP_PASSWORD || 'wibanibxxhrbewwk';
+
+    const user = rawUser.trim().replace(/^["']|["']$/g, '');
+    const pass = rawPass.trim().replace(/^["']|["']$/g, '').replace(/[^a-zA-Z0-9]/g, '');
+
+    return { user, pass };
+  }
 
   isConfigured(): boolean {
-    return Boolean(this.user && this.pass);
+    const { user, pass } = this.getCredentials();
+    return Boolean(user && pass);
   }
 
   getStatus(): ProviderStatus {
     const configured = this.isConfigured();
+    const { user } = this.getCredentials();
     return {
       name: this.name,
       configured,
       isMock: false,
       details: configured
-        ? `Gmail SMTP connected for ${this.user}. Delivers directly to real client inboxes.`
+        ? `Gmail SMTP connected for ${user}. Delivers directly to real client inboxes.`
         : 'Gmail credentials missing (GMAIL_USER / GMAIL_APP_PASSWORD).',
     };
   }
@@ -143,12 +152,14 @@ export class GmailSmtpProvider implements IEmailProvider {
       };
     }
 
+    const { user, pass } = this.getCredentials();
+
     try {
       const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
-          user: this.user,
-          pass: this.pass,
+          user,
+          pass,
         },
       });
 
@@ -164,9 +175,9 @@ export class GmailSmtpProvider implements IEmailProvider {
       const htmlBody = buildInboxFriendlyHtml(payload, hasInlineCid);
 
       const mailOptions: nodemailer.SendMailOptions = {
-        from: `"GetVisible Team" <${this.user}>`,
+        from: `"GetVisible Team" <${user}>`,
         to: payload.to,
-        replyTo: this.user,
+        replyTo: user,
         subject: payload.subject,
         text: payload.body,
         html: htmlBody,
