@@ -17,11 +17,14 @@ import { FooterSection } from './footer-section';
 import { ProcessSection } from './process-section';
 import { TrustSection } from './trust-section';
 import { ExpertiseSection } from './expertise-section';
+import { WhatsAppFloatingButton } from './component-registry';
+import { WebsiteBlueprint } from '@/lib/blueprint/blueprint-schema';
 
 interface DemoRendererProps {
   content: WebsiteContent;
   theme?: WebsiteTheme;
   design?: WebsiteDesign;
+  blueprint?: WebsiteBlueprint;
 }
 
 const DEFAULT_SECTION_ORDER: WebsiteSectionType[] = [
@@ -203,6 +206,12 @@ export function DemoRenderer({ content, theme, design }: DemoRendererProps) {
         brand={brandData}
         navigation={navigationData}
         theme={safeTheme}
+      />
+
+      {/* Reusable Floating WhatsApp Button Component */}
+      <WhatsAppFloatingButton
+        phone={safeContent.contact?.publicPhone}
+        businessName={brandData.businessName}
       />
     </div>
   );

@@ -246,6 +246,7 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
                 ? activeDemo.design.sectionOrder
                 : CA_LAYOUTS.MODERN_INDIAN.sectionOrder,
           }}
+          blueprint={activeDemo.blueprint}
         />
 
 

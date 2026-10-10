@@ -60,6 +60,7 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
           theme: themeObj,
           sectionOrder,
         }}
+        blueprint={demo.blueprint}
       />
     </div>
   );

@@ -102,6 +102,18 @@ export class WebsiteDemoGeneratorService {
     // Validate using Zod schema to ensure no unsafe URLs or boundary violations
     const validatedContent = WebsiteContentSchema.parse(content) as ValidatedWebsiteContent;
 
+    // Generate structured, validated WebsiteBlueprint
+    let blueprint: any = null;
+    try {
+      const { BlueprintGeneratorService } = await import('@/lib/blueprint/blueprint-generator');
+      blueprint = await BlueprintGeneratorService.generateBlueprint(lead, {
+        useAi: options.useAiEnrichment,
+        version: versionNumber,
+      });
+    } catch {
+      // Non-blocking fallback
+    }
+
     const demoId = `demo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
     const websiteDemo: WebsiteDemoData = {
@@ -114,6 +126,7 @@ export class WebsiteDemoGeneratorService {
       content: validatedContent as WebsiteContent,
       theme: selectedTheme,
       design,
+      blueprint,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

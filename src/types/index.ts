@@ -367,6 +367,7 @@ export interface WebsiteDemoData {
   content: WebsiteContent;
   theme: WebsiteTheme;
   design?: WebsiteDesign;
+  blueprint?: any;
   screenshotUrl?: string | null;
   screenshotTakenAt?: string | null;
   error?: string | null;
