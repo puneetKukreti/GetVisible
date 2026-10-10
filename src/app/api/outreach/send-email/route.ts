@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { LeadRepository } from '@/lib/db/repository';
-import { ProductionEmailProvider, MockEmailProvider } from '@/lib/providers/email.provider';
+import { ProductionEmailProvider, MockEmailProvider, GmailSmtpProvider } from '@/lib/providers/email.provider';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,9 +40,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If RESEND_API_KEY is present, always use ProductionEmailProvider so real emails get dispatched!
-    const hasResend = Boolean(process.env.RESEND_API_KEY);
-    const emailProvider = hasResend ? new ProductionEmailProvider() : new MockEmailProvider();
+    // Prioritize Gmail SMTP (sends from authentic govisibleonweb@gmail.com to ANY recipient)
+    const gmailProvider = new GmailSmtpProvider();
+    const resendProvider = new ProductionEmailProvider();
+    const emailProvider = gmailProvider.isConfigured()
+      ? gmailProvider
+      : resendProvider.isConfigured()
+      ? resendProvider
+      : new MockEmailProvider();
 
     const sendResult = await emailProvider.sendOutreachEmail({
       to: lead.publicEmail,
