@@ -8,17 +8,26 @@ export interface DiscoverySearchInput {
   limit: number;
   websitePreference?: 'ANY' | 'NO_WEBSITE' | 'WEBSITE_EXISTS' | 'POOR_OUTDATED';
   contactPreference?: 'EITHER' | 'EMAIL_AVAILABLE' | 'PHONE_AVAILABLE';
+  providerId?: string;
+  useDemoProvider?: boolean;
 }
+
+export type ContactDataStatus = 'VERIFIED' | 'SOURCE_CONFIRMED' | 'FOUND' | 'UNAVAILABLE';
 
 export interface DiscoveredBusinessRecord {
   sourceRecordId: string;
   businessName: string;
+  contactName?: string | null;
   profession: string;
   city: string;
   address: string;
   website?: string | null;
   publicEmail?: string | null;
   publicPhone?: string | null;
+  contactStatus?: ContactDataStatus;
+  emailStatus?: 'SOURCE_CONFIRMED' | 'UNAVAILABLE';
+  phoneStatus?: 'SOURCE_CONFIRMED' | 'UNAVAILABLE';
+  retrievedAt?: string;
   source: string;
   sourceUrl: string;
   sourceQuality: SourceQuality;

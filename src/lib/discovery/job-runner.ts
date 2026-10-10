@@ -11,10 +11,17 @@ import { DEMO_ORGANIZATION_ID } from '../db/demo-data';
 
 export interface DiscoveryItemResult {
   businessName: string;
+  contactName?: string | null;
+  profession?: string;
   city: string;
+  address?: string;
   website: string | null;
   publicEmail: string | null;
   publicPhone: string | null;
+  contactStatus?: string;
+  emailStatus?: string;
+  phoneStatus?: string;
+  retrievedAt?: string;
   source: string;
   sourceUrl: string;
   sourceQuality: string;
@@ -65,7 +72,7 @@ export class DiscoveryJobRunner {
 
     try {
       // 1. Resolve Provider
-      const provider = providerRegistry.getActiveDiscoveryProvider();
+      const provider = providerRegistry.getActiveDiscoveryProvider(input);
 
       if (!provider.isConfigured()) {
         const status = provider.getStatus();
@@ -109,10 +116,17 @@ export class DiscoveryJobRunner {
           progress.duplicates++;
           progress.results.push({
             businessName: entity.businessName.normalizedValue,
+            contactName: entity.contactName,
+            profession: entity.profession,
             city: entity.city.normalizedValue,
+            address: entity.address.normalizedValue,
             website: entity.website?.normalizedValue || null,
             publicEmail: entity.publicEmail?.normalizedValue || null,
             publicPhone: entity.publicPhone?.normalizedValue || null,
+            contactStatus: entity.contactStatus,
+            emailStatus: entity.emailStatus,
+            phoneStatus: entity.phoneStatus,
+            retrievedAt: entity.retrievedAt,
             source: entity.source,
             sourceUrl: entity.sourceUrl,
             sourceQuality: entity.sourceQuality,
@@ -139,10 +153,17 @@ export class DiscoveryJobRunner {
           progress.errors++;
           progress.results.push({
             businessName: item.entity.businessName.normalizedValue,
+            contactName: item.entity.contactName,
+            profession: item.entity.profession,
             city: item.entity.city.normalizedValue,
+            address: item.entity.address.normalizedValue,
             website: item.entity.website?.normalizedValue || null,
             publicEmail: item.entity.publicEmail?.normalizedValue || null,
             publicPhone: item.entity.publicPhone?.normalizedValue || null,
+            contactStatus: item.entity.contactStatus,
+            emailStatus: item.entity.emailStatus,
+            phoneStatus: item.entity.phoneStatus,
+            retrievedAt: item.entity.retrievedAt,
             source: item.entity.source,
             sourceUrl: item.entity.sourceUrl,
             sourceQuality: item.entity.sourceQuality,
@@ -222,12 +243,12 @@ export class DiscoveryJobRunner {
                 },
               ]
             : [],
-          contacts: entity.publicEmail || entity.publicPhone
+          contacts: (entity.publicEmail || entity.publicPhone || entity.contactName)
             ? [
                 {
                   id: `cnt-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                  name: `${entity.businessName.normalizedValue} Primary Office`,
-                  role: 'Public Business Contact',
+                  name: entity.contactName || `${entity.businessName.normalizedValue} Primary Office`,
+                  role: entity.contactName ? 'Principal Professional' : 'Public Business Contact',
                   email: entity.publicEmail?.normalizedValue || null,
                   phone: entity.publicPhone?.normalizedValue || null,
                   isPrimary: true,
@@ -271,10 +292,17 @@ export class DiscoveryJobRunner {
         const importStatus = item.isPossibleDuplicate ? 'POSSIBLE_DUPLICATE_IMPORTED' : 'IMPORTED';
         progress.results.push({
           businessName: createdLead.businessName,
+          contactName: entity.contactName,
+          profession: createdLead.profession,
           city: createdLead.city,
+          address: createdLead.address,
           website: createdLead.website || null,
           publicEmail: createdLead.publicEmail || null,
           publicPhone: createdLead.publicPhone || null,
+          contactStatus: entity.contactStatus,
+          emailStatus: entity.emailStatus,
+          phoneStatus: entity.phoneStatus,
+          retrievedAt: entity.retrievedAt,
           source: createdLead.source,
           sourceUrl: createdLead.sourceUrl || '',
           sourceQuality: createdLead.sourceQuality || entity.sourceQuality,

@@ -14,6 +14,8 @@ const DiscoveryRequestSchema = z.object({
   limit: z.number().min(1).max(50).default(10),
   websitePreference: z.enum(['ANY', 'NO_WEBSITE', 'WEBSITE_EXISTS', 'POOR_OUTDATED']).default('ANY'),
   contactPreference: z.enum(['EITHER', 'EMAIL_AVAILABLE', 'PHONE_AVAILABLE']).default('EITHER'),
+  providerId: z.string().optional(),
+  useDemoProvider: z.boolean().optional(),
 });
 
 export async function POST(request: NextRequest) {

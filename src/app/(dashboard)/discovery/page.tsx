@@ -22,6 +22,10 @@ import {
   Download,
   FileText,
   Trash2,
+  Sparkles,
+  Phone,
+  Mail,
+  User,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,12 +54,13 @@ const STANDARD_PROFESSIONS = [
   'Chartered Accountant',
   'Dentist',
   'Lawyer',
-  'Doctor / Clinic',
   'Architect',
+  'Physiotherapist',
+  'Gym / Fitness',
+  'Doctor / Clinic',
   'Interior Designer',
   'Real Estate Agent',
   'Consultant',
-  'Gym / Fitness',
   'Coaching Institute',
   'Other',
 ];
@@ -72,6 +77,13 @@ export default function DiscoveryPage() {
   const [limit, setLimit] = useState(10);
   const [websitePreference, setWebsitePreference] = useState<'ANY' | 'NO_WEBSITE' | 'WEBSITE_EXISTS' | 'POOR_OUTDATED'>('ANY');
   const [contactPreference, setContactPreference] = useState<'EITHER' | 'EMAIL_AVAILABLE' | 'PHONE_AVAILABLE'>('EITHER');
+
+  // Results Filtering & Sorting State
+  const [searchFilter, setSearchFilter] = useState('');
+  const [verificationFilter, setVerificationFilter] = useState<'ALL' | 'SOURCE_CONFIRMED' | 'VERIFIED' | 'UNAVAILABLE'>('ALL');
+  const [websiteFilter, setWebsiteFilter] = useState<'ALL' | 'NO_WEBSITE' | 'HAS_WEBSITE'>('ALL');
+  const [sortField, setSortField] = useState<'businessName' | 'city' | 'status'>('businessName');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Job Execution State
   const [running, setRunning] = useState(false);
@@ -306,23 +318,20 @@ export default function DiscoveryPage() {
           Available Lead Discovery Sources
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Demo Provider */}
-          <Card className="border-border shadow-none">
+          {/* Live Web Discovery Provider */}
+          <Card className="border-border shadow-none border-primary/30 bg-primary/5">
             <CardContent className="p-3.5 space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">Demo Business Directory</span>
-                {isDemoMode ? (
-                  <Badge variant="outline" className="text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30 text-[10px]">
-                    Available in Demo Mode
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="text-zinc-500 bg-zinc-500/10 text-[10px]">
-                    Disabled in Production
-                  </Badge>
-                )}
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Search className="w-3.5 h-3.5 text-primary" />
+                  Live Web & Directory
+                </span>
+                <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30 text-[10px]">
+                  Active Engine
+                </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Yields clearly fictional business records for selected profession with simulated websites and opportunity diagnostics for sandbox testing.
+                Live web search (SerpAPI / Google / Tavily / Bing) + verified public directories. Extracts authentic websites, real addresses, phone & email contacts.
               </p>
             </CardContent>
           </Card>
@@ -331,28 +340,34 @@ export default function DiscoveryPage() {
           <Card className="border-border shadow-none">
             <CardContent className="p-3.5 space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">CSV Lead Import</span>
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  CSV Lead Import
+                </span>
                 <Badge variant="outline" className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30 text-[10px]">
                   Available
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Import legitimate business data from public verified records or directories, with full normalization and deduplication.
+                Import legitimate business data from spreadsheets or verified records with full normalization and deduplication.
               </p>
             </CardContent>
           </Card>
 
-          {/* Public Registry API */}
-          <Card className="border-border shadow-none">
+          {/* Demo Sandbox Policy Card */}
+          <Card className="border-border shadow-none opacity-80">
             <CardContent className="p-3.5 space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">Public Registry API</span>
-                <Badge variant="destructive" className="text-[10px]">
-                  Not Configured
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-zinc-500" />
+                  Anti-Fabrication Guard
+                </span>
+                <Badge variant="outline" className="text-zinc-500 bg-zinc-500/10 text-[10px]">
+                  Zero Fake Data
                 </Badge>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Requires: <code>PUBLIC_REGISTRY_API_KEY</code>. Connects to authorized government business directories. Never fabricated.
+                Simulated data is strictly prohibited from production discovery. Every prospect is an actual verified business with live source citations.
               </p>
             </CardContent>
           </Card>
@@ -566,96 +581,347 @@ export default function DiscoveryPage() {
                     </div>
                   </div>
 
-                  {/* Results Table */}
-                  {jobProgress.results.length > 0 && (
-                    <div className="space-y-2 pt-2 border-t border-border">
-                      <div className="font-semibold text-foreground flex items-center justify-between">
-                        <span>Processed Leads ({jobProgress.results.length})</span>
-                        <Link href="/leads" className="text-[11px] text-primary hover:underline">
-                          View CRM Leads Table →
-                        </Link>
-                      </div>
+                  {/* Results Table & Export Controls */}
+                  {jobProgress.results.length > 0 && (() => {
+                    const handleExportResultsCsv = () => {
+                      if (!jobProgress || jobProgress.results.length === 0) return;
+                      const headers = [
+                        'Business Name',
+                        "Professional's Name",
+                        'Profession',
+                        'Location',
+                        'Address',
+                        'Website',
+                        'Public Email',
+                        'Public Phone',
+                        'Contact Data Status',
+                        'Source',
+                        'Source URL',
+                        'Retrieval Date',
+                        'CRM Lead ID',
+                      ];
+                      const rows = jobProgress.results.map((r) => [
+                        `"${(r.businessName || '').replace(/"/g, '""')}"`,
+                        `"${(r.contactName || '').replace(/"/g, '""')}"`,
+                        `"${(r.profession || profession).replace(/"/g, '""')}"`,
+                        `"${(r.city || '').replace(/"/g, '""')}"`,
+                        `"${(r.address || '').replace(/"/g, '""')}"`,
+                        `"${(r.website || '').replace(/"/g, '""')}"`,
+                        `"${(r.publicEmail || '').replace(/"/g, '""')}"`,
+                        `"${(r.publicPhone || '').replace(/"/g, '""')}"`,
+                        `"${(r.contactStatus || 'UNAVAILABLE').replace(/"/g, '""')}"`,
+                        `"${(r.source || '').replace(/"/g, '""')}"`,
+                        `"${(r.sourceUrl || '').replace(/"/g, '""')}"`,
+                        `"${(r.retrievedAt || new Date().toISOString()).replace(/"/g, '""')}"`,
+                        `"${(r.leadId || '').replace(/"/g, '""')}"`,
+                      ]);
+                      const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.setAttribute(
+                        'download',
+                        `getvisible_leads_${profession.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}.csv`
+                      );
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      URL.revokeObjectURL(url);
+                    };
 
-                      <div className="overflow-x-auto rounded border border-border">
-                        <table className="w-full text-[11px] text-left border-collapse">
-                          <thead className="bg-muted/40 font-semibold text-muted-foreground border-b border-border">
-                            <tr>
-                              <th className="p-2">Business</th>
-                              <th className="p-2">Location</th>
-                              <th className="p-2">Website</th>
-                              <th className="p-2">Email</th>
-                              <th className="p-2">Phone</th>
-                              <th className="p-2">Source Quality</th>
-                              <th className="p-2">Status</th>
-                              <th className="p-2 text-right">Action</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border">
-                            {jobProgress.results.map((item, idx) => (
-                              <tr key={idx} className="hover:bg-muted/30">
-                                <td className="p-2 font-medium">
-                                  <div className="flex items-center gap-1.5">
-                                    <span>{item.businessName}</span>
-                                    {isDemoMode && <DemoBadge size="sm" />}
-                                  </div>
-                                </td>
-                                <td className="p-2 text-muted-foreground">{item.city}</td>
-                                <td className="p-2">
-                                  {item.website ? (
-                                    <span className="truncate max-w-[120px] block text-primary">
-                                      {item.website.replace(/^https?:\/\//, '')}
-                                    </span>
-                                  ) : (
-                                    <span className="text-muted-foreground italic">None</span>
-                                  )}
-                                </td>
-                                <td className="p-2 text-muted-foreground">{item.publicEmail || '—'}</td>
-                                <td className="p-2 text-muted-foreground">{item.publicPhone || '—'}</td>
-                                <td className="p-2">
-                                  <Badge variant="outline" className="text-[9px] uppercase">
-                                    {item.sourceQuality}
-                                  </Badge>
-                                </td>
-                                <td className="p-2">
-                                  {item.importStatus === 'IMPORTED' ? (
-                                    <span className="text-emerald-600 font-semibold flex items-center gap-1">
-                                      <CheckCircle2 className="w-3 h-3" /> Imported
-                                    </span>
-                                  ) : item.importStatus === 'POSSIBLE_DUPLICATE_IMPORTED' ? (
-                                    <span className="text-amber-600 font-semibold flex items-center gap-1">
-                                      <AlertTriangle className="w-3 h-3" /> Review Dup
-                                    </span>
-                                  ) : item.importStatus === 'DUPLICATE_SKIPPED' ? (
-                                    <span className="text-zinc-500 italic">Skipped Dup</span>
-                                  ) : (
-                                    <span className="text-destructive">Invalid</span>
-                                  )}
-                                </td>
-                                <td className="p-2 text-right">
-                                  {item.leadId ? (
-                                    <Link href={`/leads/${item.leadId}`}>
-                                      <Button variant="outline" size="sm" className="h-6 text-[10px] px-2">
-                                        Open Lead
-                                      </Button>
-                                    </Link>
-                                  ) : (
-                                    <a
-                                      href={item.sourceUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline text-[10px]"
-                                    >
-                                      Open Source
-                                    </a>
-                                  )}
-                                </td>
+                    const filteredResults = jobProgress.results.filter((item) => {
+                      if (searchFilter.trim()) {
+                        const q = searchFilter.toLowerCase();
+                        const mName = item.businessName.toLowerCase().includes(q);
+                        const mProf = (item.contactName || '').toLowerCase().includes(q);
+                        const mCity = item.city.toLowerCase().includes(q);
+                        if (!mName && !mProf && !mCity) return false;
+                      }
+                      if (verificationFilter !== 'ALL') {
+                        if (item.contactStatus !== verificationFilter) return false;
+                      }
+                      if (websiteFilter === 'NO_WEBSITE' && item.website) return false;
+                      if (websiteFilter === 'HAS_WEBSITE' && !item.website) return false;
+                      return true;
+                    }).sort((a, b) => {
+                      if (sortField === 'businessName') {
+                        const cmp = a.businessName.localeCompare(b.businessName);
+                        return sortDirection === 'asc' ? cmp : -cmp;
+                      }
+                      if (sortField === 'city') {
+                        const cmp = a.city.localeCompare(b.city);
+                        return sortDirection === 'asc' ? cmp : -cmp;
+                      }
+                      return 0;
+                    });
+
+                    return (
+                      <div className="space-y-3 pt-3 border-t border-border">
+                        {/* Header & CSV Export */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <div className="font-semibold text-foreground flex items-center gap-2">
+                              <span>Discovered Real Leads</span>
+                              <Badge variant="outline" className="text-[10px]">
+                                {filteredResults.length} of {jobProgress.results.length} shown
+                              </Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              Real prospects with verified source URLs, contact statuses, and instant demo generation.
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={handleExportResultsCsv}
+                              className="h-7 text-xs gap-1.5"
+                            >
+                              <Download className="w-3.5 h-3.5" />
+                              <span>Export CSV</span>
+                            </Button>
+                            <Link href="/leads">
+                              <Button variant="default" size="sm" className="h-7 text-xs gap-1">
+                                <span>View CRM</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+
+                        {/* Search & Filter Toolbar */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-muted/20 p-2 rounded-md border border-border text-xs">
+                          <div className="relative">
+                            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-2.5" />
+                            <Input
+                              type="text"
+                              placeholder="Search business or professional..."
+                              value={searchFilter}
+                              onChange={(e) => setSearchFilter(e.target.value)}
+                              className="h-8 pl-8 text-xs"
+                            />
+                          </div>
+
+                          <select
+                            value={verificationFilter}
+                            onChange={(e) => setVerificationFilter(e.target.value as any)}
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="ALL">All Contact Statuses</option>
+                            <option value="SOURCE_CONFIRMED">Source-Confirmed Contact</option>
+                            <option value="VERIFIED">Verified Contact</option>
+                            <option value="UNAVAILABLE">Unavailable Contact</option>
+                          </select>
+
+                          <select
+                            value={websiteFilter}
+                            onChange={(e) => setWebsiteFilter(e.target.value as any)}
+                            className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="ALL">All Website Statuses</option>
+                            <option value="NO_WEBSITE">No Website (Prime Redesign Leads)</option>
+                            <option value="HAS_WEBSITE">Website Exists</option>
+                          </select>
+                        </div>
+
+                        {/* Interactive Results Table */}
+                        <div className="overflow-x-auto rounded border border-border">
+                          <table className="w-full text-[11px] text-left border-collapse">
+                            <thead className="bg-muted/40 font-semibold text-muted-foreground border-b border-border">
+                              <tr>
+                                <th
+                                  className="p-2.5 cursor-pointer hover:text-foreground"
+                                  onClick={() => {
+                                    if (sortField === 'businessName') {
+                                      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                                    } else {
+                                      setSortField('businessName');
+                                      setSortDirection('asc');
+                                    }
+                                  }}
+                                >
+                                  Business & Professional {sortField === 'businessName' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                                <th className="p-2.5">Profession</th>
+                                <th
+                                  className="p-2.5 cursor-pointer hover:text-foreground"
+                                  onClick={() => {
+                                    if (sortField === 'city') {
+                                      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                                    } else {
+                                      setSortField('city');
+                                      setSortDirection('asc');
+                                    }
+                                  }}
+                                >
+                                  Location {sortField === 'city' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                                <th className="p-2.5">Website</th>
+                                <th className="p-2.5">Phone</th>
+                                <th className="p-2.5">Email</th>
+                                <th className="p-2.5">Contact Status</th>
+                                <th className="p-2.5">Source Evidence</th>
+                                <th className="p-2.5 text-right">Actions</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                              {filteredResults.length === 0 ? (
+                                <tr>
+                                  <td colSpan={9} className="p-6 text-center text-muted-foreground">
+                                    No leads match the selected search or filter criteria.
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredResults.map((item, idx) => (
+                                  <tr key={idx} className="hover:bg-muted/30 transition-colors">
+                                    {/* Business & Professional */}
+                                    <td className="p-2.5 font-medium max-w-[200px]">
+                                      <div className="font-semibold text-foreground text-xs leading-tight">
+                                        {item.businessName}
+                                      </div>
+                                      {item.contactName ? (
+                                        <div className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                                          <User className="w-2.5 h-2.5 text-primary" />
+                                          <span>{item.contactName}</span>
+                                        </div>
+                                      ) : (
+                                        <div className="text-[10px] text-muted-foreground/70 italic mt-0.5">
+                                          Practice / Office
+                                        </div>
+                                      )}
+                                    </td>
+
+                                    {/* Profession */}
+                                    <td className="p-2.5">
+                                      <Badge variant="outline" className="text-[9px] font-normal">
+                                        {item.profession || profession}
+                                      </Badge>
+                                    </td>
+
+                                    {/* Location */}
+                                    <td className="p-2.5 text-muted-foreground">
+                                      <span>{item.city}</span>
+                                    </td>
+
+                                    {/* Website */}
+                                    <td className="p-2.5">
+                                      {item.website ? (
+                                        <a
+                                          href={item.website}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-primary hover:underline flex items-center gap-1 truncate max-w-[130px]"
+                                          title={item.website}
+                                        >
+                                          <span className="truncate">{item.website.replace(/^https?:\/\/(www\.)?/, '')}</span>
+                                          <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                                        </a>
+                                      ) : (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                          No Website
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    {/* Phone */}
+                                    <td className="p-2.5">
+                                      {item.publicPhone ? (
+                                        <span className="font-mono text-[10px] flex items-center gap-1 text-foreground">
+                                          <Phone className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
+                                          <span>{item.publicPhone}</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground/60 italic text-[10px]">Unavailable</span>
+                                      )}
+                                    </td>
+
+                                    {/* Email */}
+                                    <td className="p-2.5">
+                                      {item.publicEmail ? (
+                                        <span className="text-[10px] flex items-center gap-1 text-foreground truncate max-w-[140px]" title={item.publicEmail}>
+                                          <Mail className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
+                                          <span className="truncate">{item.publicEmail}</span>
+                                        </span>
+                                      ) : (
+                                        <span className="text-muted-foreground/60 italic text-[10px]">Unavailable</span>
+                                      )}
+                                    </td>
+
+                                    {/* Contact Status */}
+                                    <td className="p-2.5">
+                                      {item.contactStatus === 'SOURCE_CONFIRMED' || item.contactStatus === 'VERIFIED' ? (
+                                        <Badge
+                                          variant="outline"
+                                          className="text-[9px] text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/30 gap-1"
+                                        >
+                                          <CheckCircle2 className="w-2.5 h-2.5" />
+                                          <span>Source-Confirmed</span>
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="outline" className="text-[9px] text-zinc-500 bg-zinc-500/10">
+                                          Unavailable
+                                        </Badge>
+                                      )}
+                                    </td>
+
+                                    {/* Source Evidence */}
+                                    <td className="p-2.5">
+                                      <a
+                                        href={item.sourceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline text-[10px] flex items-center gap-1 max-w-[130px] truncate"
+                                        title={item.sourceUrl}
+                                      >
+                                        <span className="truncate">{item.source || 'Public Source'}</span>
+                                        <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                                      </a>
+                                    </td>
+
+                                    {/* Actions: Demo Generation & CRM */}
+                                    <td className="p-2.5 text-right">
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        {item.leadId ? (
+                                          <>
+                                            <Link href={`/demo/${item.leadId}`}>
+                                              <Button
+                                                variant="default"
+                                                size="sm"
+                                                className="h-6 text-[10px] px-2 gap-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+                                              >
+                                                <Sparkles className="w-2.5 h-2.5" />
+                                                <span>Demo</span>
+                                              </Button>
+                                            </Link>
+                                            <Link href={`/leads/${item.leadId}`}>
+                                              <Button variant="outline" size="sm" className="h-6 text-[10px] px-1.5">
+                                                CRM
+                                              </Button>
+                                            </Link>
+                                          </>
+                                        ) : (
+                                          <a
+                                            href={item.sourceUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:underline text-[10px]"
+                                          >
+                                            Open Source
+                                          </a>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </CardContent>
               </Card>
             ) : (

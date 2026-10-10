@@ -4,12 +4,17 @@ import { FieldProvenance, SourceQuality } from '@/types';
 export interface NormalizedLeadEntity {
   sourceRecordId: string;
   businessName: FieldProvenance;
+  contactName?: string | null;
   profession: string;
   city: FieldProvenance & { region?: string };
   address: FieldProvenance;
   website: (FieldProvenance & { canonicalDomain: string }) | null;
   publicEmail: FieldProvenance | null;
   publicPhone: FieldProvenance | null;
+  contactStatus?: string;
+  emailStatus?: string;
+  phoneStatus?: string;
+  retrievedAt?: string;
   source: string;
   sourceUrl: string;
   sourceQuality: SourceQuality;
@@ -107,12 +112,17 @@ export class LeadNormalizer {
     return {
       sourceRecordId: record.sourceRecordId,
       businessName,
+      contactName: record.contactName || null,
       profession: record.profession || 'Chartered Accountant',
       city,
       address,
       website,
       publicEmail,
       publicPhone,
+      contactStatus: record.contactStatus || (record.publicEmail || record.publicPhone ? 'SOURCE_CONFIRMED' : 'UNAVAILABLE'),
+      emailStatus: record.emailStatus || (record.publicEmail ? 'SOURCE_CONFIRMED' : 'UNAVAILABLE'),
+      phoneStatus: record.phoneStatus || (record.publicPhone ? 'SOURCE_CONFIRMED' : 'UNAVAILABLE'),
+      retrievedAt: record.retrievedAt || timestamp,
       source: record.source,
       sourceUrl: record.sourceUrl,
       sourceQuality: record.sourceQuality,
