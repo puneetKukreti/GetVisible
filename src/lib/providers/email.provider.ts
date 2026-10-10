@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import https from 'https';
 import { ProviderExecutionResult, ProviderStatus } from './provider-result';
 
 export interface EmailSendPayload {
@@ -18,13 +19,42 @@ export interface IEmailProvider {
 }
 
 /**
- * Builds the responsive HTML email template featuring the live website concept screenshot
+ * Downloads image buffer safely for embedding as an inline CID attachment.
+ * Inline attachments avoid Gmail third-party image blocking and spam filters.
  */
-function buildOutreachHtml(payload: EmailSendPayload): string {
+async function fetchImageBuffer(url: string): Promise<Buffer | null> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(null), 8000);
+    https
+      .get(url, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          clearTimeout(timeout);
+          return fetchImageBuffer(res.headers.location).then(resolve);
+        }
+        const chunks: Buffer[] = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          clearTimeout(timeout);
+          resolve(Buffer.concat(chunks));
+        });
+      })
+      .on('error', () => {
+        clearTimeout(timeout);
+        resolve(null);
+      });
+  });
+}
+
+/**
+ * Clean, human-looking HTML template that mimics personal agency communication.
+ * Avoids aggressive spam triggers (NO heavy colored headers, NO "UNSUBSCRIBE" blast text).
+ */
+function buildInboxFriendlyHtml(payload: EmailSendPayload, hasInlineCid: boolean): string {
   const urlMatch = payload.body.match(/https?:\/\/[^\s]+/);
   const targetDemoUrl = urlMatch ? urlMatch[0] : 'https://get-visible-web.vercel.app';
   const encodedDemoUrl = encodeURIComponent(targetDemoUrl);
-  const screenshotImgUrl = `https://api.microlink.io?url=${encodedDemoUrl}&screenshot=true&meta=false&embed=screenshot.url`;
+  const remoteImgUrl = `https://api.microlink.io?url=${encodedDemoUrl}&screenshot=true&meta=false&embed=screenshot.url`;
+  const imgSrc = hasInlineCid ? 'cid:websitepreview' : remoteImgUrl;
 
   const cleanBodyText = payload.body.replace(/Preview Snapshot:[\s\S]*?(Best regards|$)/i, '$1');
 
@@ -33,47 +63,34 @@ function buildOutreachHtml(payload: EmailSendPayload): string {
     <html>
     <head>
       <meta charset="utf-8">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; margin: 0; padding: 24px; background-color: #f8fafc; }
-        .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
-        .header { background: #0f172a; padding: 24px; color: #ffffff; }
-        .header h1 { margin: 0; font-size: 20px; font-weight: 700; }
-        .content { padding: 28px; }
-        .screenshot-card { margin: 24px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #f1f5f9; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
-        .screenshot-card img { width: 100%; height: auto; display: block; border-bottom: 1px solid #e2e8f0; }
-        .screenshot-footer { padding: 12px 16px; background: #ffffff; font-size: 13px; font-weight: 600; color: #334155; }
-        .button { display: inline-block; background: #2563eb; color: #ffffff !important; padding: 12px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 14px; margin-top: 12px; }
-        .footer { padding: 20px 28px; background: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 11px; color: #64748b; line-height: 1.5; }
-      </style>
     </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <h1>Digital Practice Concept · GetVisible</h1>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #222222; margin: 0; padding: 16px;">
+      <div style="max-width: 600px; margin: 0 auto;">
+        <div style="white-space: pre-line; margin-bottom: 20px; font-size: 14px; color: #222222;">
+${cleanBodyText}
         </div>
-        <div class="content">
-          <div style="white-space: pre-line; margin-bottom: 20px; font-size: 14px; color: #334155;">
-            ${cleanBodyText}
-          </div>
-          
-          <div class="screenshot-card">
-            <a href="${targetDemoUrl}" target="_blank">
-              <img src="${screenshotImgUrl}" alt="Personalized Website Preview" />
-            </a>
-            <div class="screenshot-footer">
-              Interactive Concept Preview (Click image or button below to view live)
-            </div>
-          </div>
 
-          <div style="text-align: center; margin: 24px 0;">
-            <a href="${targetDemoUrl}" target="_blank" class="button">
-              Open Live Interactive Website Demo &rarr;
-            </a>
+        <div style="margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #ffffff;">
+          <a href="${targetDemoUrl}" target="_blank" style="text-decoration: none; display: block;">
+            <img src="${imgSrc}" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #e2e8f0;" alt="Interactive Practice Website Concept" />
+          </a>
+          <div style="padding: 10px 14px; background: #f8fafc; font-size: 12px; font-weight: 600; color: #475569;">
+            Live Interactive Concept Preview (Click image or link below to view)
           </div>
         </div>
-        <div class="footer">
-          This individualized concept was prepared specifically for this business practice. We adhere strictly to consent-first outreach. If you do not wish to receive further communications, please reply with &quot;UNSUBSCRIBE&quot;.
+
+        <div style="margin: 20px 0;">
+          <a href="${targetDemoUrl}" target="_blank" style="display: inline-block; background-color: #1a73e8; color: #ffffff !important; padding: 10px 22px; border-radius: 5px; text-decoration: none; font-weight: 600; font-size: 13px;">
+            Open Live Interactive Website Demo &rarr;
+          </a>
         </div>
+
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0 16px;" />
+        
+        <p style="font-size: 11px; color: #64748b; line-height: 1.4; margin: 0;">
+          Prepared by GetVisible Digital Practice Team &bull; Gurgaon, Haryana<br />
+          If you prefer not to receive updates from us, simply reply with "opt out".
+        </p>
       </div>
     </body>
     </html>
@@ -81,8 +98,9 @@ function buildOutreachHtml(payload: EmailSendPayload): string {
 }
 
 /**
- * Direct Gmail SMTP Provider (Uses Google App Passwords)
- * Delivers directly from user's authentic Gmail address to ANY customer in the world.
+ * Direct Gmail SMTP Provider
+ * Sends authentic 1-on-1 personal emails through your verified Gmail account.
+ * Uses CID inline image embedding to maximize primary inbox placement.
  */
 export class GmailSmtpProvider implements IEmailProvider {
   name = 'GmailSmtpProvider';
@@ -134,15 +152,41 @@ export class GmailSmtpProvider implements IEmailProvider {
         },
       });
 
-      const htmlBody = buildOutreachHtml(payload);
+      // Fetch live screenshot buffer to attach directly as inline CID
+      const urlMatch = payload.body.match(/https?:\/\/[^\s]+/);
+      const targetDemoUrl = urlMatch ? urlMatch[0] : 'https://get-visible-web.vercel.app';
+      const encodedDemoUrl = encodeURIComponent(targetDemoUrl);
+      const screenshotImgUrl = `https://api.microlink.io?url=${encodedDemoUrl}&screenshot=true&meta=false&embed=screenshot.url`;
 
-      const info = await transporter.sendMail({
-        from: `"GetVisible Digital" <${this.user}>`,
+      const imageBuffer = await fetchImageBuffer(screenshotImgUrl);
+      const hasInlineCid = Boolean(imageBuffer && imageBuffer.length > 0);
+
+      const htmlBody = buildInboxFriendlyHtml(payload, hasInlineCid);
+
+      const mailOptions: nodemailer.SendMailOptions = {
+        from: `"GetVisible Team" <${this.user}>`,
         to: payload.to,
+        replyTo: this.user,
         subject: payload.subject,
         text: payload.body,
         html: htmlBody,
-      });
+        headers: {
+          'X-Mailer': 'GetVisible Client Platform',
+          'Importance': 'Normal',
+        },
+      };
+
+      if (hasInlineCid && imageBuffer) {
+        mailOptions.attachments = [
+          {
+            filename: 'website-preview.png',
+            content: imageBuffer,
+            cid: 'websitepreview',
+          },
+        ];
+      }
+
+      const info = await transporter.sendMail(mailOptions);
 
       return {
         success: true,
@@ -207,7 +251,7 @@ export class ProductionEmailProvider implements IEmailProvider {
 
     try {
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-      const htmlBody = buildOutreachHtml(payload);
+      const htmlBody = buildInboxFriendlyHtml(payload, false);
 
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
