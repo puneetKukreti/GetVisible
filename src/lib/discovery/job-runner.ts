@@ -14,10 +14,17 @@ export interface DiscoveryItemResult {
   contactName?: string | null;
   profession?: string;
   city: string;
+  state?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
   address?: string;
   website: string | null;
   publicEmail: string | null;
   publicPhone: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
   contactStatus?: string;
   emailStatus?: string;
   phoneStatus?: string;
@@ -119,10 +126,17 @@ export class DiscoveryJobRunner {
             contactName: entity.contactName,
             profession: entity.profession,
             city: entity.city.normalizedValue,
+            state: entity.state || null,
+            country: entity.country || null,
+            postalCode: entity.postalCode || null,
             address: entity.address.normalizedValue,
             website: entity.website?.normalizedValue || null,
             publicEmail: entity.publicEmail?.normalizedValue || null,
             publicPhone: entity.publicPhone?.normalizedValue || null,
+            rating: entity.rating ?? null,
+            reviewCount: entity.reviewCount ?? null,
+            latitude: entity.latitude ?? null,
+            longitude: entity.longitude ?? null,
             contactStatus: entity.contactStatus,
             emailStatus: entity.emailStatus,
             phoneStatus: entity.phoneStatus,
@@ -156,10 +170,17 @@ export class DiscoveryJobRunner {
             contactName: item.entity.contactName,
             profession: item.entity.profession,
             city: item.entity.city.normalizedValue,
+            state: item.entity.state || null,
+            country: item.entity.country || null,
+            postalCode: item.entity.postalCode || null,
             address: item.entity.address.normalizedValue,
             website: item.entity.website?.normalizedValue || null,
             publicEmail: item.entity.publicEmail?.normalizedValue || null,
             publicPhone: item.entity.publicPhone?.normalizedValue || null,
+            rating: item.entity.rating ?? null,
+            reviewCount: item.entity.reviewCount ?? null,
+            latitude: item.entity.latitude ?? null,
+            longitude: item.entity.longitude ?? null,
             contactStatus: item.entity.contactStatus,
             emailStatus: item.entity.emailStatus,
             phoneStatus: item.entity.phoneStatus,
@@ -295,10 +316,17 @@ export class DiscoveryJobRunner {
           contactName: entity.contactName,
           profession: createdLead.profession,
           city: createdLead.city,
+          state: entity.state || null,
+          country: entity.country || null,
+          postalCode: entity.postalCode || null,
           address: createdLead.address,
           website: createdLead.website || null,
           publicEmail: createdLead.publicEmail || null,
           publicPhone: createdLead.publicPhone || null,
+          rating: entity.rating ?? null,
+          reviewCount: entity.reviewCount ?? null,
+          latitude: entity.latitude ?? null,
+          longitude: entity.longitude ?? null,
           contactStatus: entity.contactStatus,
           emailStatus: entity.emailStatus,
           phoneStatus: entity.phoneStatus,

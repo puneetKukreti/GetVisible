@@ -98,6 +98,56 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
+---
+
+## Universal Business Lead Extractor (Leads Discovery)
+
+The application includes **Business Lead Extractor** at `/discovery`, providing universal multi-industry lead discovery, automated contact cleansing, duplicate detection, and professional Excel/CSV export.
+
+### Supported Industries & Categories
+Users can extract leads for any commercial category or free-form keyword without modifying source code:
+- Lawyers & Law Firms
+- Doctors, Dentists & Medical Clinics
+- Real Estate Agents & Brokers
+- Restaurants, Cafes & Bakeries
+- Gyms & Fitness Centers
+- Manufacturers & Wholesalers
+- Importers & Exporters
+- Digital Marketing Agencies
+- Hotels, Resorts & Travel Agencies
+- Salons & Beauty Centers
+- Contractors & Repair Services
+- Chartered Accountants & Tax Consultants
+- Architects & Interior Designers
+- *Any custom business category or niche entered by the user*
+
+### Data Sources & Provider Adapters
+1. **Google Places API (`google-places`):**
+   - Direct integration with Google Places API (Places Text Search & Place Details).
+   - Retrieves verified place names, physical addresses, ratings, review counts, and international phone numbers.
+   - Configure in `.env`: `GOOGLE_PLACES_API_KEY=your_google_cloud_api_key`.
+2. **Live Web & Directory Search Engine (`live-search`):**
+   - Discovers live business websites and public directory records.
+   - Crawls homepages and `/contact` pages for authenticated public phone numbers and emails.
+   - Supports optional SerpAPI, Google CSE, and Tavily AI accelerators.
+3. **Licensed Public Business Registry (`public-registry`):**
+   - Authoritative professional directories (ICAI, Bar Council, DCI, COA).
+4. **Spreadsheet Import Engine (CSV / XLSX):**
+   - Drag-and-drop or upload `.csv`, `.xlsx`, or `.xls` spreadsheets.
+   - Normalizes columns, cleans emails, formats phone numbers, and flags duplicates.
+
+### Data Cleansing & Anti-Injection Defense
+- Normalizes phone numbers with country prefixes, formats standard text, and extracts canonical website domains.
+- Multi-signal duplicate detection (canonical domain match, phone match, business email, and name similarity).
+- **Formula Injection Defense (CWE-1236):** Escapes values starting with `=`, `+`, `-`, `@`, `\t`, or `\r` with a leading `'` to protect spreadsheets against CSV/XLSX formula execution.
+
+### Excel (.xlsx) & CSV Export
+- **Sheet 1 (Business Leads):** Formatted lead records, styled column widths, AutoFilter enabled, frozen header row.
+- **Sheet 2 (Export Summary):** Search keyword, location, data provider, record counts, and coverage metrics.
+- Export history logged with re-download capabilities.
+
+---
+
 ## Verification & Quality Assurance
 
 Run the test suite:
@@ -119,13 +169,3 @@ Run production build:
 ```bash
 npm run build
 ```
-
----
-
-## Phase 2 Roadmap
-
-- Automated ICAI and MCA public registry scheduled crawling.
-- Live Google Lighthouse & PageSpeed Insights API diagnostics.
-- Multi-agent LangGraph workflow for automated opportunity reasoning.
-- Interactive Next.js website demo generator with Vercel preview deployment.
-- Resend webhook integration for 1-to-1 reply tracking and intent classification.

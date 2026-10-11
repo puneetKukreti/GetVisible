@@ -10,6 +10,8 @@ import { getResolvedOrganizationId } from '@/lib/auth';
 import { LeadData, WebsiteStatus } from '@/types';
 import { DiscoveryItemResult } from '@/lib/discovery/job-runner';
 
+import * as XLSX from 'xlsx';
+
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
@@ -19,15 +21,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
     }
 
-
     let csvContent = '';
     const contentType = request.headers.get('content-type') || '';
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       const file = formData.get('file');
-      if (file && typeof (file as Blob).text === 'function') {
-        csvContent = await (file as Blob).text();
+      if (file && typeof (file as Blob).arrayBuffer === 'function') {
+        const fileObj = file as File;
+        const name = (fileObj.name || '').toLowerCase();
+        if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+          const ab = await fileObj.arrayBuffer();
+          const wb = XLSX.read(Buffer.from(ab), { type: 'buffer' });
+          const sheetName = wb.SheetNames[0];
+          csvContent = XLSX.utils.sheet_to_csv(wb.Sheets[sheetName]);
+        } else {
+          csvContent = await fileObj.text();
+        }
       } else {
         csvContent = (formData.get('csvContent') as string) || '';
       }

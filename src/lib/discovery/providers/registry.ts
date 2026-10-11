@@ -1,4 +1,5 @@
 import { ILeadSourceProvider, DiscoverySearchInput } from './types';
+import { GooglePlacesProvider } from './google-places';
 import { DemoLeadSourceProvider } from './demo';
 import { CsvLeadSourceProvider } from './csv';
 import { PublicRegistryLeadSourceProvider } from './public-registry';
@@ -21,6 +22,7 @@ export class LeadSourceProviderRegistry {
   }
 
   private registerDefaults() {
+    this.register(new GooglePlacesProvider());
     this.register(new LiveWebSearchProvider());
     this.register(new DemoLeadSourceProvider());
     this.register(new CsvLeadSourceProvider());

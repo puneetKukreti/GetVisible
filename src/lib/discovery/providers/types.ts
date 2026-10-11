@@ -3,13 +3,17 @@ import { ProviderStatus, ProviderExecutionResult } from '@/lib/providers/provide
 
 export interface DiscoverySearchInput {
   profession: string;
+  category?: string;
   location: string;
   locality?: string;
+  radius?: number; // search radius in km or meters
   limit: number;
   websitePreference?: 'ANY' | 'NO_WEBSITE' | 'WEBSITE_EXISTS' | 'POOR_OUTDATED';
   contactPreference?: 'EITHER' | 'EMAIL_AVAILABLE' | 'PHONE_AVAILABLE';
   providerId?: string;
   useDemoProvider?: boolean;
+  fieldsToCollect?: string[];
+  exportFormat?: 'XLSX' | 'CSV';
 }
 
 export type ContactDataStatus = 'VERIFIED' | 'SOURCE_CONFIRMED' | 'FOUND' | 'UNAVAILABLE';
@@ -20,10 +24,17 @@ export interface DiscoveredBusinessRecord {
   contactName?: string | null;
   profession: string;
   city: string;
+  state?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
   address: string;
   website?: string | null;
   publicEmail?: string | null;
   publicPhone?: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
   contactStatus?: ContactDataStatus;
   emailStatus?: 'SOURCE_CONFIRMED' | 'UNAVAILABLE';
   phoneStatus?: 'SOURCE_CONFIRMED' | 'UNAVAILABLE';

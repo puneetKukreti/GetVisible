@@ -38,11 +38,35 @@ const AGGREGATOR_DOMAINS = [
   'google.com',
 ];
 
+const EXCLUDED_NON_BUSINESS_DOMAINS = [
+  'bing.com',
+  'google.com',
+  'duckduckgo.com',
+  'wikipedia.org',
+  'wiktionary.org',
+  'cambridge.org',
+  'merriam-webster.com',
+  'charteredbus.in',
+  'redbus.in',
+  'makemytrip.com',
+  'tripadvisor.com',
+  'youtube.com',
+  'facebook.com',
+  'twitter.com',
+  'instagram.com',
+  'reddit.com',
+  'quora.com',
+  'zhihu.com',
+  'baidu.com',
+  'charteredstudies.in',
+];
+
 function decodeBingTargetUrl(rawUrl: string): string {
   try {
-    const urlObj = new URL(rawUrl);
+    const cleanUrl = rawUrl.replace(/&amp;/g, '&');
+    const urlObj = new URL(cleanUrl);
     const uParam = urlObj.searchParams.get('u');
-    if (!uParam) return rawUrl;
+    if (!uParam) return cleanUrl;
     const b64 = uParam.startsWith('a1') ? uParam.slice(2) : uParam;
     const decoded = Buffer.from(b64, 'base64').toString('utf8');
     if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
@@ -51,7 +75,62 @@ function decodeBingTargetUrl(rawUrl: string): string {
   } catch {
     // ignore
   }
-  return rawUrl;
+  return rawUrl.replace(/&amp;/g, '&');
+}
+
+function matchesProfessionDomain(text: string, profession: string): boolean {
+  const norm = text.toLowerCase();
+  const prof = profession.toLowerCase();
+
+  if (prof.includes('accountant') || prof === 'ca') {
+    return /ca\b|chartered|accountant|accounting|tax|audit|advisory|gst|financial|consulting/.test(norm);
+  }
+  if (prof.includes('dentist') || prof.includes('dental')) {
+    return /dentist|dental|clinic|teeth|tooth|orthodont|oral|implant|smile/.test(norm);
+  }
+  if (prof.includes('lawyer') || prof.includes('legal') || prof.includes('advocate') || prof.includes('law firm')) {
+    return /lawyer|advocate|law\b|legal|attorney|court|chambers|solicitor|litigation|barrister/.test(norm);
+  }
+  if (prof.includes('architect') || prof.includes('interior')) {
+    return /architect|architecture|interior|design\s+studio|spatial|planners|decor/.test(norm);
+  }
+  if (prof.includes('physio')) {
+    return /physio|therapy|rehab|orthopaedic|spine|pain|clinic/.test(norm);
+  }
+  if (prof.includes('gym') || prof.includes('fitness')) {
+    return /gym|fitness|workout|crossfit|training|strength|club|wellness/.test(norm);
+  }
+  if (prof.includes('doctor') || prof.includes('clinic') || prof.includes('medical') || prof.includes('hospital')) {
+    return /doctor|clinic|hospital|physician|health|care|medic|specialist/.test(norm);
+  }
+  if (prof.includes('real estate') || prof.includes('property') || prof.includes('realtor')) {
+    return /real\s*estate|property|realty|broker|housing|apartments|commercial|realtor/.test(norm);
+  }
+  if (prof.includes('restaurant') || prof.includes('cafe') || prof.includes('dining')) {
+    return /restaurant|cafe|bistro|dining|eatery|food|kitchen|lounge|bakery|catering/.test(norm);
+  }
+  if (prof.includes('manufacturer') || prof.includes('wholesale') || prof.includes('factory')) {
+    return /manufactur|factory|industrial|producer|wholesale|distribut|supplier|works/.test(norm);
+  }
+  if (prof.includes('import') || prof.includes('export') || prof.includes('trading')) {
+    return /import|export|trading|global\s*trade|logistics|freight|shipping|exim/.test(norm);
+  }
+  if (prof.includes('marketing') || prof.includes('agency') || prof.includes('digital')) {
+    return /marketing|digital|seo|agency|branding|advertising|media|web\s*design/.test(norm);
+  }
+  if (prof.includes('hotel') || prof.includes('travel') || prof.includes('resort')) {
+    return /hotel|resort|suites|travel|tourism|tour|stay|hospitality|holidays/.test(norm);
+  }
+  if (prof.includes('salon') || prof.includes('beauty') || prof.includes('spa')) {
+    return /salon|beauty|spa|parlour|hair|skincare|cosmetic|makeover|grooming/.test(norm);
+  }
+  if (prof.includes('contractor') || prof.includes('repair') || prof.includes('builder')) {
+    return /contractor|repair|builder|renovation|plumbing|electrical|construction|services/.test(norm);
+  }
+
+  // Universal fallback for custom user-entered categories
+  const words = prof.split(/\s+/).filter((w) => w.length > 2);
+  return words.length === 0 || words.some((w) => norm.includes(w));
 }
 
 function cleanBusinessTitle(rawTitle: string, profession: string, location: string): string {
@@ -192,70 +271,8 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     const seenNames = new Set<string>();
     const seenDomains = new Set<string>();
 
-    // 1. Check SerpAPI if configured
-    if (process.env.SERPAPI_API_KEY) {
-      try {
-        const serpResults = await this.searchSerpApi(profession, location, locality, limit);
-        for (const item of serpResults) {
-          const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (!seenNames.has(key)) {
-            seenNames.add(key);
-            candidates.push(item);
-          }
-        }
-      } catch (err) {
-        console.warn('[LiveWebSearchProvider] SerpAPI query error:', err);
-      }
-    }
-
-    // 2. Check Google Custom Search API if configured
-    if (process.env.GOOGLE_SEARCH_API_KEY && (process.env.GOOGLE_SEARCH_ENGINE_ID || process.env.GOOGLE_CSE_ID)) {
-      try {
-        const googleResults = await this.searchGoogleCse(profession, location, locality, limit);
-        for (const item of googleResults) {
-          const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (!seenNames.has(key)) {
-            seenNames.add(key);
-            candidates.push(item);
-          }
-        }
-      } catch (err) {
-        console.warn('[LiveWebSearchProvider] Google CSE query error:', err);
-      }
-    }
-
-    // 3. Check Tavily API if configured
-    if (process.env.TAVILY_API_KEY) {
-      try {
-        const tavilyResults = await this.searchTavily(profession, location, locality, limit);
-        for (const item of tavilyResults) {
-          const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (!seenNames.has(key)) {
-            seenNames.add(key);
-            candidates.push(item);
-          }
-        }
-      } catch (err) {
-        console.warn('[LiveWebSearchProvider] Tavily query error:', err);
-      }
-    }
-
-    // 4. Query Live Web Search Engine (Bing/DDG parser with contact extraction)
-    try {
-      const liveResults = await this.searchLiveWebEngine(profession, location, locality, limit);
-      for (const item of liveResults) {
-        const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (!seenNames.has(key)) {
-          seenNames.add(key);
-          candidates.push(item);
-        }
-      }
-    } catch (err) {
-      console.warn('[LiveWebSearchProvider] Live web search engine error:', err);
-    }
-
-    // 5. Match from Verified Public Directory Dataset
-    // (Contains authentic ICAI, DCI, Bar Council, COA public listings)
+    // 1. FIRST: Match from Verified Public Directory Dataset
+    // (Contains authentic ICAI, DCI, Bar Council, COA public listings with real verified phones, emails, and websites)
     const normProf = profession.toLowerCase();
     const normLoc = location.toLowerCase();
 
@@ -263,13 +280,17 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
       const pMatch =
         rec.profession.toLowerCase().includes(normProf) ||
         normProf.includes(rec.profession.toLowerCase()) ||
-        (normProf.includes('ca') && rec.profession.toLowerCase().includes('accountant'));
+        (normProf.includes('ca') && rec.profession.toLowerCase().includes('accountant')) ||
+        (normProf.includes('accountant') && rec.profession.toLowerCase().includes('ca'));
 
       const lMatch =
         rec.city.toLowerCase().includes(normLoc) ||
         normLoc.includes(rec.city.toLowerCase()) ||
         (normLoc.includes('delhi') && rec.city.toLowerCase().includes('delhi')) ||
-        (normLoc.includes('ncr') && (rec.city.toLowerCase().includes('gurgaon') || rec.city.toLowerCase().includes('noida') || rec.city.toLowerCase().includes('delhi')));
+        (normLoc.includes('ncr') &&
+          (rec.city.toLowerCase().includes('gurgaon') ||
+            rec.city.toLowerCase().includes('noida') ||
+            rec.city.toLowerCase().includes('delhi')));
 
       return pMatch && lMatch;
     });
@@ -283,6 +304,74 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
           sourceRecordId: `dir-${match.sourceRecordId}-${Date.now().toString(36)}`,
           retrievedAt: new Date().toISOString(),
         });
+      }
+    }
+
+    // 2. Check SerpAPI if configured and more leads needed
+    if (candidates.length < limit && process.env.SERPAPI_API_KEY) {
+      try {
+        const serpResults = await this.searchSerpApi(profession, location, locality, limit - candidates.length);
+        for (const item of serpResults) {
+          const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (!seenNames.has(key)) {
+            seenNames.add(key);
+            candidates.push(item);
+          }
+        }
+      } catch (err) {
+        console.warn('[LiveWebSearchProvider] SerpAPI query error:', err);
+      }
+    }
+
+    // 3. Check Google Custom Search API if configured and more leads needed
+    if (
+      candidates.length < limit &&
+      process.env.GOOGLE_SEARCH_API_KEY &&
+      (process.env.GOOGLE_SEARCH_ENGINE_ID || process.env.GOOGLE_CSE_ID)
+    ) {
+      try {
+        const googleResults = await this.searchGoogleCse(profession, location, locality, limit - candidates.length);
+        for (const item of googleResults) {
+          const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (!seenNames.has(key)) {
+            seenNames.add(key);
+            candidates.push(item);
+          }
+        }
+      } catch (err) {
+        console.warn('[LiveWebSearchProvider] Google CSE query error:', err);
+      }
+    }
+
+    // 4. Check Tavily API if configured and more leads needed
+    if (candidates.length < limit && process.env.TAVILY_API_KEY) {
+      try {
+        const tavilyResults = await this.searchTavily(profession, location, locality, limit - candidates.length);
+        for (const item of tavilyResults) {
+          const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (!seenNames.has(key)) {
+            seenNames.add(key);
+            candidates.push(item);
+          }
+        }
+      } catch (err) {
+        console.warn('[LiveWebSearchProvider] Tavily query error:', err);
+      }
+    }
+
+    // 5. Query Live Web Search Engine (Bing/DDG parser with contact extraction) if more leads needed
+    if (candidates.length < limit) {
+      try {
+        const liveResults = await this.searchLiveWebEngine(profession, location, locality, limit - candidates.length);
+        for (const item of liveResults) {
+          const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (!seenNames.has(key)) {
+            seenNames.add(key);
+            candidates.push(item);
+          }
+        }
+      } catch (err) {
+        console.warn('[LiveWebSearchProvider] Live web search engine error:', err);
       }
     }
 
@@ -603,8 +692,15 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
           let hostname = '';
           try {
             hostname = new URL(targetUrl).hostname.replace(/^www\./, '');
+            if (EXCLUDED_NON_BUSINESS_DOMAINS.some((d) => hostname.includes(d))) {
+              continue;
+            }
             isAgg = AGGREGATOR_DOMAINS.some((d) => hostname.includes(d));
           } catch {
+            continue;
+          }
+
+          if (!matchesProfessionDomain(title + ' ' + snippet, profession)) {
             continue;
           }
 
@@ -625,7 +721,7 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
 
           const website = isAgg ? null : targetUrl;
 
-          // If direct website and missing contact, quickly fetch homepage for verified contact
+          // If direct website and missing contact, quickly fetch homepage & contact page for verified contact
           if (website && (!phone || !email)) {
             try {
               const siteRes = await fetch(website, {
@@ -646,10 +742,41 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
                   if (eMatches.length > 0) email = eMatches[0];
                 }
               }
+
+              // Try contact page if still missing contact
+              if (!phone || !email) {
+                try {
+                  const contactUrl = new URL('/contact', website).toString();
+                  const cRes = await fetch(contactUrl, {
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                    signal: AbortSignal.timeout(2500),
+                  });
+                  if (cRes.ok) {
+                    const cHtml = await cRes.text();
+                    if (!phone) {
+                      const pMatch = cHtml.match(/(?:\+91[\s-]?)?(?:0\d{2,4}[\s-]?)?[6-9]\d{4}[\s-]?\d{5}|(?:\+91[\s-]?)?0124[\s-]?\d{6,7}/);
+                      if (pMatch) phone = pMatch[0].trim();
+                    }
+                    if (!email) {
+                      const rawMatches = cHtml.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [];
+                      const eMatches = rawMatches
+                        .map((m) => m.trim())
+                        .filter((e) => !e.endsWith('.png') && !e.endsWith('.jpg') && !e.includes('sentry') && !e.includes('wix'));
+                      if (eMatches.length > 0) email = eMatches[0];
+                    }
+                  }
+                } catch {
+                  // ignore
+                }
+              }
             } catch {
               // Ignore timeout / network failure
             }
           }
+
+          // Discard empty leads without any phone, email or website
+          if (!phone && !email && !website) continue;
+          if (isAgg && !phone && !email) continue;
 
           const contactStatus = phone || email ? 'SOURCE_CONFIRMED' : 'UNAVAILABLE';
 

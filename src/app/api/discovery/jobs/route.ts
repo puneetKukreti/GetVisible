@@ -9,13 +9,17 @@ export const dynamic = 'force-dynamic';
 
 const DiscoveryRequestSchema = z.object({
   profession: z.string().default('Chartered Accountant'),
+  category: z.string().optional(),
   location: z.string().default('Gurgaon'),
   locality: z.string().optional(),
-  limit: z.number().min(1).max(50).default(10),
+  radius: z.number().optional(),
+  limit: z.number().min(1).max(500).default(25),
   websitePreference: z.enum(['ANY', 'NO_WEBSITE', 'WEBSITE_EXISTS', 'POOR_OUTDATED']).default('ANY'),
   contactPreference: z.enum(['EITHER', 'EMAIL_AVAILABLE', 'PHONE_AVAILABLE']).default('EITHER'),
   providerId: z.string().optional(),
   useDemoProvider: z.boolean().optional(),
+  fieldsToCollect: z.array(z.string()).optional(),
+  exportFormat: z.enum(['XLSX', 'CSV']).optional(),
 });
 
 export async function POST(request: NextRequest) {

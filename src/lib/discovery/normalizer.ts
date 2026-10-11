@@ -7,10 +7,17 @@ export interface NormalizedLeadEntity {
   contactName?: string | null;
   profession: string;
   city: FieldProvenance & { region?: string };
+  state?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
   address: FieldProvenance;
   website: (FieldProvenance & { canonicalDomain: string }) | null;
   publicEmail: FieldProvenance | null;
   publicPhone: FieldProvenance | null;
+  rating?: number | null;
+  reviewCount?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
   contactStatus?: string;
   emailStatus?: string;
   phoneStatus?: string;
@@ -115,10 +122,17 @@ export class LeadNormalizer {
       contactName: record.contactName || null,
       profession: record.profession || 'Chartered Accountant',
       city,
+      state: record.state || null,
+      country: record.country || null,
+      postalCode: record.postalCode || null,
       address,
       website,
       publicEmail,
       publicPhone,
+      rating: typeof record.rating === 'number' ? record.rating : null,
+      reviewCount: typeof record.reviewCount === 'number' ? record.reviewCount : null,
+      latitude: typeof record.latitude === 'number' ? record.latitude : null,
+      longitude: typeof record.longitude === 'number' ? record.longitude : null,
       contactStatus: record.contactStatus || (record.publicEmail || record.publicPhone ? 'SOURCE_CONFIRMED' : 'UNAVAILABLE'),
       emailStatus: record.emailStatus || (record.publicEmail ? 'SOURCE_CONFIRMED' : 'UNAVAILABLE'),
       phoneStatus: record.phoneStatus || (record.publicPhone ? 'SOURCE_CONFIRMED' : 'UNAVAILABLE'),
