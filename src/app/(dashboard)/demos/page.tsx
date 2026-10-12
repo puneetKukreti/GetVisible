@@ -19,6 +19,7 @@ import {
   FileCode,
   Award,
 } from 'lucide-react';
+import { STITCH_TEMPLATES } from '@/lib/demos/stitch-templates';
 
 export default function DemosPage() {
   const [demos, setDemos] = useState<WebsiteDemoData[]>([]);
@@ -125,24 +126,84 @@ export default function DemosPage() {
         <Card className="border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase">
-              Template Registry
+              Google Stitch Designs
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">Cleared</div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">Awaiting new templates</p>
+            <div className="text-2xl font-bold text-amber-500">3 Available</div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Selectable responsive templates</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Demo Templates Cleared State */}
-      <div className="rounded-xl border border-dashed border-border/80 bg-muted/5 p-6 text-center space-y-2">
-        <div className="text-sm font-semibold text-foreground">
-          Demo Templates Cleared
+      {/* 3 Selectable Google Stitch Templates Showcase */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Award className="h-4 w-4 text-amber-500" />
+              <span>Selectable Website Demo Templates</span>
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Google Stitch templates ready to preview across desktop, tablet, and mobile.
+            </p>
+          </div>
+          <Link
+            href="/demo-preview/templates"
+            className="text-xs text-amber-500 hover:text-amber-400 font-semibold flex items-center gap-1"
+          >
+            <span>View All Details</span>
+            <ArrowRight className="h-3 w-3" />
+          </Link>
         </div>
-        <p className="text-xs text-muted-foreground max-w-md mx-auto leading-relaxed">
-          Previous demo templates have been removed. The rendering engine is standing by for your new template configurations and layouts.
-        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {STITCH_TEMPLATES.map((tmpl) => (
+            <div
+              key={tmpl.id}
+              className="rounded-xl border border-border bg-card overflow-hidden hover:border-amber-500/50 transition-all shadow-sm hover:shadow-md flex flex-col justify-between"
+            >
+              <div className="relative aspect-[16/9] bg-slate-950 overflow-hidden border-b border-border">
+                <img
+                  src={tmpl.thumbnail}
+                  alt={tmpl.name}
+                  className="w-full h-full object-cover object-top"
+                />
+                <Badge className="absolute top-2 left-2 bg-slate-900/90 text-amber-400 border border-amber-400/30 text-[10px]">
+                  {tmpl.badge}
+                </Badge>
+              </div>
+
+              <div className="p-3.5 space-y-2 flex-1 flex flex-col justify-between">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold text-foreground">{tmpl.name}</h3>
+                  <p className="text-[11px] text-muted-foreground line-clamp-2">
+                    {tmpl.shortDescription}
+                  </p>
+                </div>
+
+                <div className="pt-2 border-t border-border/40 flex items-center gap-2">
+                  <Link
+                    href={`/demo-preview/template/${tmpl.id}`}
+                    className="flex-1 inline-flex items-center justify-center gap-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-1.5 rounded-lg text-xs transition"
+                  >
+                    <Eye className="h-3 w-3" />
+                    <span>Live Preview</span>
+                  </Link>
+                  <a
+                    href={tmpl.htmlUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground transition"
+                    title="Open standalone"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Search Bar */}

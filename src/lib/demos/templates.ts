@@ -325,10 +325,97 @@ export const BASE_TEMPLATE: ProfessionTemplate = {
 export const CA_ACCOUNTING_TEMPLATE: ProfessionTemplate = BASE_TEMPLATE;
 
 /**
- * Extensible, dynamic template registry.
- * Cleared of all hardcoded demo templates; ready to register new user-provided templates.
+ * Design 1: Premium Editorial (Venerable Jurisprudence)
  */
-const TEMPLATE_REGISTRY: Record<string, ProfessionTemplate> = {};
+export const DESIGN_1_PREMIUM_TEMPLATE: ProfessionTemplate = {
+  id: 'design-1-premium',
+  name: 'Premium Editorial (Venerable Jurisprudence)',
+  profession: 'Chartered Accountant',
+  description: 'Authoritative editorial design with deep corporate navy and antique gold.',
+  themes: [THEMES.executiveNavy, THEMES.corporateSlate],
+  defaultTheme: THEMES.executiveNavy,
+  buildContent(facts, theme, design) {
+    const base = BASE_TEMPLATE.buildContent(facts, theme, design);
+    return {
+      ...base,
+      meta: {
+        ...base.meta,
+        templateId: 'design-1-premium',
+      },
+      hero: {
+        ...base.hero,
+        badge: 'Statutory Assurance & Corporate Tax Advisory',
+        headline: 'Authoritative Tax Advisory & Statutory Assurance Practice',
+        subheadline: `Partner-led chartered accountancy solutions in ${facts.city || 'Gurgaon'} safeguarding compliance, governance, and financial integrity for enterprises.`,
+      },
+    };
+  },
+};
+
+/**
+ * Design 2: Minimalist Ledger (Architectural Ledger)
+ */
+export const DESIGN_2_MINIMALIST_TEMPLATE: ProfessionTemplate = {
+  id: 'design-2-minimalist',
+  name: 'Minimalist Ledger (Architectural Ledger)',
+  profession: 'Chartered Accountant',
+  description: 'High-density architectural ledger layout with JetBrains Mono data tags and fine-line borders.',
+  themes: [THEMES.corporateSlate, THEMES.techTeal],
+  defaultTheme: THEMES.corporateSlate,
+  buildContent(facts, theme, design) {
+    const base = BASE_TEMPLATE.buildContent(facts, theme, design);
+    return {
+      ...base,
+      meta: {
+        ...base.meta,
+        templateId: 'design-2-minimalist',
+      },
+      hero: {
+        ...base.hero,
+        badge: 'GST Defense & Industrial Accounting Corridor',
+        headline: 'Field-Tested GST Defense & Plant-Level Audit Protection',
+        subheadline: `High-precision indirect tax representation, scrutiny defense, and ITC optimization in ${facts.city || 'Gurgaon'}.`,
+      },
+    };
+  },
+};
+
+/**
+ * Design 3: Contemporary Corporate (Executive Capital)
+ */
+export const DESIGN_3_CONTEMPORARY_TEMPLATE: ProfessionTemplate = {
+  id: 'design-3-contemporary',
+  name: 'Contemporary Corporate (Executive Capital)',
+  profession: 'Chartered Accountant',
+  description: 'Prestige corporate advisory layout with elegant split cards and warm gradient lighting.',
+  themes: [THEMES.emeraldPrestige, THEMES.techTeal],
+  defaultTheme: THEMES.emeraldPrestige,
+  buildContent(facts, theme, design) {
+    const base = BASE_TEMPLATE.buildContent(facts, theme, design);
+    return {
+      ...base,
+      meta: {
+        ...base.meta,
+        templateId: 'design-3-contemporary',
+      },
+      hero: {
+        ...base.hero,
+        badge: 'Virtual CFO & Strategic Advisory',
+        headline: 'Strategic Financial Leadership for High-Growth Ventures',
+        subheadline: `Investor-ready MIS reporting, cross-border remittance, and agile financial leadership anchored in ${facts.city || 'Gurgaon'}.`,
+      },
+    };
+  },
+};
+
+/**
+ * Extensible template registry populated with the 3 Google Stitch designs.
+ */
+const TEMPLATE_REGISTRY: Record<string, ProfessionTemplate> = {
+  [DESIGN_1_PREMIUM_TEMPLATE.id]: DESIGN_1_PREMIUM_TEMPLATE,
+  [DESIGN_2_MINIMALIST_TEMPLATE.id]: DESIGN_2_MINIMALIST_TEMPLATE,
+  [DESIGN_3_CONTEMPORARY_TEMPLATE.id]: DESIGN_3_CONTEMPORARY_TEMPLATE,
+};
 
 /**
  * Register a new custom template into the engine.
