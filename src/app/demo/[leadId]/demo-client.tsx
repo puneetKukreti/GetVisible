@@ -34,9 +34,9 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
     }
   );
   const [activeLayout, setActiveLayout] = useState<WebsiteLayout>(
-    initialDemos[0]?.design?.layout || 'CORPORATE_TRANSFER_PRICING'
+    initialDemos[0]?.design?.layout || 'EDITORIAL_FINANCE'
   );
-  const [selectedArchetype, setSelectedArchetype] = useState<string>('CORPORATE_TRANSFER_PRICING');
+  const [selectedArchetype, setSelectedArchetype] = useState<string>('');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +53,8 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
         body: JSON.stringify({
           leadId: initialLead.id,
           themeId: activeTheme.id,
-          templateId: selectedArchetype,
-          layout: selectedArchetype,
+          templateId: selectedArchetype || undefined,
+          layout: selectedArchetype || activeLayout,
         }),
       });
       const data = await res.json();
@@ -139,26 +139,28 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
 
           {initialLead.websiteStatus === 'NO_WEBSITE' ? (
             <div className="space-y-3">
-              <div className="text-left space-y-1.5 bg-slate-800/60 p-3 rounded-xl border border-slate-700">
-                <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-                  <span>Select CA Practice Archetype:</span>
-                  <span className="text-[10px] text-amber-400 font-mono">7 Authentic Models</span>
-                </label>
-                <select
-                  value={selectedArchetype}
-                  onChange={(e) => setSelectedArchetype(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-amber-400"
-                >
-                  {INDIAN_CA_ARCHETYPES.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.shortName})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[11px] text-slate-400 leading-snug">
-                  {INDIAN_CA_ARCHETYPES.find((a) => a.id === selectedArchetype)?.description}
-                </p>
-              </div>
+              {INDIAN_CA_ARCHETYPES.length > 0 && (
+                <div className="text-left space-y-1.5 bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                  <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                    <span>Select Template:</span>
+                    <span className="text-[10px] text-amber-400 font-mono">{INDIAN_CA_ARCHETYPES.length} Available</span>
+                  </label>
+                  <select
+                    value={selectedArchetype}
+                    onChange={(e) => setSelectedArchetype(e.target.value)}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-amber-400"
+                  >
+                    {INDIAN_CA_ARCHETYPES.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.shortName})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-400 leading-snug">
+                    {INDIAN_CA_ARCHETYPES.find((a) => a.id === selectedArchetype)?.description}
+                  </p>
+                </div>
+              )}
 
               <button
                 onClick={handleGenerate}

@@ -54,7 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Demos',
     items: [
       { title: 'Demos Hub', href: '/demos', icon: FileCode },
-      { title: 'CA Templates (7)', href: '/demo-preview/templates', icon: Award },
+      { title: 'Templates', href: '/demo-preview/templates', icon: Award },
     ],
   },
   {

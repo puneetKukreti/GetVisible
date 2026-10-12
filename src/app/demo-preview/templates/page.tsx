@@ -1,393 +1,45 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { WebsiteTheme, WebsiteTemplate, WebsiteDesign, WebsiteLayout } from '@/types';
-import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
-import { CA_LAYOUTS, CA_THEMES } from '@/lib/demos/personalization';
-import { getTemplate } from '@/lib/demos/templates';
-import { INDIAN_CA_ARCHETYPES, CAArchetypeMeta } from '@/lib/demos/ca-archetypes';
-import { categorizeFirmName } from '@/lib/demos/brand-typography';
-import { Sparkles, Layers, Palette, Monitor, Smartphone, CheckCircle, Info, Briefcase, Award, Type } from 'lucide-react';
+import React from 'react';
 import Link from 'next/link';
-
-interface LayoutMeta {
-  name: string;
-  tag: string;
-  description: string;
-  highlights: string[];
-}
-
-const VISUAL_LAYOUT_META: Record<string, LayoutMeta> = {
-  EDITORIAL_FINANCE: {
-    name: 'Editorial Finance',
-    tag: 'Asymmetric & Typographic',
-    description:
-      'High-contrast editorial layout with massive numbered manifesto services, two-column narrative about section, and abstract geometric vector artwork.',
-    highlights: ['Bold numbered entries (01, 02)', 'Two-column editorial essay', 'Minimal geometric charts'],
-  },
-  MODERN_FINTECH: {
-    name: 'Modern Fintech',
-    tag: 'Modern SaaS / Advisory',
-    description:
-      'Floating rounded glass header, two-column hero with decorative compliance dashboard widget, subtle gradient glow cards, and visual timeline.',
-    highlights: ['Floating glassmorphism navigation', 'Simulated compliance card visual', 'Glow border cards'],
-  },
-  LUXURY_PROFESSIONAL: {
-    name: 'Luxury Professional',
-    tag: 'Private Wealth & Advisory',
-    description:
-      'Ultra-refined aesthetic with serif display typography, dramatic whitespace, hairline dividers, and full-width horizontal luxury service rows.',
-    highlights: ['Serif editorial typography', 'Horizontal service strips', 'Hairline luxury borders'],
-  },
-  SWISS_MINIMAL: {
-    name: 'Swiss Minimal',
-    tag: 'Strict Architectural Grid',
-    description:
-      'Strict 1px grid borders, heavy uppercase Swiss headings, numbered border boxes, and clean 50/50 split layout with restrained accenting.',
-    highlights: ['1px structured grid boxes', 'Heavy brutalist-inspired typography', 'Monochrome aesthetic'],
-  },
-  MODERN_INDIAN: {
-    name: 'Modern Indian CA',
-    tag: 'Regional & Practice-Focused',
-    description:
-      'Tailored specifically for Indian accounting practices. Prominent ICAI firm profile badge, large practice area cards (GST, Direct Tax, Statutory Audit), and localized address card.',
-    highlights: ['ICAI compliance credentials card', 'Prominent practice cards', 'Localized address card'],
-  },
-};
-
-type NameTestProfile = 'short' | 'medium' | 'long' | 'very_long';
-
-const NAME_TEST_PROFILES: Record<NameTestProfile, { label: string; name: string; tag: string }> = {
-  short: {
-    label: 'Short Name',
-    name: 'Singhi & Co.',
-    tag: '12 chars',
-  },
-  medium: {
-    label: 'Medium Name',
-    name: 'Batra Singhal & Associates',
-    tag: '26 chars',
-  },
-  long: {
-    label: 'Long Name',
-    name: 'Kalyaniwalla & Mistry LLP Chartered Accountants',
-    tag: '47 chars',
-  },
-  very_long: {
-    label: 'Very Long Name',
-    name: 'Singhal Batra & Associates Chartered Accountants LLP',
-    tag: '52 chars',
-  },
-};
-
-function TemplatesPreviewContent() {
-  const searchParams = useSearchParams();
-  const archetypeParam = searchParams.get('archetype');
-
-  const [viewMode, setViewMode] = useState<'archetypes' | 'layouts'>('archetypes');
-  const [selectedArchetypeId, setSelectedArchetypeId] = useState<string>(
-    archetypeParam && INDIAN_CA_ARCHETYPES.some((a) => a.id === archetypeParam)
-      ? archetypeParam
-      : 'CORPORATE_TRANSFER_PRICING'
-  );
-  const [selectedLayoutKey, setSelectedLayoutKey] = useState<string>('EDITORIAL_FINANCE');
-  const [selectedThemeId, setSelectedThemeId] = useState<string>('executive-navy');
-  const [nameProfile, setNameProfile] = useState<NameTestProfile>('medium');
-  const [isMobileView, setIsMobileView] = useState<boolean>(false);
-
-  // Sync if URL search params change
-  useEffect(() => {
-    if (archetypeParam && INDIAN_CA_ARCHETYPES.some((a) => a.id === archetypeParam)) {
-      setSelectedArchetypeId(archetypeParam);
-      setViewMode('archetypes');
-      const found = INDIAN_CA_ARCHETYPES.find((a) => a.id === archetypeParam);
-      if (found) {
-        setSelectedThemeId(found.defaultThemeId);
-      }
-    }
-  }, [archetypeParam]);
-
-  const activeArchetype: CAArchetypeMeta =
-    INDIAN_CA_ARCHETYPES.find((a) => a.id === selectedArchetypeId) || INDIAN_CA_ARCHETYPES[0];
-
-  const activeTheme: WebsiteTheme =
-    CA_THEMES.find((t: WebsiteTheme) => t.id === selectedThemeId) || CA_THEMES[0];
-
-  // Determine active layout configuration
-  const activeLayoutKey: WebsiteLayout =
-    viewMode === 'archetypes' ? activeArchetype.defaultLayout : (selectedLayoutKey as WebsiteLayout);
-  const layoutConfig = CA_LAYOUTS[activeLayoutKey] || CA_LAYOUTS['MODERN_INDIAN'];
-
-  const design: WebsiteDesign = {
-    layout: activeLayoutKey,
-    template: layoutConfig.template || (activeLayoutKey as WebsiteTemplate),
-    theme: activeTheme,
-    heroLayout: layoutConfig.heroLayout,
-    servicesLayout: layoutConfig.servicesLayout,
-    sectionOrder: layoutConfig.sectionOrder,
-    features: layoutConfig.features,
-    contentDensity: layoutConfig.contentDensity,
-  };
-
-  // Build authentic content with the dynamically chosen firm name
-  const templateBuilderId = viewMode === 'archetypes' ? activeArchetype.id : 'CA_ACCOUNTING_PROFESSIONAL';
-  const templateBuilder = getTemplate(templateBuilderId);
-
-  const chosenFirmName = NAME_TEST_PROFILES[nameProfile].name;
-  const nameCategory = categorizeFirmName(chosenFirmName);
-
-  const content = templateBuilder.buildContent(
-    {
-      businessName: chosenFirmName,
-      profession: 'Chartered Accountant',
-      city: 'Gurugram',
-      address: 'DLF Cyber City, Tower B, Sector 24, Gurugram, Haryana 122002',
-      publicEmail: 'partner@practice-ca.in',
-      publicPhone: '+91 124 4991100',
-      source: 'ICAI Directory',
-    },
-    activeTheme,
-    design
-  );
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Top QA Showcase Bar */}
-      <header className="sticky top-0 z-50 bg-slate-900/95 backdrop-blur border-b border-slate-800 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/demos"
-              className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 transition"
-            >
-              ← Back to Demos Hub
-            </Link>
-            <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-              <h1 className="text-sm font-bold text-white flex items-center gap-1.5">
-                <Sparkles className="h-4 w-4 text-amber-400" />
-                Indian CA Website Showcase
-              </h1>
-            </div>
-            {/* View Mode Pill Toggle */}
-            <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700 text-xs">
-              <button
-                onClick={() => setViewMode('archetypes')}
-                className={`px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1.5 ${
-                  viewMode === 'archetypes'
-                    ? 'bg-amber-400 text-slate-950 font-bold shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Award className="h-3 w-3" />
-                <span>7 CA Archetypes</span>
-              </button>
-              <button
-                onClick={() => setViewMode('layouts')}
-                className={`px-2.5 py-1 rounded-md transition font-medium flex items-center gap-1.5 ${
-                  viewMode === 'layouts'
-                    ? 'bg-amber-400 text-slate-950 font-bold shadow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Layers className="h-3 w-3" />
-                <span>5 Visual Styles</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Firm Name Length Selector */}
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Type className="h-3.5 w-3.5 text-amber-400" />
-              <span className="hidden sm:inline">Firm Name:</span>
-              <select
-                value={nameProfile}
-                onChange={(e) => setNameProfile(e.target.value as NameTestProfile)}
-                className="bg-slate-800 border border-slate-700 text-slate-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 font-medium"
-              >
-                {(Object.keys(NAME_TEST_PROFILES) as NameTestProfile[]).map((key) => (
-                  <option key={key} value={key}>
-                    {NAME_TEST_PROFILES[key].label} ({NAME_TEST_PROFILES[key].tag})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Theme Selector */}
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Palette className="h-3.5 w-3.5" />
-              <span className="hidden md:inline">Theme:</span>
-              <select
-                value={selectedThemeId}
-                onChange={(e) => setSelectedThemeId(e.target.value)}
-                className="bg-slate-800 border border-slate-700 text-slate-200 rounded px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400"
-              >
-                {CA_THEMES.map((theme: WebsiteTheme) => (
-                  <option key={theme.id} value={theme.id}>
-                    {theme.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Viewport Toggle */}
-            <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700">
-              <button
-                onClick={() => setIsMobileView(false)}
-                className={`p-1.5 rounded transition ${
-                  !isMobileView ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Desktop View"
-              >
-                <Monitor className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => setIsMobileView(true)}
-                className={`p-1.5 rounded transition ${
-                  isMobileView ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                }`}
-                title="Mobile View"
-              >
-                <Smartphone className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic Selector Tabs */}
-        <div className="max-w-7xl mx-auto mt-3 pt-2 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto scrollbar-none pb-1">
-          {viewMode === 'archetypes' ? (
-            <>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1 mr-1">
-                <Briefcase className="h-3.5 w-3.5 text-amber-400" />
-                Select CA Archetype:
-              </span>
-              {INDIAN_CA_ARCHETYPES.map((arch) => {
-                const isSelected = selectedArchetypeId === arch.id;
-                return (
-                  <button
-                    key={arch.id}
-                    onClick={() => {
-                      setSelectedArchetypeId(arch.id);
-                      setSelectedThemeId(arch.defaultThemeId);
-                    }}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition shrink-0 flex items-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
-                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
-                    }`}
-                  >
-                    <span>{arch.shortName}</span>
-                  </button>
-                );
-              })}
-            </>
-          ) : (
-            <>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1 mr-1">
-                <Layers className="h-3.5 w-3.5 text-amber-400" />
-                Select Visual Style:
-              </span>
-              {(
-                [
-                  'EDITORIAL_FINANCE',
-                  'MODERN_FINTECH',
-                  'LUXURY_PROFESSIONAL',
-                  'SWISS_MINIMAL',
-                  'MODERN_INDIAN',
-                ] as const
-              ).map((layoutKey) => {
-                const isSelected = selectedLayoutKey === layoutKey;
-                const meta = VISUAL_LAYOUT_META[layoutKey];
-                return (
-                  <button
-                    key={layoutKey}
-                    onClick={() => setSelectedLayoutKey(layoutKey)}
-                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition shrink-0 flex items-center gap-2 ${
-                      isSelected
-                        ? 'bg-amber-400 text-slate-950 font-bold shadow-md shadow-amber-400/20'
-                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white border border-slate-700/60'
-                    }`}
-                  >
-                    <span>{meta.name}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded font-normal ${
-                        isSelected ? 'bg-slate-900/20 text-slate-950' : 'text-slate-400'
-                      }`}
-                    >
-                      {meta.tag}
-                    </span>
-                  </button>
-                );
-              })}
-            </>
-          )}
-        </div>
-      </header>
-
-      {/* Info & Regulatory Context Card */}
-      <div className="bg-slate-900/80 border-b border-slate-800/80 px-4 py-2.5">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-semibold text-white">Active Firm Identity:</span>
-            <span className="text-amber-300 font-bold font-mono">&ldquo;{chosenFirmName}&rdquo;</span>
-            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
-              {nameCategory} ({chosenFirmName.length} chars)
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {viewMode === 'archetypes' ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] text-slate-400 font-mono">Regulations:</span>
-                {activeArchetype.keyRegulations.slice(0, 3).map((reg, idx) => (
-                  <span
-                    key={idx}
-                    className="inline-flex items-center gap-1 text-[10px] font-mono bg-slate-800 text-amber-300 px-2 py-0.5 rounded border border-slate-700"
-                  >
-                    <CheckCircle className="h-2.5 w-2.5 text-emerald-400" />
-                    {reg}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <Info className="h-3.5 w-3.5 text-amber-400" />
-                <span>{VISUAL_LAYOUT_META[selectedLayoutKey]?.tag}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Preview Container */}
-      <main className="flex-1 bg-slate-950 py-6 px-4 flex justify-center">
-        <div
-          className={`transition-all duration-300 w-full ${
-            isMobileView
-              ? 'max-w-md border-[6px] border-slate-800 rounded-3xl overflow-hidden shadow-2xl bg-white'
-              : 'max-w-7xl shadow-xl'
-          }`}
-        >
-          <DemoRenderer content={content} theme={activeTheme} design={design} />
-        </div>
-      </main>
-    </div>
-  );
-}
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { LayoutTemplate, ArrowLeft, Sparkles } from 'lucide-react';
 
 export default function TemplatesPreviewPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-400 text-xs">
-          Loading Templates Showcase...
-        </div>
-      }
-    >
-      <TemplatesPreviewContent />
-    </Suspense>
+    <div className="min-h-screen bg-background text-foreground p-6 flex flex-col items-center justify-center">
+      <Card className="max-w-md w-full border-dashed border-border/80 bg-muted/5 shadow-none">
+        <CardContent className="p-8 flex flex-col items-center text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+            <LayoutTemplate className="w-7 h-7" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h2 className="text-base font-bold text-foreground">
+              Demo Templates Cleared
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              All previous demo templates have been removed. This section is cleared and awaiting your new template configurations and layouts.
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center gap-3">
+            <Link href="/demos">
+              <Button size="sm" variant="outline" className="text-xs gap-1.5">
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Demos</span>
+              </Button>
+            </Link>
+            <Link href="/campaigns">
+              <Button size="sm" className="text-xs gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Campaigns</span>
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
