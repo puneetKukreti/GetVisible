@@ -451,6 +451,8 @@ export interface OutreachMessage {
   screenshotUrl?: string | null;
   whatsappMessage?: string;
   whatsappShareUrl?: string;
+  businessImprovementPitch?: string;
+  interestDetectionHook?: string;
 }
 
 export interface OutreachInput {
@@ -465,6 +467,8 @@ export interface OutreachInput {
   templateName?: string;
   themeName?: string;
   opportunityReason?: string;
+  websiteStatus?: WebsiteStatus;
+  website?: string | null;
 }
 
 export interface LeadData {

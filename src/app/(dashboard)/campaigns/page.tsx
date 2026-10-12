@@ -22,6 +22,16 @@ import {
   ArrowRight,
   Ban,
   Sparkles,
+  Copy,
+  Download,
+  Eye,
+  FileText,
+  Check,
+  ExternalLink,
+  Flame,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -92,9 +102,11 @@ interface OutreachPanelProps {
 }
 
 function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
-  const [channel, setChannel] = useState<OutreachChannel>('EMAIL');
+  const [channel, setChannel] = useState<OutreachChannel>('WHATSAPP');
   const [intent, setIntent] = useState(DEFAULT_INTENT);
   const [draft, setDraft] = useState('');
+  const [emailDraft, setEmailDraft] = useState('');
+  const [whatsappMessage, setWhatsappMessage] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [whatsappShareUrl, setWhatsappShareUrl] = useState<string | null>(null);
@@ -106,6 +118,15 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [notes, setNotes] = useState('');
+
+  // Image & Text Clipboard State
+  const [copyImageStatus, setCopyImageStatus] = useState<'IDLE' | 'COPYING' | 'COPIED' | 'FAILED'>('IDLE');
+  const [copyTextStatus, setCopyTextStatus] = useState<'IDLE' | 'COPIED'>('IDLE');
+
+  // Interest Outcome State
+  const [interestStatus, setInterestStatus] = useState<string | null>(lead.leadStatus);
+  const [updatingInterest, setUpdatingInterest] = useState(false);
+  const [interestNotice, setInterestNotice] = useState<string | null>(null);
 
   // Auto-fetch or capture demo screenshot when opening drawer
   useEffect(() => {
@@ -132,10 +153,18 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
     };
   }, [lead.id]);
 
+  const handleSelectChannel = (ch: OutreachChannel) => {
+    setChannel(ch);
+    if (ch === 'WHATSAPP' && whatsappMessage) {
+      setDraft(whatsappMessage);
+    } else if (ch === 'EMAIL' && emailDraft) {
+      setDraft(emailDraft);
+    }
+  };
+
   const generateDraft = async () => {
     setDraftLoading(true);
     setDraftError('');
-    setDraft('');
     try {
       const res = await fetch('/api/outreach/generate', {
         method: 'POST',
@@ -152,6 +181,8 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
       }
       const data = await res.json();
       setDraft(data.draft);
+      if (data.outreach?.message) setEmailDraft(data.outreach.message);
+      if (data.whatsappMessage) setWhatsappMessage(data.whatsappMessage);
       if (data.subject) setDraftSubject(data.subject);
       if (data.screenshotUrl) setScreenshotUrl(data.screenshotUrl);
       if (data.whatsappShareUrl) setWhatsappShareUrl(data.whatsappShareUrl);
@@ -159,6 +190,90 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
       setDraftError(err instanceof Error ? err.message : 'Failed to generate draft.');
     } finally {
       setDraftLoading(false);
+    }
+  };
+
+  const copyScreenshotImage = async () => {
+    setCopyImageStatus('COPYING');
+    try {
+      // Fetch binary image from same-origin proxy to eliminate any CORS issues
+      const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('Could not fetch screenshot image');
+      const blob = await res.blob();
+      const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': pngBlob }),
+      ]);
+      setCopyImageStatus('COPIED');
+      setTimeout(() => setCopyImageStatus('IDLE'), 3500);
+    } catch (err) {
+      console.warn('Clipboard image copy error:', err);
+      setCopyImageStatus('FAILED');
+      setTimeout(() => setCopyImageStatus('IDLE'), 3500);
+    }
+  };
+
+  const downloadScreenshot = async () => {
+    try {
+      const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
+      const res = await fetch(proxyUrl);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${lead.businessName.replace(/[^a-z0-9]/gi, '_')}_website_concept.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      if (screenshotUrl) window.open(screenshotUrl, '_blank');
+    }
+  };
+
+  const copyDraftText = async () => {
+    try {
+      await navigator.clipboard.writeText(draft);
+      setCopyTextStatus('COPIED');
+      setTimeout(() => setCopyTextStatus('IDLE'), 3000);
+    } catch {
+      // fallback
+    }
+  };
+
+  const handleUpdateInterest = async (newStatus: LeadStatus) => {
+    setUpdatingInterest(true);
+    setInterestNotice(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadStatus: newStatus,
+          reason:
+            newStatus === 'INTERESTED'
+              ? 'Prospect expressed positive interest in website concept'
+              : `Lead status updated to ${newStatus} following outreach review`,
+        }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to update interest status');
+      }
+      setInterestStatus(newStatus);
+      if (newStatus === 'INTERESTED') {
+        setInterestNotice('🎉 Prospect marked as INTERESTED! Ready to send website proposal.');
+      } else if (newStatus === 'NOT_INTERESTED') {
+        setInterestNotice('Lead marked as Not Interested.');
+      } else if (newStatus === 'DO_NOT_CONTACT') {
+        setInterestNotice('Compliance suppression active: Marked as DO NOT CONTACT.');
+      }
+      onContacted(lead.id);
+    } catch (err: unknown) {
+      setDraftError(err instanceof Error ? err.message : 'Failed to update interest status');
+    } finally {
+      setUpdatingInterest(false);
     }
   };
 
@@ -176,7 +291,7 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
         body: JSON.stringify({
           leadId: lead.id,
           subject: draftSubject || `Website Concept Prepared for ${lead.businessName}`,
-          message: draft,
+          message: emailDraft || draft,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -218,8 +333,11 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
     }
   };
 
+  const activeDemo = lead.websiteDemos?.[0];
+  const demoViewCount = activeDemo?.viewCount || 0;
+
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md shadow-2xl border-l border-border bg-background flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg shadow-2xl border-l border-border bg-background flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
       {/* Panel header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-muted/30">
         <div>
@@ -244,39 +362,68 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-xs">
+        {/* Real-time Engagement Signal Tracker */}
+        {demoViewCount > 0 ? (
+          <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 space-y-1">
+            <div className="flex items-center justify-between font-bold">
+              <span className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+                <Eye className="w-4 h-4 text-emerald-600 animate-pulse" />
+                🔥 Active Interest: Concept Viewed {demoViewCount}x!
+              </span>
+              <Badge className="bg-emerald-600 text-white text-[10px]">
+                High Intent
+              </Badge>
+            </div>
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
+              The prospect opened and viewed their private website concept{activeDemo?.lastViewedAt ? ` on ${new Date(activeDemo.lastViewedAt).toLocaleDateString()}` : ''}. They are evaluating the design!
+            </p>
+          </div>
+        ) : (
+          <div className="p-2.5 rounded-lg border border-border bg-muted/20 text-muted-foreground flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-[11px]">
+              <Eye className="w-3.5 h-3.5 text-muted-foreground/70" />
+              <span>Awaiting concept link click (Views tracked in real-time)</span>
+            </span>
+            <Badge variant="outline" className="text-[9px] font-mono">0 views</Badge>
+          </div>
+        )}
+
         {/* Lead Summary */}
         <div className="rounded-lg border border-border bg-muted/10 p-3 space-y-2">
-          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Lead Summary</p>
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Lead Context</p>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
             <span className="text-muted-foreground">Website</span>
             <Badge variant={websiteStatusVariant(lead.websiteStatus)} className="w-fit text-[10px]">
               {websiteStatusLabel(lead.websiteStatus)}
             </Badge>
             <span className="text-muted-foreground">Status</span>
-            <Badge variant={leadStatusVariant(lead.leadStatus)} className="w-fit text-[10px]">
-              {lead.leadStatus.replace(/_/g, ' ')}
+            <Badge variant={leadStatusVariant(interestStatus || lead.leadStatus)} className="w-fit text-[10px]">
+              {(interestStatus || lead.leadStatus).replace(/_/g, ' ')}
             </Badge>
             <span className="text-muted-foreground">Opp. Score</span>
             <span className={`font-bold ${scoreColor(lead.opportunityScore)}`}>{lead.opportunityScore}/100</span>
+            {lead.publicPhone && (
+              <>
+                <span className="text-muted-foreground">WhatsApp/Phone</span>
+                <span className="text-foreground font-mono font-medium">{lead.publicPhone}</span>
+              </>
+            )}
             {lead.publicEmail && (
               <>
                 <span className="text-muted-foreground">Email</span>
                 <span className="text-foreground font-mono truncate">{lead.publicEmail}</span>
               </>
             )}
-            {lead.publicPhone && (
-              <>
-                <span className="text-muted-foreground">Phone</span>
-                <span className="text-foreground font-mono">{lead.publicPhone}</span>
-              </>
-            )}
           </div>
         </div>
 
         {/* Channel Selector */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-foreground">Channel</p>
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-foreground">Select Channel</p>
+            <span className="text-[10px] text-muted-foreground">Tailored copy per channel</span>
+          </div>
           <div className="flex gap-2">
             {(Object.keys(CHANNEL_META) as OutreachChannel[]).map((ch) => {
               const meta = CHANNEL_META[ch];
@@ -285,10 +432,10 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
               return (
                 <button
                   key={ch}
-                  onClick={() => setChannel(ch)}
-                  className={`flex-1 flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs font-medium transition-colors ${
+                  onClick={() => handleSelectChannel(ch)}
+                  className={`flex-1 flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium transition-colors ${
                     active
-                      ? 'border-primary bg-primary/10 text-primary'
+                      ? 'border-primary bg-primary/10 text-primary font-bold shadow-xs'
                       : 'border-border text-muted-foreground hover:text-foreground hover:border-border/80'
                   }`}
                 >
@@ -300,32 +447,24 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
           </div>
         </div>
 
-        {/* Intent */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-foreground">Outreach Intent</label>
-          <textarea
-            rows={3}
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            className="w-full text-xs rounded-md border border-border bg-muted/10 px-3 py-2 text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-relaxed"
-          />
-        </div>
-
-        {/* Generate Button */}
-        {/* Visual Real Website Screenshot Thumbnail */}
-        <div className="space-y-1.5 rounded-lg border border-border bg-muted/10 p-3">
+        {/* Visual Real Website Screenshot Card */}
+        <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-3">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              {lead.website ? 'Live Website Screenshot' : 'Live Website Concept Screenshot'}
+            <p className="text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <span>Website Concept Mockup</span>
+              <Badge variant="outline" className="text-[9px] font-normal py-0">
+                Direct Image Ready
+              </Badge>
             </p>
             {screenshotLoading && (
               <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Capturing Real Screenshot…
+                <Loader2 className="w-3 h-3 animate-spin" /> Capturing snapshot…
               </span>
             )}
           </div>
+
           {screenshotUrl ? (
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-black/5 shadow-inner">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -334,9 +473,57 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
                   className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
                 />
               </div>
-              <p className="text-[10px] text-muted-foreground truncate">
-                Attachment URL: <span className="font-mono">{screenshotUrl}</span>
-              </p>
+
+              {/* Direct Image Action Buttons for WhatsApp & Email */}
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyScreenshotImage}
+                  disabled={copyImageStatus === 'COPYING'}
+                  className={`text-xs h-8 gap-1.5 font-medium ${
+                    copyImageStatus === 'COPIED'
+                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
+                      : 'border-border'
+                  }`}
+                  title="Copy PNG screenshot image directly to clipboard"
+                >
+                  {copyImageStatus === 'COPYING' ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : copyImageStatus === 'COPIED' ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-primary" />
+                  )}
+                  <span>
+                    {copyImageStatus === 'COPYING'
+                      ? 'Copying…'
+                      : copyImageStatus === 'COPIED'
+                      ? 'Image Copied!'
+                      : '📋 Copy Image'}
+                  </span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadScreenshot}
+                  className="text-xs h-8 gap-1.5 font-medium border-border hover:bg-muted"
+                  title="Download concept PNG to attach as file"
+                >
+                  <Download className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span>⬇️ Download PNG</span>
+                </Button>
+              </div>
+
+              {copyImageStatus === 'COPIED' && (
+                <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[11px] flex items-center gap-1.5 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  <span>Image is in clipboard! In WhatsApp Web, simply press <strong>Ctrl + V</strong> to send the photo directly.</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border rounded-md">
@@ -345,18 +532,18 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
           )}
         </div>
 
-        {/* Generate Button */}
+        {/* Generate Draft Button */}
         <Button
           onClick={generateDraft}
           disabled={draftLoading || !intent.trim()}
-          className="w-full gap-2 text-xs h-9"
+          className="w-full gap-2 text-xs h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
         >
           {draftLoading ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
             <Sparkles className="w-3.5 h-3.5" />
           )}
-          {draftLoading ? 'Generating Draft…' : 'Generate AI Draft & Attach Snapshot'}
+          <span>{draftLoading ? 'Drafting Tailored Copy…' : `Generate Tailored ${CHANNEL_META[channel].label} Draft`}</span>
         </Button>
 
         {/* Error */}
@@ -367,42 +554,162 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
           </div>
         )}
 
+        {/* WhatsApp Direct Dispatch Guide */}
+        {channel === 'WHATSAPP' && (
+          <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
+            <div className="font-semibold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Direct Photo WhatsApp Dispatch (No link spam):</span>
+            </div>
+            <ol className="list-decimal pl-4 space-y-0.5 text-[11px] text-muted-foreground">
+              <li>Click <strong>&ldquo;📋 Copy Image&rdquo;</strong> above (image is copied to your clipboard).</li>
+              <li>Click <strong>&ldquo;Open in WhatsApp Web&rdquo;</strong> below.</li>
+              <li>In the chat box, press <strong>Ctrl + V</strong> to attach the concept image directly with your message text!</li>
+            </ol>
+          </div>
+        )}
+
         {/* Draft output */}
         {draft && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                Generated Draft
+                <span>Generated Draft ({CHANNEL_META[channel].label})</span>
               </p>
-              {channel === 'WHATSAPP' && whatsappShareUrl && (
-                <a
-                  href={whatsappShareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20"
+              <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={copyDraftText}
+                  className="h-6.5 text-[11px] px-2 gap-1 text-muted-foreground hover:text-foreground"
                 >
-                  <MessageSquare className="w-3 h-3" />
-                  Open in WhatsApp Web
-                </a>
-              )}
+                  {copyTextStatus === 'COPIED' ? (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-500" />
+                      <span className="text-emerald-600 font-semibold">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Text</span>
+                    </>
+                  )}
+                </Button>
+
+                {channel === 'WHATSAPP' && whatsappShareUrl && (
+                  <a
+                    href={whatsappShareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 shadow-2xs"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    <span>Open in WhatsApp Web</span>
+                  </a>
+                )}
+              </div>
             </div>
+
             <textarea
-              readOnly
-              rows={6}
+              rows={8}
               value={draft}
-              className="w-full text-xs rounded-md border border-border bg-muted/20 px-3 py-2 text-foreground resize-none focus:outline-none leading-relaxed font-mono"
+              onChange={(e) => setDraft(e.target.value)}
+              className="w-full text-xs rounded-md border border-border bg-muted/20 px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring leading-relaxed font-sans"
             />
           </div>
         )}
 
+        {/* Log Prospect Response & Interest */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+              <span>Log Prospect Response &amp; Intent</span>
+            </p>
+            {interestStatus && (
+              <Badge variant="outline" className="text-[10px]">
+                Current: {interestStatus.replace(/_/g, ' ')}
+              </Badge>
+            )}
+          </div>
+
+          <p className="text-[11px] text-muted-foreground">
+            How did {lead.businessName} respond to your outreach?
+          </p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleUpdateInterest('INTERESTED')}
+              disabled={updatingInterest}
+              className="text-xs h-8 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 gap-1.5 font-semibold"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Replied YES / Interested</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleUpdateInterest('PROPOSAL')}
+              disabled={updatingInterest}
+              className="text-xs h-8 border-blue-600/40 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10 gap-1.5"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              <span>Asked Pricing / Details</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleUpdateInterest('NOT_INTERESTED')}
+              disabled={updatingInterest}
+              className="text-xs h-8 border-border text-muted-foreground hover:bg-muted gap-1.5"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Declined / Not Now</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleUpdateInterest('DO_NOT_CONTACT')}
+              disabled={updatingInterest}
+              className="text-xs h-8 border-destructive/40 text-destructive hover:bg-destructive/10 gap-1.5"
+            >
+              <Ban className="w-3.5 h-3.5" />
+              <span>Opt-Out / Stop Contact</span>
+            </Button>
+          </div>
+
+          {interestNotice && (
+            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs flex items-center justify-between">
+              <span>{interestNotice}</span>
+              {interestStatus === 'INTERESTED' && (
+                <Link
+                  href="/proposals"
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 underline ml-2"
+                >
+                  Create Proposal →
+                </Link>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Notes */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pt-1">
           <label className="text-xs font-semibold text-foreground">Contact Notes (optional)</label>
           <Input
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g. Sent via WhatsApp with demo screenshot attached…"
+            placeholder="e.g. Sent via WhatsApp with concept image attached…"
             className="text-xs h-8"
           />
         </div>
@@ -475,6 +782,7 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
   const [contactedIds, setContactedIds] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<'ALL' | 'READY' | 'PHONE'>('ALL');
   const [approvingAll, setApprovingAll] = useState(false);
+  const [showInterestGuide, setShowInterestGuide] = useState(false);
 
   const handleContacted = useCallback((leadId: string) => {
     setContactedIds((prev) => new Set([...Array.from(prev), leadId]));
@@ -584,6 +892,81 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
         />
       )}
 
+      {/* Playbook: How to detect prospect interest */}
+      <div className="mb-4 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center shrink-0">
+              <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold text-foreground flex items-center gap-2">
+                <span>Playbook: How to Know If a Client is Interested in a Website</span>
+                <Badge variant="outline" className="text-[10px] font-normal py-0">
+                  Agency Conversion Guide
+                </Badge>
+              </h3>
+              <p className="text-[11px] text-muted-foreground">
+                3 concrete signals to identify serious prospects without guessing or cold-calling.
+              </p>
+            </div>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowInterestGuide(!showInterestGuide)}
+            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
+          >
+            <span>{showInterestGuide ? 'Hide Guide' : 'View 3 Signals'}</span>
+            {showInterestGuide ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </Button>
+        </div>
+
+        {showInterestGuide && (
+          <div className="mt-4 pt-3 border-t border-border/60 grid grid-cols-1 md:grid-cols-3 gap-3 animate-in fade-in duration-200">
+            <div className="p-3 rounded-lg border border-border bg-card/60 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span>1. The Binary Response Hook</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Our outreach ends with: <em>&ldquo;Would you be open to a 1-minute live preview on your phone, or are you not currently taking on new advisory clients in your city?&rdquo;</em>
+              </p>
+              <div className="text-[10px] font-medium text-foreground bg-muted/40 p-1.5 rounded">
+                <strong>Signal:</strong> Anyone replying &ldquo;Yes&rdquo;, &ldquo;Send link&rdquo;, or &ldquo;What&rsquo;s the cost?&rdquo; is an active buyer.
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg border border-border bg-card/60 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
+                <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500 shrink-0" />
+                <span>2. Live Demo View Tracking</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Every concept demo has real-time view telemetry. When a prospect opens the link, the badge updates to <strong>🔥 Viewed (1x)</strong> in the table below.
+              </p>
+              <div className="text-[10px] font-medium text-foreground bg-muted/40 p-1.5 rounded">
+                <strong>Signal:</strong> If <span className="text-amber-600 font-bold">Viewed &ge; 2x</span>, partners are sharing it internally. Reach out within 2 hours.
+              </div>
+            </div>
+
+            <div className="p-3 rounded-lg border border-border bg-card/60 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
+                <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                <span>3. Value Framing for No-Website</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Practices without websites lose corporate retainers because clients Google them before signing. They want credibility without ₹50k agency friction.
+              </p>
+              <div className="text-[10px] font-medium text-foreground bg-muted/40 p-1.5 rounded">
+                <strong>Signal:</strong> When they see their own firm name &amp; services already live, their main objection (&ldquo;I have no time to build a site&rdquo;) is erased.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Filter and Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
         <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-md border border-border/60">
@@ -668,13 +1051,26 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
                     selectedLead?.id === lead.id ? 'bg-primary/5' : ''
                   }`}
                 >
-                  <td className="px-4 py-3 font-medium text-foreground max-w-[180px] truncate">
-                    {lead.businessName}
-                    {lead.isDemoData && (
-                      <span className="ml-1.5 text-[9px] font-bold text-muted-foreground bg-muted px-1 py-0.5 rounded">
-                        DEMO
-                      </span>
-                    )}
+                  <td className="px-4 py-3 font-medium text-foreground max-w-[220px]">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="truncate max-w-[150px]">{lead.businessName}</span>
+                      {lead.isDemoData && (
+                        <span className="text-[9px] font-bold text-muted-foreground bg-muted px-1 py-0.5 rounded">
+                          DEMO
+                        </span>
+                      )}
+                      {Boolean(lead.websiteDemos?.[0]?.viewCount && lead.websiteDemos[0].viewCount > 0) && (
+                        <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[9px] h-4 px-1 gap-0.5 font-semibold">
+                          <Flame className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
+                          {lead.websiteDemos![0].viewCount}x
+                        </Badge>
+                      )}
+                      {lead.leadStatus === 'INTERESTED' && (
+                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[9px] h-4 px-1 font-semibold">
+                          🟢 Interested
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{lead.city}</td>
                   <td className="px-4 py-3 whitespace-nowrap">
@@ -701,23 +1097,16 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       {lead.publicPhone && (
-                        <a
-                          href={`https://api.whatsapp.com/send?phone=${lead.publicPhone.replace(/[^0-9]/g, '')}&text=${encodeURIComponent(
-                            `Hello ${lead.businessName} Team, we created a personalized demo website concept for your practice: https://get-visible-web.vercel.app/demo/${lead.id}`
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="1-Click Direct WhatsApp Message"
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[11px] gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 font-medium"
+                          onClick={() => setSelectedLead(lead)}
+                          title="Open WhatsApp Outreach Drawer (Direct image copy + tailored pitch)"
                         >
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 px-2 text-[11px] gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-                          >
-                            <MessageSquare className="w-3 h-3" />
-                            WhatsApp
-                          </Button>
-                        </a>
+                          <MessageSquare className="w-3 h-3" />
+                          WhatsApp
+                        </Button>
                       )}
                       <Button
                         size="sm"
@@ -726,7 +1115,7 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
                         onClick={() => setSelectedLead(lead)}
                       >
                         <Send className="w-3 h-3" />
-                        Draft & Attach
+                        Draft &amp; Attach
                       </Button>
                     </div>
                   </td>

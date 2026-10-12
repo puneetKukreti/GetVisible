@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { validateStatusTransition, canPrepareOutreach, getNextActionRecommendation } from '@/lib/sales/lifecycle';
-import { OutreachGeneratorService, validateOutreachClaims, generateDeterministicOutreach } from '@/lib/sales/outreach';
+import { OutreachGeneratorService, validateOutreachClaims, generateDeterministicOutreach, getBusinessImprovementDetails } from '@/lib/sales/outreach';
 import { LeadData, WebsiteDemoData } from '@/types';
 
 describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
@@ -265,6 +265,51 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       };
 
       expect(validateOutreachClaims(safeMessage).valid).toBe(true);
+    });
+
+    it('generates structured business improvement pitches and low-friction interest hooks', () => {
+      // Test for CA with NO_WEBSITE
+      const caNoWeb = getBusinessImprovementDetails('Chartered Accountant', 'Singhal & Co', 'Gurgaon', false);
+      expect(caNoWeb.bullets.length).toBeGreaterThanOrEqual(3);
+      expect(caNoWeb.summary).toContain('Singhal & Co');
+      expect(caNoWeb.summary).toContain('Gurgaon');
+      expect(caNoWeb.hookQuestion).toContain('Would you be open to a 1-minute live preview');
+
+      // Test for Lawyer with NO_WEBSITE
+      const lawyerNoWeb = getBusinessImprovementDetails('Advocate', 'Sharma Law Chambers', 'Delhi', false);
+      expect(lawyerNoWeb.bullets.some((b) => b.includes('Institutional Trust') || b.includes('legal'))).toBe(true);
+      expect(lawyerNoWeb.hookQuestion).toContain('Would you be open to reviewing the live concept');
+    });
+
+    it('generates clean WhatsApp copy referencing attached image without raw image URLs', () => {
+      const outreach = generateDeterministicOutreach({
+        businessName: 'Apex Tax Partners CA',
+        profession: 'Chartered Accountant',
+        city: 'Gurgaon',
+        demoUrl: 'https://example.com/demo/apex-1',
+        screenshotUrl: 'https://example.com/api/demos/apex-1/screenshot.png',
+        websiteStatus: 'NO_WEBSITE',
+        publicPhone: '+91 98111 22233',
+      });
+
+      expect(outreach.whatsappMessage).toBeDefined();
+      const wa = outreach.whatsappMessage!;
+
+      // Verifies no raw screenshot URL link spam in WhatsApp text
+      expect(wa).not.toContain('screenshot.png');
+      expect(wa).not.toContain('screenshotUrl');
+
+      // Verifies direct photo reference
+      expect(wa).toContain('*(Attached a custom visual concept mockup above 👆)*');
+
+      // Verifies business improvement value and low-friction interest question
+      expect(wa).toContain('Statutory Credibility');
+      expect(wa).toContain('1-minute live preview');
+
+      // Verifies WhatsApp share link is properly populated
+      expect(outreach.whatsappShareUrl).toBeDefined();
+      expect(outreach.whatsappShareUrl).toContain('api.whatsapp.com/send');
+      expect(outreach.whatsappShareUrl).toContain('919811122233');
     });
   });
 

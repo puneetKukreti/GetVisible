@@ -46,7 +46,29 @@ export async function GET(
 
     // Return cached screenshot if already taken and not requested to refresh
     const forceRefresh = request.nextUrl.searchParams.get('refresh') === 'true';
+    const isImageFormat = request.nextUrl.searchParams.get('format') === 'image';
+
     if (demo?.screenshotUrl && !forceRefresh) {
+      if (isImageFormat) {
+        try {
+          const imgRes = await fetch(demo.screenshotUrl, { signal: AbortSignal.timeout(6000) });
+          if (imgRes.ok) {
+            const buf = await imgRes.arrayBuffer();
+            const contentType = imgRes.headers.get('content-type') || 'image/png';
+            return new NextResponse(buf, {
+              headers: {
+                'Content-Type': contentType,
+                'Cache-Control': 'public, max-age=86400',
+                'Access-Control-Allow-Origin': '*',
+                'Content-Disposition': 'inline; filename="concept_preview.png"',
+              },
+            });
+          }
+        } catch {
+          // fall through to JSON
+        }
+      }
+
       return NextResponse.json({
         success: true,
         screenshotUrl: demo.screenshotUrl,
@@ -95,6 +117,26 @@ export async function GET(
       await WebsiteDemoRepository.updateDemo(orgId, demo.id, {
         ...demo,
       } as any, 'system');
+    }
+
+    if (isImageFormat) {
+      try {
+        const imgRes = await fetch(screenshotUrl, { signal: AbortSignal.timeout(6000) });
+        if (imgRes.ok) {
+          const buf = await imgRes.arrayBuffer();
+          const contentType = imgRes.headers.get('content-type') || 'image/png';
+          return new NextResponse(buf, {
+            headers: {
+              'Content-Type': contentType,
+              'Cache-Control': 'public, max-age=86400',
+              'Access-Control-Allow-Origin': '*',
+              'Content-Disposition': 'inline; filename="concept_preview.png"',
+            },
+          });
+        }
+      } catch {
+        // fall through to JSON
+      }
     }
 
     return NextResponse.json({

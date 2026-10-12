@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { leadId, demoId } = body;
+    const { leadId, demoId, channel, intent } = body;
 
     if (!leadId) {
       return NextResponse.json(
@@ -50,19 +50,28 @@ export async function POST(request: NextRequest) {
     const result = await service.generateOutreach(lead, demo, {
       baseUrl,
       usePublicToken: true,
+      channel,
+      intent,
     });
 
     const publicUrl = demo?.publicToken
       ? getPublicDemoUrl(demo.publicToken, baseUrl)
       : `${baseUrl}/demo/${lead.id}`;
 
+    const chosenDraft =
+      channel === 'WHATSAPP'
+        ? (result.outreach.whatsappMessage || result.outreach.message)
+        : result.outreach.message;
+
     return NextResponse.json({
       success: true,
-      draft: result.outreach.message,
+      draft: chosenDraft,
       subject: result.outreach.subject,
       screenshotUrl: result.outreach.screenshotUrl,
       whatsappMessage: result.outreach.whatsappMessage,
       whatsappShareUrl: result.outreach.whatsappShareUrl,
+      businessImprovementPitch: result.outreach.businessImprovementPitch,
+      interestDetectionHook: result.outreach.interestDetectionHook,
       outreach: result.outreach,
       isAiGenerated: result.isAiGenerated,
       demoUrl: publicUrl,
