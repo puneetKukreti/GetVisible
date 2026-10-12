@@ -61,6 +61,85 @@ const EXCLUDED_NON_BUSINESS_DOMAINS = [
   'charteredstudies.in',
 ];
 
+const NEGATIVE_EXCLUSION_QUERY =
+  '-site:justdial.com -site:sulekha.com -site:practo.com -site:wikipedia.org -site:quora.com -site:facebook.com -site:linkedin.com -site:indiamart.com -site:tradeindia.com -site:yellowpages.in -site:tripadvisor.com -site:reddit.com';
+
+export function buildRefinedSearchQuery(
+  profession: string,
+  location: string,
+  locality?: string,
+  searchScope?: string
+): string {
+  const normProf = profession.toLowerCase();
+  const loc = locality ? `${locality} ${location}` : location;
+
+  let coreQuery = '';
+
+  if (normProf.includes('accountant') || normProf === 'ca') {
+    coreQuery = `("Chartered Accountants" OR "CA Firm") ("& Associates" OR "& Co" OR "& Partners") "${loc}"`;
+  } else if (
+    normProf.includes('lawyer') ||
+    normProf.includes('advocate') ||
+    normProf.includes('legal') ||
+    normProf.includes('law firm')
+  ) {
+    coreQuery = `("Law Firm" OR "Advocate" OR "Law Chambers" OR "Legal Associates") "${loc}" ("contact" OR "phone" OR "+91")`;
+  } else if (normProf.includes('dentist') || normProf.includes('dental')) {
+    coreQuery = `("Dental Clinic" OR "Dental Care" OR "Dentist") "Dr." "${loc}" ("contact" OR "appointment")`;
+  } else if (normProf.includes('doctor') || normProf.includes('clinic')) {
+    coreQuery = `("Clinic" OR "Healthcare" OR "Consultant") "Dr." "${loc}" ("contact" OR "appointment")`;
+  } else if (normProf.includes('architect') || normProf.includes('interior')) {
+    coreQuery = `("Architects" OR "Design Studio" OR "Architectural Planners") "${loc}" ("portfolio" OR "contact")`;
+  } else if (normProf.includes('real estate') || normProf.includes('property') || normProf.includes('realtor')) {
+    coreQuery = `("Real Estate Consultants" OR "Realtors" OR "Property Advisors") "${loc}" ("office" OR "contact")`;
+  } else if (normProf.includes('gym') || normProf.includes('fitness')) {
+    coreQuery = `("Fitness Club" OR "Gym" OR "Crossfit") "${loc}" ("membership" OR "contact")`;
+  } else if (normProf.includes('manufacturer') || normProf.includes('wholesale') || normProf.includes('factory')) {
+    coreQuery = `("Manufacturers" OR "Wholesalers" OR "Industries" OR "Works") "${loc}" ("contact" OR "enquiry")`;
+  } else if (normProf.includes('marketing') || normProf.includes('agency') || normProf.includes('digital')) {
+    coreQuery = `("Digital Marketing Agency" OR "SEO Agency" OR "Web Agency") "${loc}" ("services" OR "contact")`;
+  } else if (normProf.includes('contractor') || normProf.includes('repair')) {
+    coreQuery = `("Contractors" OR "Repair Services" OR "Engineering") "${loc}" ("contact" OR "phone")`;
+  } else if (normProf.includes('salon') || normProf.includes('beauty') || normProf.includes('spa')) {
+    coreQuery = `("Salon" OR "Beauty Parlour" OR "Spa & Wellness") "${loc}" ("appointment" OR "contact")`;
+  } else {
+    coreQuery = `"${profession}" "${loc}" ("office" OR "services" OR "contact us" OR "phone")`;
+  }
+
+  if (searchScope === 'SOLO_PRACTITIONERS') {
+    coreQuery += ' ("Dr." OR "CA" OR "Advocate" OR "Proprietor")';
+  } else if (searchScope === 'INDIVIDUAL_FIRMS') {
+    coreQuery += ' ("& Associates" OR "LLP" OR "Clinic" OR "Chambers" OR "Studio" OR "Firm")';
+  }
+
+  return `${coreQuery} ${NEGATIVE_EXCLUSION_QUERY}`;
+}
+
+export function isListicleOrAggregatorTitle(title: string): boolean {
+  if (!title) return false;
+  const t = title.toLowerCase();
+  if (/\b(top \d+|best \d+|list of|compare \d+|find the best|directory of|reviews of)\b/i.test(t)) {
+    return true;
+  }
+  if (/\b(what is|how to become|wikipedia|meaning of|definition of|salary of|course)\b/i.test(t)) {
+    return true;
+  }
+  return false;
+}
+
+export function isListicleOrAggregatorUrl(urlStr: string): boolean {
+  try {
+    const parsed = new URL(urlStr);
+    const path = parsed.pathname.toLowerCase();
+    if (/\/(best-|top-|list-of-|category|search|city|explore|ranking|blog\/top-)/i.test(path)) {
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 function decodeBingTargetUrl(rawUrl: string): string {
   try {
     const cleanUrl = rawUrl.replace(/&amp;/g, '&');
@@ -139,6 +218,8 @@ function cleanBusinessTitle(rawTitle: string, profession: string, location: stri
     .replace(/&amp;/g, '&')
     .replace(/&#39;/g, "'")
     .replace(/&quot;/g, '"')
+    .replace(/\s*\|\s*(Home|Contact Us|About Us|Official Website|Welcome|Services|Lawyers|CA|Doctors|Dentists).*$/i, '')
+    .replace(/\s*-\s*(Home|Contact Us|About Us|Official Website|Welcome|Services|Lawyers|CA|Doctors|Dentists).*$/i, '')
     .replace(/\|.*$/g, '')
     .replace(/–.*$/g, '')
     .replace(/\s+-\s+.*$/g, '')
@@ -276,7 +357,7 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     const normProf = profession.toLowerCase();
     const normLoc = location.toLowerCase();
 
-    const directoryMatches = VERIFIED_INDIAN_PROFESSIONALS.filter((rec) => {
+    let directoryMatches = VERIFIED_INDIAN_PROFESSIONALS.filter((rec) => {
       const pMatch =
         rec.profession.toLowerCase().includes(normProf) ||
         normProf.includes(rec.profession.toLowerCase()) ||
@@ -295,6 +376,18 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
       return pMatch && lMatch;
     });
 
+    if (input.searchScope === 'SOLO_PRACTITIONERS') {
+      const solo = directoryMatches.filter(
+        (m) => Boolean(m.contactName) || /^(dr|ca|adv|advocate)\.?\s+/i.test(m.businessName)
+      );
+      if (solo.length > 0) directoryMatches = solo;
+    } else if (input.searchScope === 'INDIVIDUAL_FIRMS') {
+      const firms = directoryMatches.filter((m) =>
+        /(&\s*(associates|co|partners)|llp|chambers|clinic|studio|associates|consultants)/i.test(m.businessName)
+      );
+      if (firms.length > 0) directoryMatches = firms;
+    }
+
     for (const match of directoryMatches) {
       const key = match.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!seenNames.has(key)) {
@@ -310,7 +403,7 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     // 2. Check SerpAPI if configured and more leads needed
     if (candidates.length < limit && process.env.SERPAPI_API_KEY) {
       try {
-        const serpResults = await this.searchSerpApi(profession, location, locality, limit - candidates.length);
+        const serpResults = await this.searchSerpApi(profession, location, locality, limit - candidates.length, input.searchScope);
         for (const item of serpResults) {
           const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (!seenNames.has(key)) {
@@ -330,7 +423,7 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
       (process.env.GOOGLE_SEARCH_ENGINE_ID || process.env.GOOGLE_CSE_ID)
     ) {
       try {
-        const googleResults = await this.searchGoogleCse(profession, location, locality, limit - candidates.length);
+        const googleResults = await this.searchGoogleCse(profession, location, locality, limit - candidates.length, input.searchScope);
         for (const item of googleResults) {
           const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (!seenNames.has(key)) {
@@ -346,7 +439,7 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     // 4. Check Tavily API if configured and more leads needed
     if (candidates.length < limit && process.env.TAVILY_API_KEY) {
       try {
-        const tavilyResults = await this.searchTavily(profession, location, locality, limit - candidates.length);
+        const tavilyResults = await this.searchTavily(profession, location, locality, limit - candidates.length, input.searchScope);
         for (const item of tavilyResults) {
           const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (!seenNames.has(key)) {
@@ -362,7 +455,7 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     // 5. Query Live Web Search Engine (Bing/DDG parser with contact extraction) if more leads needed
     if (candidates.length < limit) {
       try {
-        const liveResults = await this.searchLiveWebEngine(profession, location, locality, limit - candidates.length);
+        const liveResults = await this.searchLiveWebEngine(profession, location, locality, limit - candidates.length, input.searchScope);
         for (const item of liveResults) {
           const key = item.businessName.toLowerCase().replace(/[^a-z0-9]/g, '');
           if (!seenNames.has(key)) {
@@ -431,14 +524,13 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     profession: string,
     location: string,
     locality: string,
-    limit: number
+    limit: number,
+    searchScope?: string
   ): Promise<DiscoveredBusinessRecord[]> {
     const key = process.env.SERPAPI_API_KEY;
     if (!key) return [];
 
-    const q = locality
-      ? `${profession} in ${locality}, ${location}`
-      : `${profession} in ${location}`;
+    const q = buildRefinedSearchQuery(profession, location, locality, searchScope);
 
     const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(q)}&gl=in&hl=en&api_key=${key}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -450,6 +542,9 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     // Local results (Google Local Pack)
     if (Array.isArray(data.local_results)) {
       for (const item of data.local_results) {
+        if (isListicleOrAggregatorTitle(item.title)) continue;
+        if (item.website && isListicleOrAggregatorUrl(item.website)) continue;
+
         const cleanName = cleanBusinessTitle(item.title, profession, location);
         results.push({
           sourceRecordId: `serp-loc-${item.place_id || Date.now().toString(36)}`,
@@ -481,6 +576,9 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     // Organic results
     if (Array.isArray(data.organic_results)) {
       for (const item of data.organic_results) {
+        if (isListicleOrAggregatorTitle(item.title)) continue;
+        if (isListicleOrAggregatorUrl(item.link)) continue;
+
         let isAgg = false;
         try {
           const dom = new URL(item.link).hostname;
@@ -488,6 +586,8 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
         } catch {
           continue;
         }
+
+        if (searchScope !== 'ALL_COMMERCIAL' && isAgg) continue;
 
         const cleanName = cleanBusinessTitle(item.title, profession, location);
         results.push({
@@ -523,15 +623,14 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     profession: string,
     location: string,
     locality: string,
-    limit: number
+    limit: number,
+    searchScope?: string
   ): Promise<DiscoveredBusinessRecord[]> {
     const key = process.env.GOOGLE_SEARCH_API_KEY;
     const cx = process.env.GOOGLE_SEARCH_ENGINE_ID || process.env.GOOGLE_CSE_ID;
     if (!key || !cx) return [];
 
-    const q = locality
-      ? `"${profession}" "${locality}" "${location}"`
-      : `"${profession}" "${location}"`;
+    const q = buildRefinedSearchQuery(profession, location, locality, searchScope);
 
     const url = `https://www.googleapis.com/customsearch/v1?key=${key}&cx=${cx}&q=${encodeURIComponent(q)}&num=10`;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -542,6 +641,9 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
 
     if (Array.isArray(data.items)) {
       for (const item of data.items) {
+        if (isListicleOrAggregatorTitle(item.title)) continue;
+        if (isListicleOrAggregatorUrl(item.link)) continue;
+
         let isAgg = false;
         try {
           const dom = new URL(item.link).hostname;
@@ -549,6 +651,8 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
         } catch {
           continue;
         }
+
+        if (searchScope !== 'ALL_COMMERCIAL' && isAgg) continue;
 
         const cleanName = cleanBusinessTitle(item.title, profession, location);
         results.push({
@@ -584,12 +688,13 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     profession: string,
     location: string,
     locality: string,
-    limit: number
+    limit: number,
+    searchScope?: string
   ): Promise<DiscoveredBusinessRecord[]> {
     const key = process.env.TAVILY_API_KEY;
     if (!key) return [];
 
-    const q = `${profession} in ${locality ? locality + ', ' : ''}${location} India`;
+    const q = buildRefinedSearchQuery(profession, location, locality, searchScope);
     const res = await fetch('https://api.tavily.com/search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -608,6 +713,9 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
 
     if (Array.isArray(data.results)) {
       for (const item of data.results) {
+        if (isListicleOrAggregatorTitle(item.title)) continue;
+        if (isListicleOrAggregatorUrl(item.url)) continue;
+
         let isAgg = false;
         try {
           const dom = new URL(item.url).hostname;
@@ -615,6 +723,8 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
         } catch {
           continue;
         }
+
+        if (searchScope !== 'ALL_COMMERCIAL' && isAgg) continue;
 
         const cleanName = cleanBusinessTitle(item.title, profession, location);
         results.push({
@@ -649,11 +759,10 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
     profession: string,
     location: string,
     locality: string,
-    limit: number
+    limit: number,
+    searchScope?: string
   ): Promise<DiscoveredBusinessRecord[]> {
-    const query = locality
-      ? `${profession} in ${locality} ${location}`
-      : `${profession} in ${location}`;
+    const query = buildRefinedSearchQuery(profession, location, locality, searchScope);
 
     const items: DiscoveredBusinessRecord[] = [];
 
@@ -683,6 +792,9 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
           const title = linkMatch[2].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim();
           const targetUrl = decodeBingTargetUrl(rawHref);
 
+          if (isListicleOrAggregatorTitle(title)) continue;
+          if (isListicleOrAggregatorUrl(targetUrl)) continue;
+
           const captionMatch = block.match(/<div class="b_caption">[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
           const snippet = captionMatch
             ? captionMatch[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').trim()
@@ -697,6 +809,10 @@ export class LiveWebSearchProvider implements ILeadSourceProvider {
             }
             isAgg = AGGREGATOR_DOMAINS.some((d) => hostname.includes(d));
           } catch {
+            continue;
+          }
+
+          if (searchScope !== 'ALL_COMMERCIAL' && isAgg) {
             continue;
           }
 

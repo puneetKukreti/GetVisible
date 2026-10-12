@@ -20,6 +20,7 @@ const DiscoveryRequestSchema = z.object({
   useDemoProvider: z.boolean().optional(),
   fieldsToCollect: z.array(z.string()).optional(),
   exportFormat: z.enum(['XLSX', 'CSV']).optional(),
+  searchScope: z.enum(['INDIVIDUAL_FIRMS', 'SOLO_PRACTITIONERS', 'ALL_COMMERCIAL']).optional(),
 });
 
 export async function POST(request: NextRequest) {

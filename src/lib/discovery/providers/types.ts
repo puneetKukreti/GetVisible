@@ -14,6 +14,7 @@ export interface DiscoverySearchInput {
   useDemoProvider?: boolean;
   fieldsToCollect?: string[];
   exportFormat?: 'XLSX' | 'CSV';
+  searchScope?: 'INDIVIDUAL_FIRMS' | 'SOLO_PRACTITIONERS' | 'ALL_COMMERCIAL';
 }
 
 export type ContactDataStatus = 'VERIFIED' | 'SOURCE_CONFIRMED' | 'FOUND' | 'UNAVAILABLE';

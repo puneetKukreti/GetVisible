@@ -10,6 +10,11 @@ import {
   ExportLeadItem,
 } from '@/lib/discovery/export-helper';
 import { LeadExtractorStorage } from '@/lib/discovery/storage';
+import {
+  buildRefinedSearchQuery,
+  isListicleOrAggregatorTitle,
+  isListicleOrAggregatorUrl,
+} from '@/lib/discovery/providers/live-search';
 
 describe('Universal Business Lead Extractor', () => {
   describe('GooglePlacesProvider', () => {
@@ -314,6 +319,55 @@ describe('Universal Business Lead Extractor', () => {
 
       const afterDelete = LeadExtractorStorage.listExportHistory(testOrgId);
       expect(afterDelete.some((h) => h.id === recorded.id)).toBe(false);
+    });
+  });
+
+  describe('Search Query Refinement & Listicle / Aggregator Filtering', () => {
+    it('constructs targeted commercial queries with negative exclusion operators', () => {
+      const caQuery = buildRefinedSearchQuery('Chartered Accountant', 'Gurgaon', 'DLF Phase 1', 'INDIVIDUAL_FIRMS');
+      expect(caQuery).toContain('"Chartered Accountants" OR "CA Firm"');
+      expect(caQuery).toContain('"DLF Phase 1 Gurgaon"');
+      expect(caQuery).toContain('-site:justdial.com');
+      expect(caQuery).toContain('-site:sulekha.com');
+      expect(caQuery).toContain('-site:practo.com');
+      expect(caQuery).toContain('"& Associates" OR "LLP"');
+
+      const lawyerQuery = buildRefinedSearchQuery('Lawyer', 'Noida', undefined, 'SOLO_PRACTITIONERS');
+      expect(lawyerQuery).toContain('"Law Firm" OR "Advocate" OR "Law Chambers"');
+      expect(lawyerQuery).toContain('"Noida"');
+      expect(lawyerQuery).toContain('"Dr." OR "CA" OR "Advocate"');
+      expect(lawyerQuery).toContain('-site:wikipedia.org');
+
+      const dentistQuery = buildRefinedSearchQuery('Dentist', 'South Delhi');
+      expect(dentistQuery).toContain('"Dental Clinic" OR "Dental Care" OR "Dentist"');
+      expect(dentistQuery).toContain('"Dr."');
+      expect(dentistQuery).toContain('"South Delhi"');
+    });
+
+    it('identifies and rejects aggregator and listicle titles', () => {
+      expect(isListicleOrAggregatorTitle('Top 10 Lawyers in Gurgaon - Updated 2026')).toBe(true);
+      expect(isListicleOrAggregatorTitle('Best 15 Dental Clinics in South Delhi')).toBe(true);
+      expect(isListicleOrAggregatorTitle('List of Chartered Accountants in Delhi NCR')).toBe(true);
+      expect(isListicleOrAggregatorTitle('Compare 5 Best Architecture Firms')).toBe(true);
+      expect(isListicleOrAggregatorTitle('What is Chartered Accountancy - Wikipedia')).toBe(true);
+
+      // Legitimate client practice titles should NOT be flagged
+      expect(isListicleOrAggregatorTitle('Khanna & Associates Law Chambers')).toBe(false);
+      expect(isListicleOrAggregatorTitle('Dr. Sethi Dental Care & Implant Clinic')).toBe(false);
+      expect(isListicleOrAggregatorTitle('Singhal & Co. Chartered Accountants')).toBe(false);
+    });
+
+    it('identifies and rejects aggregator and listicle URL patterns', () => {
+      expect(isListicleOrAggregatorUrl('https://example.com/best-lawyers-gurgaon')).toBe(true);
+      expect(isListicleOrAggregatorUrl('https://example.com/top-10-dentists')).toBe(true);
+      expect(isListicleOrAggregatorUrl('https://directory.com/category/advocates')).toBe(true);
+      expect(isListicleOrAggregatorUrl('https://directory.com/search/gurgaon/ca')).toBe(true);
+      expect(isListicleOrAggregatorUrl('https://blog.example.com/blog/top-accountants')).toBe(true);
+
+      // Direct client practice URLs should NOT be flagged
+      expect(isListicleOrAggregatorUrl('https://khanna-law.com/about-us')).toBe(false);
+      expect(isListicleOrAggregatorUrl('https://sethidental.in/contact')).toBe(false);
+      expect(isListicleOrAggregatorUrl('https://singhalca.com/services')).toBe(false);
     });
   });
 });

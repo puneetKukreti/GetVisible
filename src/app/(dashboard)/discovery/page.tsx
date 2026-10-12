@@ -89,6 +89,7 @@ export default function LeadExtractorPage() {
   // Search parameters
   const [category, setCategory] = useState('Lawyers & Law Firms');
   const [customCategory, setCustomCategory] = useState('');
+  const [searchScope, setSearchScope] = useState<'INDIVIDUAL_FIRMS' | 'SOLO_PRACTITIONERS' | 'ALL_COMMERCIAL'>('INDIVIDUAL_FIRMS');
   const [location, setLocation] = useState('Gurgaon');
   const [locality, setLocality] = useState('');
   const [radius, setRadius] = useState<number | ''>('');
@@ -215,6 +216,7 @@ export default function LeadExtractorPage() {
         websitePreference,
         contactPreference,
         exportFormat,
+        searchScope,
       };
 
       if (radius && Number(radius) > 0) {
@@ -785,6 +787,71 @@ export default function LeadExtractorPage() {
                         />
                       </div>
                     )}
+                  </div>
+
+                  {/* Search Precision & Target Scope */}
+                  <div className="p-3 rounded-md bg-muted/30 border border-border/80">
+                    <label className="font-semibold text-foreground block mb-1 text-[11px] uppercase tracking-wider">
+                      Search Precision & Target Scope
+                    </label>
+                    <p className="text-[11px] text-muted-foreground mb-2.5">
+                      Bypasses high-level aggregator listicles (&ldquo;Top 10...&rdquo;) and targets direct clients with authentic commercial footprints.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSearchScope('INDIVIDUAL_FIRMS')}
+                        className={`text-left p-2.5 rounded-md border transition-all text-xs ${
+                          searchScope === 'INDIVIDUAL_FIRMS'
+                            ? 'border-primary bg-primary/10 text-primary font-medium shadow-xs'
+                            : 'border-border bg-background hover:bg-muted/50 text-muted-foreground'
+                        }`}
+                      >
+                        <div className="font-semibold text-foreground flex items-center justify-between">
+                          <span>🏢 Individual Firms</span>
+                          {searchScope === 'INDIVIDUAL_FIRMS' && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+                          Commercial practices (&amp; Associates, Chambers, Clinics, LLP)
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSearchScope('SOLO_PRACTITIONERS')}
+                        className={`text-left p-2.5 rounded-md border transition-all text-xs ${
+                          searchScope === 'SOLO_PRACTITIONERS'
+                            ? 'border-primary bg-primary/10 text-primary font-medium shadow-xs'
+                            : 'border-border bg-background hover:bg-muted/50 text-muted-foreground'
+                        }`}
+                      >
+                        <div className="font-semibold text-foreground flex items-center justify-between">
+                          <span>👨‍⚕️ Solo Practitioners</span>
+                          {searchScope === 'SOLO_PRACTITIONERS' && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+                          Named professionals (Dr., CA, Advocate, Architect)
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSearchScope('ALL_COMMERCIAL')}
+                        className={`text-left p-2.5 rounded-md border transition-all text-xs ${
+                          searchScope === 'ALL_COMMERCIAL'
+                            ? 'border-primary bg-primary/10 text-primary font-medium shadow-xs'
+                            : 'border-border bg-background hover:bg-muted/50 text-muted-foreground'
+                        }`}
+                      >
+                        <div className="font-semibold text-foreground flex items-center justify-between">
+                          <span>🌐 All Commercial</span>
+                          {searchScope === 'ALL_COMMERCIAL' && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground mt-0.5 leading-snug">
+                          Broad commercial search including directories
+                        </div>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Location & Radius */}
