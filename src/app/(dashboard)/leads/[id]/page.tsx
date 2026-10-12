@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { LeadDetailClient } from './lead-detail-client';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,10 @@ export default async function LeadDetailPage({ params }: PageProps) {
   if (orgId) {
     try {
       initialLead = await LeadRepository.getLeadById(leadId, orgId);
+      if (!initialLead) {
+        const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+        initialLead = await LeadRepository.getLeadById(leadId, altOrgId);
+      }
     } catch {
       // In serverless environments, in-memory cache may miss in Page lambda;
       // client component will gracefully retrieve the lead via /api/leads/[id].

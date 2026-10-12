@@ -366,6 +366,35 @@ describe('Phase 4: Personalized Website Demo Generator', () => {
       const getB = await WebsiteDemoRepository.getDemo(orgBeta, demoA.id);
       expect(getB).toBeNull();
     });
+
+    it('H. Generates demo successfully with archetype layouts and stitch design templates', async () => {
+      const lead = await LeadRepository.createLead(
+        {
+          businessName: 'Gupta & Sons CA Practice',
+          profession: 'Chartered Accountant',
+          city: 'Gurgaon',
+          websiteStatus: 'NO_WEBSITE',
+        },
+        DEMO_ORGANIZATION_ID,
+        'Test'
+      );
+
+      // Archetype layout
+      const demoArchetype = await WebsiteDemoGeneratorService.generateDemo(lead, {
+        layout: 'EDITORIAL_FINANCE',
+        version: 1,
+      });
+      expect(demoArchetype).toBeDefined();
+      expect(demoArchetype.content.brand.businessName).toBe('Gupta & Sons CA Practice');
+
+      // Stitch layout
+      const demoStitch = await WebsiteDemoGeneratorService.generateDemo(lead, {
+        layout: 'design-1-premium',
+        version: 2,
+      });
+      expect(demoStitch).toBeDefined();
+      expect(demoStitch.content.brand.businessName).toBe('Gupta & Sons CA Practice');
+    });
   });
 });
 

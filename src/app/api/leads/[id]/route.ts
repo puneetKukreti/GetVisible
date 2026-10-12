@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { LeadStatus } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,11 @@ export async function GET(
     const rawId = resolvedParams?.id;
     const leadId = rawId ? decodeURIComponent(rawId).trim() : '';
 
-    const lead = await LeadRepository.getLeadById(leadId, orgId);
+    const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+    let lead = await LeadRepository.getLeadById(leadId, orgId);
+    if (!lead) {
+      lead = await LeadRepository.getLeadById(leadId, altOrgId);
+    }
 
     if (!lead) {
       return NextResponse.json({ error: 'Lead not found in this organization' }, { status: 404 });
@@ -53,11 +58,19 @@ export async function PATCH(
     const leadId = rawId ? decodeURIComponent(rawId).trim() : '';
     const body = await request.json();
 
+    const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+    let lead = await LeadRepository.getLeadById(leadId, orgId);
+    let targetOrg = orgId;
+    if (!lead) {
+      lead = await LeadRepository.getLeadById(leadId, altOrgId);
+      if (lead) targetOrg = altOrgId;
+    }
+
     let updatedLead = null;
 
     if (body.note) {
       await LeadRepository.addNote(
-        orgId,
+        targetOrg,
         leadId,
         body.note,
         body.actor || 'Sales Rep'
@@ -68,12 +81,12 @@ export async function PATCH(
       updatedLead = await LeadRepository.updateLeadStatus(
         leadId,
         body.leadStatus as LeadStatus,
-        orgId,
+        targetOrg,
         body.actor || 'Agency User',
         body.reason
       );
     } else {
-      updatedLead = await LeadRepository.getLeadById(leadId, orgId);
+      updatedLead = await LeadRepository.getLeadById(leadId, targetOrg);
     }
 
     if (updatedLead) {

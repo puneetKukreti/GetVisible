@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { WebsiteContentSchema, WebsiteThemeSchema } from '@/lib/demos/schema';
 import { z } from 'zod';
 
@@ -44,17 +45,49 @@ export async function GET(
     if (!orgId) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });
     }
+    const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
 
     // 2a. Check if id is a demoId
-    const demo = await WebsiteDemoRepository.getDemo(orgId, id);
+    let demo = await WebsiteDemoRepository.getDemo(orgId, id);
+    let demoOrg = orgId;
+    if (!demo) {
+      demo = await WebsiteDemoRepository.getDemo(altOrgId, id);
+      if (demo) demoOrg = altOrgId;
+    }
     if (demo) {
-      return NextResponse.json({ success: true, isPublic: false, demo });
+      const targetOrg = demo.organizationId || demoOrg;
+      const lead =
+        (await LeadRepository.getLeadById(demo.leadId, targetOrg)) ||
+        (await LeadRepository.getLeadById(demo.leadId, altOrgId)) ||
+        (await LeadRepository.getLeadById(demo.leadId, orgId));
+      let demos = await WebsiteDemoRepository.listDemos(targetOrg, demo.leadId);
+      if (demos.length === 0 && targetOrg !== altOrgId) {
+        const altDemos = await WebsiteDemoRepository.listDemos(altOrgId, demo.leadId);
+        if (altDemos.length > 0) demos = altDemos;
+      }
+      return NextResponse.json({
+        success: true,
+        isPublic: false,
+        demo,
+        lead: lead || undefined,
+        demos: demos.length > 0 ? demos : [demo],
+      });
     }
 
     // 2b. Check if id is a leadId
-    const lead = await LeadRepository.getLeadById(id, orgId);
+    let lead = await LeadRepository.getLeadById(id, orgId);
+    let leadOrg = orgId;
+    if (!lead) {
+      lead = await LeadRepository.getLeadById(id, altOrgId);
+      if (lead) leadOrg = altOrgId;
+    }
     if (lead) {
-      const demos = await WebsiteDemoRepository.listDemos(orgId, lead.id);
+      const targetOrg = lead.organizationId || leadOrg;
+      let demos = await WebsiteDemoRepository.listDemos(targetOrg, lead.id);
+      if (demos.length === 0 && targetOrg !== altOrgId) {
+        const altDemos = await WebsiteDemoRepository.listDemos(altOrgId, lead.id);
+        if (altDemos.length > 0) demos = altDemos;
+      }
       return NextResponse.json({
         success: true,
         isPublic: false,
@@ -80,14 +113,22 @@ export async function PATCH(
     if (!orgId) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });
     }
+    const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
     const resolvedParams = await Promise.resolve(params);
     const id = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';
+
+    let targetOrg = orgId;
+    let existing = await WebsiteDemoRepository.getDemo(orgId, id);
+    if (!existing) {
+      existing = await WebsiteDemoRepository.getDemo(altOrgId, id);
+      if (existing) targetOrg = altOrgId;
+    }
 
     const body = await request.json();
 
     if (body.action === 'APPROVE') {
       const result = await WebsiteDemoRepository.approveDemo(
-        orgId,
+        targetOrg,
         id,
         body.actor || 'Sales Specialist'
       );
@@ -96,7 +137,7 @@ export async function PATCH(
 
     if (body.action === 'REJECT') {
       const result = await WebsiteDemoRepository.rejectDemo(
-        orgId,
+        targetOrg,
         id,
         body.reason || 'Design not suitable',
         body.actor || 'Sales Specialist'
@@ -112,12 +153,11 @@ export async function PATCH(
       );
     }
 
-    const existing = await WebsiteDemoRepository.getDemo(orgId, id);
     if (!existing) {
       return NextResponse.json({ success: false, error: 'Demo not found' }, { status: 404 });
     }
 
-    const updated = await WebsiteDemoRepository.updateDemo(orgId, id, parsed.data, 'user');
+    const updated = await WebsiteDemoRepository.updateDemo(targetOrg, id, parsed.data, 'user');
     return NextResponse.json({ success: true, demo: updated });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update demo';

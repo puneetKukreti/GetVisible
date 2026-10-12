@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,7 @@ const GenerateDemoRequestSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required'),
   templateId: z.string().optional(),
   themeId: z.string().optional(),
-  layout: z.enum(['MODERN_CORPORATE', 'PREMIUM_PROFESSIONAL', 'TRADITIONAL_CA']).optional(),
+  layout: z.string().optional(),
   useAiEnrichment: z.boolean().optional(),
 });
 
@@ -23,7 +24,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const leadId = searchParams.get('leadId') || undefined;
 
-    const demos = await WebsiteDemoRepository.listDemos(orgId, leadId);
+    let demos = await WebsiteDemoRepository.listDemos(orgId, leadId);
+    if (demos.length === 0 && leadId) {
+      const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+      demos = await WebsiteDemoRepository.listDemos(altOrgId, leadId);
+    }
     return NextResponse.json({ success: true, demos });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to retrieve website demos';
@@ -39,7 +44,6 @@ export async function POST(request: NextRequest) {
     }
     const body = await request.json();
 
-
     const parsed = GenerateDemoRequestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -50,8 +54,17 @@ export async function POST(request: NextRequest) {
 
     const { leadId, templateId, themeId, layout, useAiEnrichment } = parsed.data;
 
-    // Fetch lead with organization isolation
-    const lead = await LeadRepository.getLeadById(leadId, orgId);
+    // Fetch lead with organization isolation and fallback
+    const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+    let lead = await LeadRepository.getLeadById(leadId, orgId);
+    let effectiveOrgId = orgId;
+    if (!lead) {
+      lead = await LeadRepository.getLeadById(leadId, altOrgId);
+      if (lead) {
+        effectiveOrgId = altOrgId;
+      }
+    }
+
     if (!lead) {
       return NextResponse.json(
         { success: false, error: `Lead not found for ID: ${leadId}` },
@@ -73,29 +86,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const targetOrgId = lead.organizationId || effectiveOrgId;
+
     // Calculate non-destructive version number
-    const existingDemos = await WebsiteDemoRepository.listDemos(orgId, leadId);
+    const existingDemos = await WebsiteDemoRepository.listDemos(targetOrgId, leadId);
     const nextVersion = existingDemos.length + 1;
 
     // Generate demo
     const demo = await WebsiteDemoGeneratorService.generateDemo(lead, {
       templateId,
       themeId,
-      layout,
-      organizationId: orgId,
+      layout: layout as any,
+      organizationId: targetOrgId,
       version: nextVersion,
       useAiEnrichment,
     });
 
     // Save to repository
-    const savedDemo = await WebsiteDemoRepository.saveDemo(orgId, demo, 'system');
+    const savedDemo = await WebsiteDemoRepository.saveDemo(targetOrgId, demo, 'system');
 
     // Update lead status to DEMO_GENERATED if currently NEW or QUALIFIED
     if (lead.leadStatus === 'NEW' || lead.leadStatus === 'QUALIFIED' || lead.leadStatus === 'RESEARCHING') {
       await LeadRepository.updateLeadStatus(
         leadId,
         'DEMO_GENERATED',
-        orgId,
+        targetOrgId,
         'System generated website demonstration concept (v' + nextVersion + ')'
       );
     }

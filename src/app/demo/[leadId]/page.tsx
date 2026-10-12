@@ -2,6 +2,7 @@ import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { DemoViewWrapper } from './demo-view-wrapper';
 import { WebsiteDemoData, LeadData } from '@/types';
 
@@ -63,6 +64,9 @@ export default async function LeadDemoPage({ params }: PageProps) {
     notFound();
   }
 
+  const orgId = (await getResolvedOrganizationId()) || PILOT_ORGANIZATION_ID;
+  const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+
   // 1. Check if token matches an approved public demo in SSR memory
   let initialPublicDemo: WebsiteDemoData | null = null;
   try {
@@ -72,15 +76,39 @@ export default async function LeadDemoPage({ params }: PageProps) {
     }
   } catch {}
 
-  // 2. Check if user is reviewing an internal lead in active organization
+  // 2. Check if user is reviewing an internal lead in active organization or fallback org
   let initialLead: LeadData | null = null;
   let initialDemos: WebsiteDemoData[] = [];
-  const orgId = await getResolvedOrganizationId();
-  if (orgId) {
+  try {
+    initialLead = await LeadRepository.getLeadById(tokenOrId, orgId);
+    if (!initialLead) {
+      initialLead = await LeadRepository.getLeadById(tokenOrId, altOrgId);
+    }
+    if (initialLead) {
+      const targetOrg = initialLead.organizationId || orgId;
+      initialDemos = await WebsiteDemoRepository.listDemos(targetOrg, initialLead.id);
+      if (initialDemos.length === 0 && targetOrg !== altOrgId) {
+        const altDemos = await WebsiteDemoRepository.listDemos(altOrgId, initialLead.id);
+        if (altDemos.length > 0) initialDemos = altDemos;
+      }
+    }
+  } catch {}
+
+  // 3. If tokenOrId was a demo ID instead of lead ID, resolve the demo and lead
+  if (!initialLead && !initialPublicDemo) {
     try {
-      initialLead = await LeadRepository.getLeadById(tokenOrId, orgId);
-      if (initialLead) {
-        initialDemos = await WebsiteDemoRepository.listDemos(orgId, initialLead.id);
+      let demo = await WebsiteDemoRepository.getDemo(orgId, tokenOrId);
+      if (!demo) {
+        demo = await WebsiteDemoRepository.getDemo(altOrgId, tokenOrId);
+      }
+      if (demo) {
+        const demoOrg = demo.organizationId || orgId;
+        initialLead =
+          (await LeadRepository.getLeadById(demo.leadId, demoOrg)) ||
+          (await LeadRepository.getLeadById(demo.leadId, altOrgId)) ||
+          (await LeadRepository.getLeadById(demo.leadId, orgId));
+        const demos = await WebsiteDemoRepository.listDemos(initialLead?.organizationId || demoOrg, demo.leadId);
+        initialDemos = demos.length > 0 ? demos : [demo];
       }
     } catch {}
   }
