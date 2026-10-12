@@ -32,6 +32,9 @@ import {
   Lightbulb,
   ChevronDown,
   ChevronUp,
+  CornerDownLeft,
+  CheckCheck,
+  Edit3,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -122,6 +125,7 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
   // Image & Text Clipboard State
   const [copyImageStatus, setCopyImageStatus] = useState<'IDLE' | 'COPYING' | 'COPIED' | 'FAILED'>('IDLE');
   const [copyTextStatus, setCopyTextStatus] = useState<'IDLE' | 'COPIED'>('IDLE');
+  const [isEditingDraft, setIsEditingDraft] = useState(false);
 
   // Interest Outcome State
   const [interestStatus, setInterestStatus] = useState<string | null>(lead.leadStatus);
@@ -447,177 +451,344 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
           </div>
         </div>
 
-        {/* Visual Real Website Screenshot Card */}
-        <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <span>Website Concept Mockup</span>
-              <Badge variant="outline" className="text-[9px] font-normal py-0">
-                Direct Image Ready
-              </Badge>
-            </p>
-            {screenshotLoading && (
-              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Capturing snapshot…
-              </span>
-            )}
-          </div>
+        {/* WhatsApp Channel: Exact Card Message with Image at Top and Quick Reply Buttons */}
+        {channel === 'WHATSAPP' ? (
+          <div className="space-y-3">
+            {/* Generate / Refresh Button */}
+            <Button
+              onClick={generateDraft}
+              disabled={draftLoading || !intent.trim()}
+              className="w-full gap-2 text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+            >
+              {draftLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              <span>{draftLoading ? 'Generating Card Copy…' : 'Generate Tailored WhatsApp Card'}</span>
+            </Button>
 
-          {screenshotUrl ? (
-            <div className="space-y-2.5">
-              <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-black/5 shadow-inner">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={screenshotUrl}
-                  alt={`Demo website preview for ${lead.businessName}`}
-                  className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
+            {/* Error */}
+            {draftError && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                {draftError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-1.5">
+                <MessageSquare className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-bold text-foreground">WhatsApp Card Message</span>
+                <Badge variant="outline" className="text-[9px] py-0 border-emerald-500/30 text-emerald-600">
+                  Quick Reply Card
+                </Badge>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditingDraft(!isEditingDraft)}
+                className="h-6 text-[11px] px-2 gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <Edit3 className="w-3 h-3" />
+                <span>{isEditingDraft ? 'Card Preview' : 'Edit Text'}</span>
+              </Button>
+            </div>
+
+            {isEditingDraft ? (
+              <div className="space-y-2">
+                <p className="text-[11px] text-muted-foreground">Edit message text below, then switch back to Card Preview:</p>
+                <textarea
+                  rows={8}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  className="w-full text-xs rounded-md border border-border bg-muted/20 px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring leading-relaxed font-sans"
                 />
               </div>
+            ) : (
+              /* WhatsApp Simulated Chat Canvas (Exact match to uploaded image) */
+              <div className="rounded-2xl border border-border/80 overflow-hidden shadow-xs">
+                {/* 1. WhatsApp Top Bar */}
+                <div className="bg-[#075e54] text-white px-3.5 py-2.5 flex items-center justify-between text-xs shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold text-xs uppercase border border-white/30 text-white shadow-2xs">
+                      {lead.businessName.charAt(0)}
+                    </div>
+                    <div>
+                      <div className="font-semibold text-xs leading-none">{lead.businessName}</div>
+                      <div className="text-[10px] text-emerald-100/90 font-normal mt-0.5">Business Account</div>
+                    </div>
+                  </div>
+                  <div className="text-white/80 text-sm font-bold tracking-widest">⋮</div>
+                </div>
 
-              {/* Direct Image Action Buttons for WhatsApp & Email */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={copyScreenshotImage}
-                  disabled={copyImageStatus === 'COPYING'}
-                  className={`text-xs h-8 gap-1.5 font-medium ${
-                    copyImageStatus === 'COPIED'
-                      ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
-                      : 'border-border'
-                  }`}
-                  title="Copy PNG screenshot image directly to clipboard"
-                >
-                  {copyImageStatus === 'COPYING' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : copyImageStatus === 'COPIED' ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5 text-primary" />
+                {/* 2. Chat Canvas with Wallpaper */}
+                <div className="bg-[#efeae2] dark:bg-[#0b141a] p-3 space-y-3">
+                  {/* Date Badge */}
+                  <div className="flex justify-center">
+                    <span className="bg-white/85 dark:bg-card/85 text-[10px] font-medium text-muted-foreground px-2.5 py-0.5 rounded-full shadow-2xs">
+                      Today
+                    </span>
+                  </div>
+
+                  {/* 3. The WhatsApp Card Bubble (Identical to image) */}
+                  <div className="bg-white dark:bg-[#1f2c34] rounded-2xl shadow-sm border border-black/5 dark:border-white/5 overflow-hidden max-w-sm mx-auto">
+                    {/* Image at Top */}
+                    <div className="relative aspect-[16/10] bg-black/5 overflow-hidden border-b border-border/30">
+                      {screenshotUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={screenshotUrl}
+                          alt={`Website concept for ${lead.businessName}`}
+                          className="w-full h-full object-cover object-top"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground text-xs p-4 text-center">
+                          {screenshotLoading ? (
+                            <>
+                              <Loader2 className="w-5 h-5 animate-spin mb-1 text-emerald-600" />
+                              <span>Rendering website concept snapshot…</span>
+                            </>
+                          ) : (
+                            <span>Mockup will render on draft generation</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Message Body below Image */}
+                    <div className="p-3.5 space-y-2 text-xs leading-relaxed text-[#111b21] dark:text-[#e9edef] whitespace-pre-line font-sans">
+                      {draft || whatsappMessage || 'Click "Generate Tailored WhatsApp Card" to draft personalized announcement…'}
+
+                      <div className="flex justify-end items-center gap-1 text-[10px] text-muted-foreground pt-1 select-none">
+                        <span>11:50 AM</span>
+                        <CheckCheck className="w-3.5 h-3.5 text-blue-500 inline" />
+                      </div>
+                    </div>
+
+                    {/* 4. Quick Reply Buttons (Exact design as in user's image!) */}
+                    <div className="border-t border-border/40 divide-y divide-border/40 bg-card/20 select-none">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateInterest('INTERESTED')}
+                        className="w-full py-2.5 px-3 text-xs font-semibold text-[#00a884] dark:text-[#00a884] hover:bg-emerald-500/10 active:bg-emerald-500/20 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="Click to log prospect as Interested & stage for Proposal"
+                      >
+                        <CornerDownLeft className="w-3.5 h-3.5" />
+                        <span>Quick Reply: Interested</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateInterest('DO_NOT_CONTACT')}
+                        className="w-full py-2 px-3 text-xs font-medium text-[#00a884]/80 dark:text-[#00a884]/80 hover:bg-rose-500/10 hover:text-rose-600 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                        title="Click to opt out"
+                      >
+                        <CornerDownLeft className="w-3.5 h-3.5" />
+                        <span>stop</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Dispatch Guide banner */}
+                  <div className="p-2 rounded bg-white/70 dark:bg-card/70 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-1.5 font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
+                    <span>Click <strong>&ldquo;📋 Copy Image&rdquo;</strong> &rarr; In WhatsApp Web press <strong>Ctrl + V</strong> to send the card image directly!</span>
+                  </div>
+
+                  {/* Action Toolbar */}
+                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyScreenshotImage}
+                      disabled={copyImageStatus === 'COPYING' || !screenshotUrl}
+                      className={`text-xs h-8 gap-1.5 font-medium bg-white dark:bg-card shadow-xs ${
+                        copyImageStatus === 'COPIED'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
+                          : 'border-border'
+                      }`}
+                      title="Copy PNG screenshot directly to OS clipboard for Ctrl+V in WhatsApp"
+                    >
+                      {copyImageStatus === 'COPYING' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : copyImageStatus === 'COPIED' ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      <span>{copyImageStatus === 'COPIED' ? 'Image Copied!' : '📋 Copy Image'}</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyDraftText}
+                      disabled={!draft}
+                      className="text-xs h-8 gap-1.5 font-medium bg-white dark:bg-card border-border shadow-xs hover:bg-muted"
+                    >
+                      {copyTextStatus === 'COPIED' ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                      )}
+                      <span>{copyTextStatus === 'COPIED' ? 'Text Copied!' : '📋 Copy Text'}</span>
+                    </Button>
+                  </div>
+
+                  {whatsappShareUrl && (
+                    <a
+                      href={whatsappShareUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 py-2 rounded-lg shadow-sm transition-colors"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Open in WhatsApp Web</span>
+                    </a>
                   )}
-                  <span>
-                    {copyImageStatus === 'COPYING'
-                      ? 'Copying…'
-                      : copyImageStatus === 'COPIED'
-                      ? 'Image Copied!'
-                      : '📋 Copy Image'}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Email & Phone Channels */
+          <div className="space-y-3">
+            {/* Visual Screenshot Card */}
+            <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <span>Website Concept Mockup</span>
+                  <Badge variant="outline" className="text-[9px] font-normal py-0">
+                    Direct Image Ready
+                  </Badge>
+                </p>
+                {screenshotLoading && (
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Capturing snapshot…
                   </span>
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={downloadScreenshot}
-                  className="text-xs h-8 gap-1.5 font-medium border-border hover:bg-muted"
-                  title="Download concept PNG to attach as file"
-                >
-                  <Download className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>⬇️ Download PNG</span>
-                </Button>
+                )}
               </div>
 
-              {copyImageStatus === 'COPIED' && (
-                <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[11px] flex items-center gap-1.5 font-medium">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                  <span>Image is in clipboard! In WhatsApp Web, simply press <strong>Ctrl + V</strong> to send the photo directly.</span>
+              {screenshotUrl ? (
+                <div className="space-y-2">
+                  <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-black/5 shadow-inner">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={screenshotUrl}
+                      alt={`Demo website preview for ${lead.businessName}`}
+                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={copyScreenshotImage}
+                      disabled={copyImageStatus === 'COPYING'}
+                      className="text-xs h-8 gap-1.5 font-medium border-border"
+                    >
+                      {copyImageStatus === 'COPIED' ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5 text-primary" />
+                      )}
+                      <span>{copyImageStatus === 'COPIED' ? 'Image Copied!' : '📋 Copy Image'}</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={downloadScreenshot}
+                      className="text-xs h-8 gap-1.5 font-medium border-border"
+                    >
+                      <Download className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span>⬇️ Download PNG</span>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border rounded-md">
+                  {screenshotLoading ? 'Generating preview snapshot…' : 'Snapshot will attach on draft generation'}
                 </div>
               )}
             </div>
-          ) : (
-            <div className="text-center py-4 text-xs text-muted-foreground border border-dashed border-border rounded-md">
-              {screenshotLoading ? 'Generating preview snapshot…' : 'Snapshot will attach on draft generation'}
-            </div>
-          )}
-        </div>
 
-        {/* Generate Draft Button */}
-        <Button
-          onClick={generateDraft}
-          disabled={draftLoading || !intent.trim()}
-          className="w-full gap-2 text-xs h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-        >
-          {draftLoading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Sparkles className="w-3.5 h-3.5" />
-          )}
-          <span>{draftLoading ? 'Drafting Tailored Copy…' : `Generate Tailored ${CHANNEL_META[channel].label} Draft`}</span>
-        </Button>
-
-        {/* Error */}
-        {draftError && (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive flex items-center gap-2">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-            {draftError}
-          </div>
-        )}
-
-        {/* WhatsApp Direct Dispatch Guide */}
-        {channel === 'WHATSAPP' && (
-          <div className="p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300 space-y-1">
-            <div className="font-semibold flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Direct Photo WhatsApp Dispatch (No link spam):</span>
-            </div>
-            <ol className="list-decimal pl-4 space-y-0.5 text-[11px] text-muted-foreground">
-              <li>Click <strong>&ldquo;📋 Copy Image&rdquo;</strong> above (image is copied to your clipboard).</li>
-              <li>Click <strong>&ldquo;Open in WhatsApp Web&rdquo;</strong> below.</li>
-              <li>In the chat box, press <strong>Ctrl + V</strong> to attach the concept image directly with your message text!</li>
-            </ol>
-          </div>
-        )}
-
-        {/* Draft output */}
-        {draft && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Generated Draft ({CHANNEL_META[channel].label})</span>
-              </p>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={copyDraftText}
-                  className="h-6.5 text-[11px] px-2 gap-1 text-muted-foreground hover:text-foreground"
-                >
-                  {copyTextStatus === 'COPIED' ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-500" />
-                      <span className="text-emerald-600 font-semibold">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>Copy Text</span>
-                    </>
-                  )}
-                </Button>
-
-                {channel === 'WHATSAPP' && whatsappShareUrl && (
-                  <a
-                    href={whatsappShareUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20 shadow-2xs"
-                  >
-                    <MessageSquare className="w-3 h-3" />
-                    <span>Open in WhatsApp Web</span>
-                  </a>
-                )}
+            {/* Email Subject */}
+            {channel === 'EMAIL' && draftSubject && (
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">Subject Line</label>
+                <Input
+                  value={draftSubject}
+                  onChange={(e) => setDraftSubject(e.target.value)}
+                  className="text-xs h-8"
+                />
               </div>
-            </div>
+            )}
 
-            <textarea
-              rows={8}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              className="w-full text-xs rounded-md border border-border bg-muted/20 px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring leading-relaxed font-sans"
-            />
+            {/* Generate Draft Button */}
+            <Button
+              onClick={generateDraft}
+              disabled={draftLoading || !intent.trim()}
+              className="w-full gap-2 text-xs h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+            >
+              {draftLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              <span>{draftLoading ? 'Drafting Tailored Copy…' : `Generate Tailored ${CHANNEL_META[channel].label} Draft`}</span>
+            </Button>
+
+            {/* Error */}
+            {draftError && (
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs text-destructive flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                {draftError}
+              </div>
+            )}
+
+            {/* Draft output for email */}
+            {draft && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>Generated Draft ({CHANNEL_META[channel].label})</span>
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={copyDraftText}
+                    className="h-6.5 text-[11px] px-2 gap-1 text-muted-foreground hover:text-foreground"
+                  >
+                    {copyTextStatus === 'COPIED' ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-500" />
+                        <span className="text-emerald-600 font-semibold">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Copy Text</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <textarea
+                  rows={8}
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  className="w-full text-xs rounded-md border border-border bg-muted/20 px-3 py-2 text-foreground focus:outline-none focus:ring-1 focus:ring-ring leading-relaxed font-sans"
+                />
+              </div>
+            )}
           </div>
         )}
 

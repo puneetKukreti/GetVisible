@@ -245,35 +245,34 @@ GetVisible Digital Team`;
   const waRecipient = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
   const salutation = input.contactName || `${input.businessName} Team`;
 
-  const waBullets = bullets
-    .map((b) => {
-      const colonIdx = b.indexOf(':');
-      if (colonIdx !== -1) {
-        return `• *${b.slice(0, colonIdx)}:* ${b.slice(colonIdx + 1).trim()}`;
-      }
-      return `• ${b}`;
-    })
-    .join('\n');
+  const headline = hasWebsite
+    ? `📢 *Digital Concept Update: Modernized Practice Portal!* 📢`
+    : `📢 *Practice Announcement: Official Website Concept Ready!* 📢`;
 
-  const whatsappMessage = `*Hello ${salutation}*,
+  const keyImpact = hasWebsite
+    ? `⚡ *Key Impact:*
+• *Ultra-Fast Mobile Architecture:* Loads under 1s for smartphone inquiries.
+• *Direct Client Consultation Intake:* Integrated WhatsApp & inquiry forms.`
+    : `🏛️ *Key Impact:*
+• *Immediate Statutory Credibility:* Institutional trust for corporate clients & audits.
+• *24/7 Consultation Capture:* Captures leads directly without competitor directory ads.`;
 
-I came across *${input.businessName}* in ${input.city || 'your area'}.
+  const whatsappMessage = `${headline}
 
-${
-  hasWebsite
-    ? `*(Attached an updated modern concept mockup above 👆)*\n\nWe put together a modernized, mobile-first concept designed to upgrade your client inquiry experience:`
-    : `I noticed your practice does not currently have an official website.\n\n*(Attached a custom visual concept mockup above 👆)*\n\nHere is how an official digital presence will improve your practice:`
-}
+*Dear ${salutation},*
 
-${waBullets}
+We designed an official, high-authority digital presence concept for *${input.businessName}* in ${input.city || 'your area'}.
 
-To save you time, we already coded a live interactive demo tailored to your practice:
-🔗 *Live Interactive Preview:*
+*(Attached a custom visual concept mockup above 👆)*
+
+${keyImpact}
+
+🔗 *Live Interactive Demo:*
 ${input.demoUrl}
 
-👉 *${hookQuestion}*
+👉 *Reply "Interested" for a 1-minute live preview on your phone, or reply "stop" to opt out.*
 
-- GetVisible Digital Team`;
+- GetVisible Digital Studio`;
 
   const encodedWaText = encodeURIComponent(whatsappMessage);
   const whatsappShareUrl = waRecipient
