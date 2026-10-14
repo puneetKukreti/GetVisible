@@ -190,33 +190,46 @@ export function personalizeStitchHtml(
   html = html.replaceAll('consultations@sharmaassociates-ca.in', escapeHtml(email));
   html = html.replaceAll('mailto:consultations@sharmaassociates-ca.in', `mailto:${escapeHtml(email)}`);
 
-  // 5. Inject CSS for smooth, natural scrolling and elegant visible scrollbar
+  // 4b. Remove any embedded styles that lock scrolling or hide scrollbars
+  html = html.replaceAll('overscroll-behavior:none;', 'overscroll-behavior:auto;');
+  html = html.replaceAll('overscroll-behavior: none;', 'overscroll-behavior: auto;');
+  html = html.replaceAll('overscroll-behavior:none', 'overscroll-behavior:auto');
+  html = html.replaceAll('overscroll-behavior: none', 'overscroll-behavior: auto');
+  html = html.replaceAll('::-webkit-scrollbar{display:none;}', '');
+  html = html.replaceAll('::-webkit-scrollbar { display: none; }', '');
+
+  // 5. Inject CSS for smooth, natural scrolling and visible, draggable scrollbar
   const injectedStyle = `
 <style>
-  html {
-    scroll-behavior: smooth !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-  }
-  body {
+  html, body {
     margin: 0 !important;
     padding: 0 !important;
     overflow-x: hidden !important;
     overflow-y: auto !important;
+    overscroll-behavior: auto !important;
+    overscroll-behavior-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
-    min-height: 100vh !important;
+    touch-action: pan-y !important;
   }
-  /* Modern clean scrollbar */
+  html {
+    scroll-behavior: smooth !important;
+    height: 100% !important;
+  }
+  body {
+    min-height: 100% !important;
+    height: auto !important;
+  }
+  /* Modern clean visible scrollbar */
   ::-webkit-scrollbar {
-    width: 6px !important;
-    height: 6px !important;
+    width: 8px !important;
+    height: 8px !important;
     display: block !important;
   }
   ::-webkit-scrollbar-track {
-    background: transparent !important;
+    background: rgba(15, 23, 42, 0.05) !important;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(100, 116, 139, 0.45) !important;
+    background: rgba(100, 116, 139, 0.5) !important;
     border-radius: 9999px !important;
   }
   ::-webkit-scrollbar-thumb:hover {
@@ -231,43 +244,10 @@ export function personalizeStitchHtml(
     html = injectedStyle + html;
   }
 
-  // 6. Inject client script for smooth scrolling, simulated form submission, and responsive iframe height
+  // 6. Inject client script for simulated form submission
   const injectedScript = `
 <script>
   (function() {
-    var lastSentHeight = 0;
-    // Measure exact bottom of website content to prevent runaway empty space
-    function notifyHeight() {
-      try {
-        var footer = document.querySelector('footer');
-        var h = 0;
-        if (footer) {
-          var rect = footer.getBoundingClientRect();
-          var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
-          h = Math.ceil(rect.bottom + scrollY);
-        } else {
-          var body = document.body;
-          h = Math.ceil(Math.max(body.offsetHeight, body.clientHeight));
-        }
-        if (h > 300 && Math.abs(h - lastSentHeight) > 2) {
-          lastSentHeight = h;
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({ type: 'GETVISIBLE_IFRAME_HEIGHT', height: h }, '*');
-          }
-        }
-      } catch (e) {}
-    }
-
-    window.addEventListener('load', notifyHeight);
-    window.addEventListener('resize', notifyHeight);
-    window.addEventListener('message', function(ev) {
-      if (ev.data && ev.data.type === 'GETVISIBLE_REQUEST_HEIGHT') {
-        notifyHeight();
-      }
-    });
-    if (typeof MutationObserver !== 'undefined') {
-      new MutationObserver(notifyHeight).observe(document.body, { childList: true, subtree: true });
-    }
 
     // Interactive simulated form submission
     document.addEventListener('DOMContentLoaded', function() {

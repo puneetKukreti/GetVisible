@@ -233,7 +233,7 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
       />
 
       {/* Rendered Public Site Demonstration */}
-      <div className="flex-1 h-[calc(100vh-52px)] overflow-hidden">
+      <div className="flex-1 min-h-[calc(100vh-52px)]">
         <DemoRenderer
           content={renderedContent || activeDemo.content}
           theme={activeTheme}

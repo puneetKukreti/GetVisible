@@ -55,7 +55,7 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
     'Your Practice';
 
   return (
-    <div className="min-h-screen h-screen w-full overflow-hidden relative bg-background text-foreground antialiased selection:bg-primary/20">
+    <div className="min-h-screen w-full relative bg-background text-foreground antialiased selection:bg-primary/20">
       {/* Personalized Website Canvas */}
       <DemoRenderer
         content={contentObj}
