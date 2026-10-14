@@ -3,6 +3,7 @@ import { WebsiteContentSchema, ValidatedWebsiteContent } from './schema';
 import { getTemplate, THEMES, LeadFacts } from './templates';
 import { GeminiAIProvider, MockAIProvider } from '@/lib/providers/ai.provider';
 import { selectWebsiteDesign } from './personalization';
+import { getTemplateScreenshotPath } from './stitch-templates';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -116,6 +117,8 @@ export class WebsiteDemoGeneratorService {
 
     const demoId = `demo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
+    const screenshotUrl = getTemplateScreenshotPath(design.layout || template.id);
+
     const websiteDemo: WebsiteDemoData = {
       id: demoId,
       leadId: lead.id,
@@ -127,6 +130,8 @@ export class WebsiteDemoGeneratorService {
       theme: selectedTheme,
       design,
       blueprint,
+      screenshotUrl,
+      screenshotTakenAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

@@ -3,6 +3,7 @@ import { LeadData, WebsiteDemoData, OutreachMessage, OutreachInput } from '@/typ
 import { canPrepareOutreach } from './lifecycle';
 import { GeminiAIProvider } from '@/lib/providers/ai.provider';
 import { getAppBaseUrl, getPublicDemoUrl } from '@/lib/demos/public';
+import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
 
 export const OutreachMessageSchema = z.object({
   subject: z.string().min(5).max(120),
@@ -336,7 +337,16 @@ export class OutreachGeneratorService {
         ? getPublicDemoUrl(activeDemo.publicToken, base)
         : `${base}/demo/${lead.id}`;
 
-    const screenshotUrl = activeDemo?.screenshotUrl || null;
+    let screenshotUrl = activeDemo?.screenshotUrl || null;
+    if (
+      !screenshotUrl ||
+      (screenshotUrl.includes('api.microlink.io') &&
+        (screenshotUrl.includes('localhost') || screenshotUrl.includes('127.0.0.1')))
+    ) {
+      screenshotUrl = getTemplateScreenshotPath(
+        activeDemo?.design?.layout || activeDemo?.templateId
+      );
+    }
 
     const fallback = generateDeterministicOutreach({
       businessName: lead.businessName,

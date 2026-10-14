@@ -1,4 +1,5 @@
 import { ProviderExecutionResult, ProviderStatus } from './provider-result';
+import { getTemplateScreenshotPath } from '../demos/stitch-templates';
 
 export interface ScreenshotOptions {
   width?: number;
@@ -10,7 +11,7 @@ export interface ScreenshotOptions {
 
 export interface ScreenshotResult {
   screenshotUrl: string;
-  source: 'microlink' | 'screenshotone' | 'urlbox' | 'mock';
+  source: 'microlink' | 'screenshotone' | 'urlbox' | 'template' | 'mock';
   width: number;
   height: number;
 }
@@ -53,7 +54,30 @@ export class CloudScreenshotProvider implements IScreenshotProvider {
     const height = options?.height || 800;
 
     try {
-      // 1. ScreenshotOne if configured
+      const isLocalUrl =
+        targetUrl.includes('localhost') ||
+        targetUrl.includes('127.0.0.1') ||
+        targetUrl.includes('0.0.0.0') ||
+        targetUrl.includes('::1') ||
+        targetUrl.startsWith('/');
+
+      // 1. If target is local or loopback (which cloud headless scrapers block with 400 Bad Request),
+      // serve the high-res template screenshot directly!
+      if (isLocalUrl && !this.screenshotOneKey) {
+        return {
+          success: true,
+          configured: true,
+          isMock: false,
+          data: {
+            screenshotUrl: getTemplateScreenshotPath(targetUrl),
+            source: 'template',
+            width,
+            height,
+          },
+        };
+      }
+
+      // 2. ScreenshotOne if configured
       if (this.screenshotOneKey) {
         const query = new URLSearchParams({
           access_key: this.screenshotOneKey,
@@ -80,8 +104,7 @@ export class CloudScreenshotProvider implements IScreenshotProvider {
         };
       }
 
-      // 2. Default Zero-Config: Microlink API CDN
-      // Microlink generates a fast, public, cached screenshot URL from any accessible public web page
+      // 3. Default Zero-Config: Microlink API CDN for public URLs
       const encodedUrl = encodeURIComponent(targetUrl);
       const microlinkUrl = `https://api.microlink.io?url=${encodedUrl}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=${width}&viewport.height=${height}`;
 

@@ -4,6 +4,8 @@ import { generateDeterministicOutreach } from '@/lib/sales/outreach';
 import { POST as batchGeneratePOST } from '@/app/api/demos/batch-generate/route';
 import { POST as sendWhatsappPOST } from '@/app/api/outreach/send-whatsapp/route';
 import { POST as csvImportPOST } from '@/app/api/discovery/csv-import/route';
+import { GET as screenshotGET } from '@/app/api/demos/[id]/screenshot/route';
+import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
 
@@ -171,6 +173,58 @@ describe('Growth & Workflow Upgrades', () => {
       // Verify lead transitioned to CONTACTED
       const updatedLead = await LeadRepository.getLeadById(testLead.id, DEMO_ORGANIZATION_ID);
       expect(updatedLead?.leadStatus).toBe('CONTACTED');
+    });
+  });
+
+  describe('Upgrade 5: Reliable Website Screenshot Image Delivery', () => {
+    it('correctly maps various layouts and templates to high-res screenshot paths', () => {
+      expect(getTemplateScreenshotPath('design-1-premium')).toBe('/demo-templates/design-1-premium/screen.png');
+      expect(getTemplateScreenshotPath('design-2-minimalist')).toBe('/demo-templates/design-2-minimalist/screen.png');
+      expect(getTemplateScreenshotPath('design-3-contemporary')).toBe('/demo-templates/design-3-contemporary/screen.png');
+      expect(getTemplateScreenshotPath('SWISS_MINIMAL')).toBe('/demo-templates/design-2-minimalist/screen.png');
+      expect(getTemplateScreenshotPath('MODERN_FINTECH')).toBe('/demo-templates/design-3-contemporary/screen.png');
+      expect(getTemplateScreenshotPath(null)).toBe('/demo-templates/design-1-premium/screen.png');
+    });
+
+    it('returns a valid JSON screenshotUrl without failing on localhost', async () => {
+      const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
+      const testLead = leads[0];
+
+      const req = new NextRequest(`http://localhost:3000/api/demos/${testLead.id}/screenshot`, {
+        method: 'GET',
+        headers: {
+          'x-organization-id': DEMO_ORGANIZATION_ID,
+        },
+      });
+
+      const res = await screenshotGET(req, { params: { id: testLead.id } });
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.screenshotUrl).toBeDefined();
+      expect(json.screenshotUrl).toContain('/demo-templates/');
+      expect(json.screenshotUrl).toContain('screen.png');
+    });
+
+    it('returns binary image/png with non-empty buffer when format=image is requested', async () => {
+      const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
+      const testLead = leads[0];
+
+      const req = new NextRequest(`http://localhost:3000/api/demos/${testLead.id}/screenshot?format=image`, {
+        method: 'GET',
+        headers: {
+          'x-organization-id': DEMO_ORGANIZATION_ID,
+        },
+      });
+
+      const res = await screenshotGET(req, { params: { id: testLead.id } });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toBe('image/png');
+
+      const arrayBuf = await res.arrayBuffer();
+      // Verify real PNG binary payload is delivered (> 50KB)
+      expect(arrayBuf.byteLength).toBeGreaterThan(50000);
     });
   });
 });

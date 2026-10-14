@@ -113,7 +113,13 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const [whatsappStep, setWhatsappStep] = useState<'step1' | 'step2'>('step1');
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [whatsappFollowUpWithLink, setWhatsappFollowUpWithLink] = useState('');
-  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+  const initialScreenshot =
+    lead.websiteDemos?.[0]?.screenshotUrl &&
+    !lead.websiteDemos[0].screenshotUrl.includes('localhost') &&
+    !lead.websiteDemos[0].screenshotUrl.includes('api.microlink.io')
+      ? lead.websiteDemos[0].screenshotUrl
+      : '/demo-templates/design-1-premium/screen.png';
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(initialScreenshot);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [whatsappShareUrl, setWhatsappShareUrl] = useState<string | null>(null);
   const [whatsappFollowUpShareUrl, setWhatsappFollowUpShareUrl] = useState<string | null>(null);
@@ -266,7 +272,13 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
     try {
       // Fetch binary image from same-origin proxy to eliminate any CORS issues
       const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
-      const res = await fetch(proxyUrl);
+      let res = await fetch(proxyUrl);
+      if (!res.ok && screenshotUrl) {
+        res = await fetch(screenshotUrl);
+      }
+      if (!res.ok) {
+        res = await fetch('/demo-templates/design-1-premium/screen.png');
+      }
       if (!res.ok) throw new Error('Could not fetch screenshot image');
       const blob = await res.blob();
       const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });
@@ -277,6 +289,20 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       setTimeout(() => setCopyImageStatus('IDLE'), 3500);
     } catch (err) {
       console.warn('Clipboard image copy error:', err);
+      // Extra fallback attempt from static template
+      try {
+        const fallbackRes = await fetch('/demo-templates/design-1-premium/screen.png');
+        if (fallbackRes.ok) {
+          const blob = await fallbackRes.blob();
+          const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': pngBlob }),
+          ]);
+          setCopyImageStatus('COPIED');
+          setTimeout(() => setCopyImageStatus('IDLE'), 3500);
+          return;
+        }
+      } catch {}
       setCopyImageStatus('FAILED');
       setTimeout(() => setCopyImageStatus('IDLE'), 3500);
     }
@@ -663,6 +689,9 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                           src={screenshotUrl}
                           alt={`Website concept for ${lead.businessName}`}
                           className="w-full h-full object-cover object-top"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/demo-templates/design-1-premium/screen.png';
+                          }}
                         />
                       ) : (
                         <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground text-xs p-4 text-center">
@@ -802,6 +831,9 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       src={screenshotUrl}
                       alt={`Demo website preview for ${lead.businessName}`}
                       className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/demo-templates/design-1-premium/screen.png';
+                      }}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -1096,7 +1128,13 @@ function OutreachQueueTab({
       // 1. Copy screenshot PNG to OS clipboard if available
       try {
         const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
-        const res = await fetch(proxyUrl);
+        let res = await fetch(proxyUrl);
+        if (!res.ok && lead.websiteDemos?.[0]?.screenshotUrl) {
+          res = await fetch(lead.websiteDemos[0].screenshotUrl);
+        }
+        if (!res.ok) {
+          res = await fetch('/demo-templates/design-1-premium/screen.png');
+        }
         if (res.ok) {
           const blob = await res.blob();
           const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });

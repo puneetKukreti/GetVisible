@@ -26,6 +26,7 @@ import {
 import { createAuditLogEntry } from '../audit';
 import { validateStatusTransition } from '../sales/lifecycle';
 import { generatePublicDemoToken } from '../demos/public';
+import { getTemplateScreenshotPath } from '../demos/stitch-templates';
 
 export class DatabaseConnectionError extends Error {
   constructor(message: string) {
@@ -418,6 +419,17 @@ function normalizeWebsiteDemo(demo: unknown): WebsiteDemoData {
   const contentObj = (copy.content && typeof copy.content === 'object') ? (copy.content as Record<string, unknown>) : null;
   if (!copy.design && contentObj?.design) {
     copy.design = contentObj.design;
+  }
+  const existingUrl = typeof copy.screenshotUrl === 'string' ? copy.screenshotUrl : '';
+  const isBrokenMicrolink =
+    existingUrl.includes('api.microlink.io') &&
+    (existingUrl.includes('localhost') || existingUrl.includes('127.0.0.1'));
+  if (!existingUrl || isBrokenMicrolink) {
+    const layout =
+      (copy.design as any)?.layout ||
+      (contentObj?.design as any)?.layout ||
+      (copy.templateId as string);
+    copy.screenshotUrl = getTemplateScreenshotPath(layout);
   }
   return copy as unknown as WebsiteDemoData;
 }

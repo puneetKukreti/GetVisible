@@ -97,3 +97,33 @@ export const STITCH_TEMPLATES: StitchTemplateMeta[] = [
 export function getStitchTemplate(id: string): StitchTemplateMeta | undefined {
   return STITCH_TEMPLATES.find((t) => t.id === id);
 }
+
+/**
+ * Resolves the relative public web URL of the template screenshot image.
+ * Guarantees a valid, high-resolution preview image is always available.
+ */
+export function getTemplateScreenshotPath(layoutOrTemplate?: string | null): string {
+  const l = (layoutOrTemplate || '').toLowerCase();
+  if (
+    l.includes('minimal') ||
+    l.includes('swiss') ||
+    l.includes('gst') ||
+    l.includes('audit_assurance') ||
+    l.includes('direct_tax') ||
+    l === 'design-2-minimalist'
+  ) {
+    return '/demo-templates/design-2-minimalist/screen.png';
+  }
+  if (
+    l.includes('fintech') ||
+    l.includes('contemporary') ||
+    l.includes('virtual_cfo') ||
+    l.includes('clinic') ||
+    l.includes('modern_indian') ||
+    l === 'design-3-contemporary'
+  ) {
+    return '/demo-templates/design-3-contemporary/screen.png';
+  }
+  // Default to design-1-premium (Editorial Finance / Corporate Tax / Transfer Pricing / Luxury)
+  return '/demo-templates/design-1-premium/screen.png';
+}
