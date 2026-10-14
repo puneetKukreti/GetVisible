@@ -190,16 +190,37 @@ export function personalizeStitchHtml(
   html = html.replaceAll('consultations@sharmaassociates-ca.in', escapeHtml(email));
   html = html.replaceAll('mailto:consultations@sharmaassociates-ca.in', `mailto:${escapeHtml(email)}`);
 
-  // 5. Inject CSS to remove unwanted scrollbars and runaway body min-height
+  // 5. Inject CSS for smooth, natural scrolling and elegant visible scrollbar
   const injectedStyle = `
 <style>
-  html, body {
+  html {
+    scroll-behavior: smooth !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+  body {
     margin: 0 !important;
     padding: 0 !important;
     overflow-x: hidden !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    min-height: 100vh !important;
   }
-  body {
-    min-height: auto !important;
+  /* Modern clean scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+    display: block !important;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.45) !important;
+    border-radius: 9999px !important;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.8) !important;
   }
 </style>
 `;

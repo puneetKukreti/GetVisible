@@ -233,7 +233,7 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
       />
 
       {/* Rendered Public Site Demonstration */}
-      <div className="flex-1">
+      <div className="flex-1 h-[calc(100vh-52px)] overflow-hidden">
         <DemoRenderer
           content={renderedContent || activeDemo.content}
           theme={activeTheme}
@@ -266,10 +266,9 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
         />
       )}
 
-      {/* Sleek Floating Claim Bar */}
+      {/* Sleek Floating Claim Bar (ONLY Claim on WhatsApp) */}
       <FloatingClaimBar
         businessName={initialLead.businessName}
-        onRequestChanges={() => setIsEditorOpen(true)}
       />
     </div>
   );
