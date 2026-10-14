@@ -3,6 +3,7 @@ import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { WebsiteContentSchema, WebsiteThemeSchema } from '@/lib/demos/schema';
+import { isRealHumanVisit } from '@/lib/demos/public';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,9 @@ export async function GET(
     // 1. Prospect-Facing: Check if id matches an approved public demo token
     const publicDemo = await WebsiteDemoRepository.getApprovedDemoByPublicToken(id);
     if (publicDemo) {
-      await WebsiteDemoRepository.recordPublicDemoView(publicDemo.id, publicDemo.organizationId);
+      if (isRealHumanVisit(request.headers, request.nextUrl.searchParams)) {
+        await WebsiteDemoRepository.recordPublicDemoView(publicDemo.id, publicDemo.organizationId);
+      }
       return NextResponse.json(
         { success: true, isPublic: true, demo: publicDemo },
         { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }

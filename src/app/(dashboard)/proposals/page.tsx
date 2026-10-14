@@ -13,6 +13,8 @@ import {
   Calendar,
   Send,
   Download,
+  Loader2,
+  Printer,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────
@@ -184,15 +186,18 @@ function ProposalGenerator({
   leads,
   selectedPackage,
   onPackageChange,
+  onLeadUpdated,
 }: {
   leads: LeadData[];
   selectedPackage: PackageId;
   onPackageChange: (id: PackageId) => void;
+  onLeadUpdated?: (leadId: string, newStatus: LeadData['leadStatus']) => void;
 }) {
   const [selectedLeadId, setSelectedLeadId] = useState<string>('');
   const [scopeNotes, setScopeNotes] = useState('');
   const [proposalGenerated, setProposalGenerated] = useState(false);
   const [markedSent, setMarkedSent] = useState(false);
+  const [markingSent, setMarkingSent] = useState(false);
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId) ?? null;
   const pkg = CA_PACKAGES.find((p) => p.id === selectedPackage)!;
@@ -202,6 +207,34 @@ function ProposalGenerator({
     setProposalGenerated(true);
     setMarkedSent(false);
   }
+
+  const handleMarkSent = async () => {
+    if (!selectedLead) return;
+    setMarkingSent(true);
+    try {
+      const res = await fetch(`/api/leads/${selectedLead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadStatus: 'PROPOSAL',
+          reason: `Sent ${pkg.name} Website Proposal (${formatINR(pkg.oneTime)} + ${formatINR(pkg.monthly)}/mo)`,
+          note: `Proposal generated & sent: ${pkg.name} (${formatINR(pkg.oneTime)}). Scope notes: ${scopeNotes || 'Standard proposal scope'}`,
+          actor: 'Solo Agency Operator',
+        }),
+      });
+
+      if (res.ok) {
+        setMarkedSent(true);
+        if (onLeadUpdated) {
+          onLeadUpdated(selectedLead.id, 'PROPOSAL');
+        }
+      }
+    } catch (err) {
+      console.error('Failed to mark proposal sent in CRM:', err);
+    } finally {
+      setMarkingSent(false);
+    }
+  };
 
   // Reset proposal when lead/package changes
   useEffect(() => {
@@ -318,7 +351,8 @@ function ProposalGenerator({
           pkg={pkg}
           scopeNotes={scopeNotes}
           markedSent={markedSent}
-          onMarkSent={() => setMarkedSent(true)}
+          markingSent={markingSent}
+          onMarkSent={handleMarkSent}
         />
       )}
     </div>
@@ -331,19 +365,21 @@ function ProposalPreview({
   pkg,
   scopeNotes,
   markedSent,
+  markingSent,
   onMarkSent,
 }: {
   lead: LeadData;
   pkg: CAPackage;
   scopeNotes: string;
   markedSent: boolean;
+  markingSent: boolean;
   onMarkSent: () => void;
 }) {
   const upfront = Math.round(pkg.oneTime * 0.5);
   const onDeployment = pkg.oneTime - upfront;
 
   return (
-    <Card className="border-primary/30 shadow-md bg-card">
+    <Card id="proposal-document-card" className="border-primary/30 shadow-md bg-card relative">
       {/* Document Header Bar */}
       <div className="h-1.5 w-full rounded-t-lg bg-gradient-to-r from-primary via-primary/70 to-primary/30" />
 
@@ -474,40 +510,71 @@ function ProposalPreview({
           </div>
         </div>
 
+        {/* Print-friendly styles for 1-click PDF export */}
+        <style jsx global>{`
+          @media print {
+            body * {
+              visibility: hidden !important;
+            }
+            #proposal-document-card,
+            #proposal-document-card * {
+              visibility: visible !important;
+            }
+            #proposal-document-card {
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100% !important;
+              border: none !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              background: white !important;
+              color: black !important;
+            }
+            .no-print {
+              display: none !important;
+            }
+          }
+        `}</style>
+
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border">
-          {/* Download PDF — disabled with tooltip */}
-          <div className="relative group">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled
-              className="gap-2 text-xs opacity-60 cursor-not-allowed"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Download PDF
-            </Button>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20">
-              <div className="bg-popover text-popover-foreground border border-border rounded-md px-2.5 py-1.5 text-[11px] shadow-lg whitespace-nowrap">
-                PDF export coming in Phase 2
-              </div>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border no-print">
+          {/* Print / Save PDF Button */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 text-xs font-semibold hover:bg-muted"
+            onClick={() => window.print()}
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print / Save PDF</span>
+          </Button>
 
           {/* Mark Lead as Proposal Sent */}
           {markedSent ? (
             <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-semibold">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              Marked as Proposal Sent
+              <span>Marked as Proposal Sent</span>
             </div>
           ) : (
             <Button
               size="sm"
+              disabled={markingSent}
               className="gap-2 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={onMarkSent}
             >
-              <Send className="w-3.5 h-3.5" />
-              Mark Lead as Proposal Sent
+              {markingSent ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving to CRM…</span>
+                </>
+              ) : (
+                <>
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Mark Lead as Proposal Sent</span>
+                </>
+              )}
             </Button>
           )}
         </div>
@@ -696,6 +763,11 @@ export default function ProposalsPage() {
             leads={proposalReadyLeads}
             selectedPackage={selectedPackage}
             onPackageChange={setSelectedPackage}
+            onLeadUpdated={(leadId, newStatus) => {
+              setLeads((prev) =>
+                prev.map((l) => (l.id === leadId ? { ...l, leadStatus: newStatus } : l))
+              );
+            }}
           />
         )}
       </section>

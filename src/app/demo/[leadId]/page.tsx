@@ -1,8 +1,10 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
+import { isRealHumanVisit } from '@/lib/demos/public';
 import { DemoViewWrapper } from './demo-view-wrapper';
 import { WebsiteDemoData, LeadData } from '@/types';
 
@@ -12,6 +14,7 @@ interface PageProps {
   params: {
     leadId: string;
   } | Promise<{ leadId: string }>;
+  searchParams?: { [key: string]: string | string[] | undefined } | Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 /**
@@ -55,7 +58,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   };
 }
 
-export default async function LeadDemoPage({ params }: PageProps) {
+export default async function LeadDemoPage({ params, searchParams }: PageProps) {
   const resolvedParams = await Promise.resolve(params);
   const rawId = resolvedParams?.leadId;
   const tokenOrId = rawId ? decodeURIComponent(rawId).trim() : '';
@@ -63,6 +66,9 @@ export default async function LeadDemoPage({ params }: PageProps) {
   if (!tokenOrId) {
     notFound();
   }
+
+  const resolvedSearchParams = searchParams ? await Promise.resolve(searchParams) : undefined;
+  const headersList = headers();
 
   const orgId = (await getResolvedOrganizationId()) || PILOT_ORGANIZATION_ID;
   const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
@@ -72,7 +78,9 @@ export default async function LeadDemoPage({ params }: PageProps) {
   try {
     initialPublicDemo = await WebsiteDemoRepository.getApprovedDemoByPublicToken(tokenOrId);
     if (initialPublicDemo) {
-      await WebsiteDemoRepository.recordPublicDemoView(initialPublicDemo.id, initialPublicDemo.organizationId);
+      if (isRealHumanVisit(headersList, resolvedSearchParams)) {
+        await WebsiteDemoRepository.recordPublicDemoView(initialPublicDemo.id, initialPublicDemo.organizationId);
+      }
     }
   } catch {}
 

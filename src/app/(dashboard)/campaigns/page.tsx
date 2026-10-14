@@ -35,6 +35,7 @@ import {
   CornerDownLeft,
   CheckCheck,
   Edit3,
+  Zap,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -102,9 +103,10 @@ interface OutreachPanelProps {
   lead: LeadData;
   onClose: () => void;
   onContacted: (leadId: string) => void;
+  onRefresh?: () => void;
 }
 
-function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
+function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelProps) {
   const [channel, setChannel] = useState<OutreachChannel>('WHATSAPP');
   const [intent, setIntent] = useState(DEFAULT_INTENT);
   const [draft, setDraft] = useState('');
@@ -194,6 +196,50 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
       setDraftError(err instanceof Error ? err.message : 'Failed to generate draft.');
     } finally {
       setDraftLoading(false);
+    }
+  };
+
+  const [fastGenerating, setFastGenerating] = useState(false);
+
+  const handleFastGenerateDemoAndCard = async () => {
+    setFastGenerating(true);
+    setDraftError('');
+    try {
+      // 1. POST /api/demos (auto-approved in solo fast mode)
+      const demoRes = await fetch('/api/demos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id }),
+      });
+      if (!demoRes.ok) {
+        const errJson = await demoRes.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to generate demo concept');
+      }
+      const demoData = await demoRes.json();
+      if (demoData.demo) {
+        if (!lead.websiteDemos) lead.websiteDemos = [];
+        lead.websiteDemos.unshift(demoData.demo);
+      }
+
+      // 2. Fetch screenshot in parallel background
+      setScreenshotLoading(true);
+      fetch(`/api/demos/${lead.id}/screenshot`)
+        .then(async (sRes) => {
+          if (sRes.ok) {
+            const sData = await sRes.json();
+            if (sData.screenshotUrl) setScreenshotUrl(sData.screenshotUrl);
+          }
+        })
+        .catch(() => {})
+        .finally(() => setScreenshotLoading(false));
+
+      // 3. Generate initial draft
+      await generateDraft();
+      if (onRefresh) onRefresh();
+    } catch (err: unknown) {
+      setDraftError(err instanceof Error ? err.message : 'Fast Generation failed.');
+    } finally {
+      setFastGenerating(false);
     }
   };
 
@@ -390,6 +436,37 @@ function OutreachPanel({ lead, onClose, onContacted }: OutreachPanelProps) {
               <span>Awaiting concept link click (Views tracked in real-time)</span>
             </span>
             <Badge variant="outline" className="text-[9px] font-mono">0 views</Badge>
+          </div>
+        )}
+
+        {/* Solo-Operator 1-Click Fast Generation if no demo yet */}
+        {(!lead.websiteDemos?.length || !activeDemo) && (
+          <div className="p-3.5 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent flex flex-col gap-2.5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+              <span className="text-xs font-bold text-foreground">No Website Demo Generated Yet</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Generate a personalized website concept demo, capture preview screenshot, and craft your WhatsApp outreach card in 1-click.
+            </p>
+            <Button
+              size="sm"
+              disabled={fastGenerating}
+              onClick={handleFastGenerateDemoAndCard}
+              className="w-full gap-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md"
+            >
+              {fastGenerating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Generating Demo &amp; WhatsApp Card…</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>⚡ 1-Click Generate Demo &amp; WhatsApp Card</span>
+                </>
+              )}
+            </Button>
           </div>
         )}
 
@@ -981,16 +1058,22 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
       const leadsToApprove = uncontacted.filter(
         (l) => l.leadStatus !== 'APPROVED' && l.leadStatus !== 'CONTACTED' && l.leadStatus !== 'DO_NOT_CONTACT'
       );
-      for (const l of leadsToApprove) {
-        await fetch(`/api/leads/${l.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            leadStatus: 'APPROVED',
-            reason: 'Batch approved for automated outreach campaign',
-            actor: 'Agency Campaign Specialist',
-          }),
-        });
+      const BATCH_SIZE = 10;
+      for (let i = 0; i < leadsToApprove.length; i += BATCH_SIZE) {
+        const chunk = leadsToApprove.slice(i, i + BATCH_SIZE);
+        await Promise.all(
+          chunk.map((l) =>
+            fetch(`/api/leads/${l.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                leadStatus: 'APPROVED',
+                reason: 'Batch approved for automated outreach campaign',
+                actor: 'Solo Agency Operator',
+              }),
+            })
+          )
+        );
       }
       onRefresh();
     } catch {
@@ -1060,6 +1143,7 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
           lead={selectedLead}
           onClose={() => setSelectedLead(null)}
           onContacted={handleContacted}
+          onRefresh={onRefresh}
         />
       )}
 

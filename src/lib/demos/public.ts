@@ -119,3 +119,34 @@ export function getPublicDemoUrl(publicToken: string, baseUrl?: string): string 
     : getAppBaseUrl();
   return `${base}/demo/${publicToken}`;
 }
+
+/**
+ * Detects whether a request is from a legitimate human prospect or an automated bot/scraper/crawler.
+ * Blocks false-positive viewCount inflation caused by link previewers (WhatsApp, Slack, Telegram, Facebook)
+ * and screenshot capture services (Microlink, HeadlessChrome, Lighthouse).
+ */
+export const BOT_USER_AGENT_REGEX =
+  /bot|crawler|spider|WhatsApp|facebookexternalhit|Microlink|HeadlessChrome|Lighthouse|Preview|Slackbot|TelegramBot/i;
+
+export function isRealHumanVisit(
+  headersList: Headers,
+  searchParams?: { [key: string]: string | string[] | undefined } | URLSearchParams
+): boolean {
+  // 1. Return false if screenshot=true
+  if (searchParams) {
+    if (searchParams instanceof URLSearchParams) {
+      if (searchParams.get('screenshot') === 'true') return false;
+    } else {
+      const paramVal = searchParams.screenshot;
+      if (paramVal === 'true' || (Array.isArray(paramVal) && paramVal.includes('true'))) return false;
+    }
+  }
+
+  // 2. Inspect user-agent
+  const ua = headersList.get('user-agent') || '';
+  if (!ua || BOT_USER_AGENT_REGEX.test(ua)) {
+    return false;
+  }
+
+  return true;
+}

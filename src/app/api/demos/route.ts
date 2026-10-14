@@ -105,17 +105,31 @@ export async function POST(request: NextRequest) {
     // Save to repository
     const savedDemo = await WebsiteDemoRepository.saveDemo(targetOrgId, demo, 'system');
 
-    // Update lead status to DEMO_GENERATED if currently NEW or QUALIFIED
-    if (lead.leadStatus === 'NEW' || lead.leadStatus === 'QUALIFIED' || lead.leadStatus === 'RESEARCHING') {
-      await LeadRepository.updateLeadStatus(
-        leadId,
-        'DEMO_GENERATED',
+    // Solo-Operator Fast Mode: Automatically approve demo on generation
+    // Immediately assigns publicToken, sets approvalStatus: 'APPROVED', and advances lead to APPROVED
+    let finalDemo = savedDemo;
+    try {
+      const approveResult = await WebsiteDemoRepository.approveDemo(
         targetOrgId,
-        'System generated website demonstration concept (v' + nextVersion + ')'
+        savedDemo.id,
+        'Solo Operator Auto-Approve'
       );
+      if (approveResult?.demo) {
+        finalDemo = approveResult.demo;
+      }
+    } catch {
+      // Fallback: If auto-approve encounters any error, ensure DEMO_GENERATED state
+      if (lead.leadStatus === 'NEW' || lead.leadStatus === 'QUALIFIED' || lead.leadStatus === 'RESEARCHING') {
+        await LeadRepository.updateLeadStatus(
+          leadId,
+          'DEMO_GENERATED',
+          targetOrgId,
+          'System generated website demonstration concept (v' + nextVersion + ')'
+        );
+      }
     }
 
-    return NextResponse.json({ success: true, demo: savedDemo }, { status: 201 });
+    return NextResponse.json({ success: true, demo: finalDemo }, { status: 201 });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Demo generation failed';
     return NextResponse.json({ success: false, error: message }, { status: 500 });

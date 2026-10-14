@@ -88,9 +88,11 @@ export async function GET(
     if (screenshotType === 'website' && lead?.website) {
       targetUrl = lead.website.startsWith('http') ? lead.website : `https://${lead.website}`;
     } else {
-      targetUrl = demo?.publicToken
+      const demoUrl = demo?.publicToken
         ? getPublicDemoUrl(demo.publicToken, baseUrl)
         : `${baseUrl}/demo/${leadId}`;
+      const sep = demoUrl.includes('?') ? '&' : '?';
+      targetUrl = `${demoUrl}${sep}screenshot=true`;
     }
 
     // 3. Capture real screenshot via CloudScreenshotProvider (Microlink / ScreenshotOne)

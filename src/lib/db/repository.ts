@@ -1545,8 +1545,10 @@ export class WebsiteDemoRepository {
     const demo = await this.getDemo(organizationId, demoId);
     if (!demo) return;
 
+    let newViewCount = 1;
     if (isExplicitDemoMode()) {
       const updated = demoStore.recordDemoView(organizationId, demoId);
+      newViewCount = updated?.viewCount || 1;
       await LeadRepository.addActivity(organizationId, demo.leadId, {
         type: 'DEMO_VIEW',
         title: 'Public Demo Viewed',
@@ -1554,33 +1556,55 @@ export class WebsiteDemoRepository {
         metadata: {
           publicToken: demo.publicToken,
           version: demo.version,
-          viewCount: updated?.viewCount || 1,
+          viewCount: newViewCount,
         },
       });
-      return;
+    } else {
+      const { prisma } = await import('./prisma');
+      const now = new Date();
+      newViewCount = (demo.viewCount || 0) + 1;
+      await prisma.websiteDemo.update({
+        where: { id: demoId },
+        data: {
+          viewCount: { increment: 1 },
+          firstViewedAt: demo.firstViewedAt ? undefined : now,
+          lastViewedAt: now,
+        },
+      });
+
+      await LeadRepository.addActivity(organizationId, demo.leadId, {
+        type: 'DEMO_VIEW',
+        title: 'Public Demo Viewed',
+        description: 'Prospect opened public website concept via shared link.',
+        metadata: {
+          publicToken: demo.publicToken,
+          version: demo.version,
+          viewCount: newViewCount,
+        },
+      });
     }
 
-    const { prisma } = await import('./prisma');
-    const now = new Date();
-    await prisma.websiteDemo.update({
-      where: { id: demoId },
-      data: {
-        viewCount: { increment: 1 },
-        firstViewedAt: demo.firstViewedAt ? undefined : now,
-        lastViewedAt: now,
-      },
-    });
+    // Optional High-Intent Webhook Alert (Telegram Bot)
+    if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+      try {
+        const contentObj =
+          typeof demo.content === 'string' ? JSON.parse(demo.content) : demo.content;
+        const bizName = contentObj?.brand?.businessName || 'Prospect Practice';
+        const city = contentObj?.location?.city || contentObj?.meta?.city || 'Delhi NCR';
+        const tgMsg = `🔥 High Intent Alert: ${bizName} (${city}) just opened their website demo! (View #${newViewCount})`;
 
-    await LeadRepository.addActivity(organizationId, demo.leadId, {
-      type: 'DEMO_VIEW',
-      title: 'Public Demo Viewed',
-      description: 'Prospect opened public website concept via shared link.',
-      metadata: {
-        publicToken: demo.publicToken,
-        version: demo.version,
-        viewCount: (demo.viewCount || 0) + 1,
-      },
-    });
+        fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: process.env.TELEGRAM_CHAT_ID,
+            text: tgMsg,
+          }),
+        }).catch(() => {});
+      } catch {
+        // Non-blocking
+      }
+    }
   }
 }
 

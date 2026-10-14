@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
@@ -27,3 +27,8 @@ yarn-error.log*
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Archives & Temporary Dumps
+*.rar
+*.zip
+project-dump.txt
