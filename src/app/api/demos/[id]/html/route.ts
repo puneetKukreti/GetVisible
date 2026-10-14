@@ -1,0 +1,109 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
+import { getResolvedOrganizationId } from '@/lib/auth';
+import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
+import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
+import { personalizeStitchHtml, isStitchLayout } from '@/lib/demos/stitch-personalizer';
+import { WebsiteContent } from '@/types';
+
+export const dynamic = 'force-dynamic';
+
+interface RouteProps {
+  params: { id: string } | Promise<{ id: string }>;
+}
+
+export async function GET(request: NextRequest, { params }: RouteProps) {
+  try {
+    const resolvedParams = await Promise.resolve(params);
+    const id = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';
+
+    if (!id) {
+      return new NextResponse('Demo or Lead ID parameter required', { status: 400 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const layoutOverride = searchParams.get('layout') || undefined;
+
+    // 1. Try public token lookup first
+    let demo = await WebsiteDemoRepository.getApprovedDemoByPublicToken(id);
+    let lead: any = null;
+
+    // 2. If not a public token, resolve organization and look up demo or lead
+    if (!demo) {
+      const orgId = (await getResolvedOrganizationId(request)) || DEMO_ORGANIZATION_ID;
+      const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+
+      // Check if id is a demo ID
+      demo = await WebsiteDemoRepository.getDemo(orgId, id);
+      if (!demo) {
+        demo = await WebsiteDemoRepository.getDemo(altOrgId, id);
+      }
+
+      // Check if id is a lead ID
+      if (!demo) {
+        lead = await LeadRepository.getLeadById(id, orgId);
+        if (!lead) {
+          lead = await LeadRepository.getLeadById(id, altOrgId);
+        }
+
+        if (lead) {
+          const demos = await WebsiteDemoRepository.listDemos(lead.organizationId || orgId, lead.id);
+          demo = demos[0] || null;
+        }
+      } else {
+        lead = await LeadRepository.getLeadById(demo.leadId, demo.organizationId || orgId);
+        if (!lead) {
+          lead = await LeadRepository.getLeadById(demo.leadId, altOrgId);
+        }
+      }
+    }
+
+    // Prepare content object for personalization
+    let content: WebsiteContent | any = null;
+
+    if (demo?.content) {
+      content = typeof demo.content === 'string' ? JSON.parse(demo.content) : demo.content;
+    } else if (lead) {
+      content = {
+        brand: { businessName: lead.businessName },
+        location: { city: lead.city, address: lead.address },
+        contact: { publicPhone: lead.publicPhone, publicEmail: lead.publicEmail },
+        meta: { profession: lead.profession },
+      };
+    } else {
+      // Fallback preview
+      content = {
+        brand: { businessName: 'Chartered Accountants & Advisory' },
+        location: { city: 'Gurgaon', address: 'Cyber City, Gurgaon' },
+        contact: { publicPhone: '+91 99999 99999', publicEmail: 'contact@ca-practice.in' },
+        meta: { profession: 'Chartered Accountant' },
+      };
+    }
+
+    // Determine layout key
+    const chosenLayout =
+      layoutOverride ||
+      demo?.design?.layout ||
+      content?.design?.layout ||
+      demo?.templateId ||
+      'design-1-premium';
+
+    // Get Stitch HTML template and personalize
+    const rawHtml = getStitchRawHtml(chosenLayout);
+    const personalizedHtml = personalizeStitchHtml(rawHtml, content);
+
+    return new NextResponse(personalizedHtml, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, must-revalidate',
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Error rendering demo HTML';
+    return new NextResponse(`<html><body><h1>Error Rendering Demo</h1><p>${message}</p></body></html>`, {
+      status: 500,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    });
+  }
+}

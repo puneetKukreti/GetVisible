@@ -20,29 +20,35 @@ interface WatermarkBannerProps {
 }
 
 const LAYOUT_NAMES: Record<string, string> = {
-  EDITORIAL_FINANCE: 'Editorial Finance',
-  MODERN_FINTECH: 'Modern Fintech',
-  LUXURY_PROFESSIONAL: 'Luxury Professional',
-  SWISS_MINIMAL: 'Swiss Minimal',
-  MODERN_INDIAN: 'Modern Indian',
+  'design-1-premium': 'Design 1: Premium Editorial (Stitch)',
+  'design-2-minimalist': 'Design 2: Minimalist Ledger (Stitch)',
+  'design-3-contemporary': 'Design 3: Contemporary Corporate (Stitch)',
+  EDITORIAL_FINANCE: 'Editorial Finance (Classic)',
+  MODERN_FINTECH: 'Modern Fintech (Classic)',
+  LUXURY_PROFESSIONAL: 'Luxury Professional (Classic)',
+  SWISS_MINIMAL: 'Swiss Minimal (Classic)',
+  MODERN_INDIAN: 'Modern Indian (Classic)',
   MODERN_CORPORATE: 'Modern Corporate',
   PREMIUM_PROFESSIONAL: 'Premium Professional',
   TRADITIONAL_CA: 'Traditional CA',
 };
 
 const TEMPLATE_OPTIONS: { id: WebsiteLayout; label: string }[] = [
-  { id: 'EDITORIAL_FINANCE', label: 'Editorial Finance' },
-  { id: 'MODERN_FINTECH', label: 'Modern Fintech' },
-  { id: 'LUXURY_PROFESSIONAL', label: 'Luxury Professional' },
-  { id: 'SWISS_MINIMAL', label: 'Swiss Minimal' },
-  { id: 'MODERN_INDIAN', label: 'Modern Indian' },
+  { id: 'design-1-premium', label: '✨ Design 1: Premium Editorial (Stitch)' },
+  { id: 'design-2-minimalist', label: '✨ Design 2: Minimalist Ledger (Stitch)' },
+  { id: 'design-3-contemporary', label: '✨ Design 3: Contemporary Corporate (Stitch)' },
+  { id: 'EDITORIAL_FINANCE', label: 'Editorial Finance (Classic)' },
+  { id: 'MODERN_FINTECH', label: 'Modern Fintech (Classic)' },
+  { id: 'LUXURY_PROFESSIONAL', label: 'Luxury Professional (Classic)' },
+  { id: 'SWISS_MINIMAL', label: 'Swiss Minimal (Classic)' },
+  { id: 'MODERN_INDIAN', label: 'Modern Indian (Classic)' },
 ];
 
 export function WatermarkBanner({
   leadId,
   businessName,
   currentTheme,
-  layout = 'MODERN_FINTECH',
+  layout = 'design-1-premium',
   onLayoutChange,
   onThemeChange,
   onOpenEditor,

@@ -34,7 +34,7 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
     }
   );
   const [activeLayout, setActiveLayout] = useState<WebsiteLayout>(
-    initialDemos[0]?.design?.layout || 'EDITORIAL_FINANCE'
+    initialDemos[0]?.design?.layout || 'design-1-premium'
   );
   const [selectedArchetype, setSelectedArchetype] = useState<string>('');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
@@ -249,9 +249,10 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
                 : CA_LAYOUTS.MODERN_INDIAN.sectionOrder,
           }}
           blueprint={activeDemo.blueprint}
+          demoId={activeDemo?.id}
+          leadId={initialLead.id}
+          version={activeVersion}
         />
-
-
       </div>
 
       {/* Human Review & Edit Modal */}

@@ -43,14 +43,14 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
     demo.design?.layout ||
     contentObj?.design?.layout ||
     demo.templateId ||
-    'MODERN_INDIAN';
+    'design-1-premium';
 
   const activeLayout: WebsiteLayout =
     (CA_LAYOUTS[rawLayoutKey as WebsiteLayout]
       ? (rawLayoutKey as WebsiteLayout)
       : null) ||
-    (rawLayoutKey === 'CA_ACCOUNTING_PROFESSIONAL' ? 'MODERN_INDIAN' : null) ||
-    'MODERN_INDIAN';
+    (rawLayoutKey === 'CA_ACCOUNTING_PROFESSIONAL' ? 'design-1-premium' : null) ||
+    'design-1-premium';
 
   const rawSectionOrder =
     demo.design?.sectionOrder ||
@@ -60,7 +60,7 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
   const sectionOrder =
     Array.isArray(rawSectionOrder) && rawSectionOrder.length > 0
       ? rawSectionOrder
-      : CA_LAYOUTS.MODERN_INDIAN.sectionOrder;
+      : (CA_LAYOUTS[activeLayout]?.sectionOrder || CA_LAYOUTS.MODERN_INDIAN.sectionOrder);
 
   const businessName =
     contentObj?.brand?.businessName ||
@@ -165,6 +165,9 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
           sectionOrder,
         }}
         blueprint={demo.blueprint}
+        demoId={demo.publicToken || demo.id}
+        leadId={demo.leadId}
+        version={demo.version}
       />
 
       {/* Floating Bottom Conversion Bar (Hidden when ?screenshot=true) */}

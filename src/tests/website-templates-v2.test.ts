@@ -4,6 +4,7 @@ import {
   selectWebsiteDesign,
   CA_LAYOUTS,
   TEMPLATE_KEYS,
+  STITCH_LAYOUT_KEYS,
 } from '@/lib/demos/personalization';
 import { WebsiteLayoutSchema, WebsiteDesignSchema } from '@/lib/demos/schema';
 import { LeadData, WebsiteTemplate } from '@/types';
@@ -86,7 +87,7 @@ describe('Phase 4.2: Modern Website Template System for CA Firms', () => {
     expect(CA_LAYOUTS['TRADITIONAL_CA']).toBeDefined();
   });
 
-  it('deterministically distributes different lead IDs across the 5 templates', () => {
+  it('deterministically distributes different lead IDs across the Stitch templates', () => {
     const assignedTemplates = new Set<string>();
 
     for (let i = 0; i < 50; i++) {
@@ -98,12 +99,10 @@ describe('Phase 4.2: Modern Website Template System for CA Firms', () => {
       assignedTemplates.add(design.layout);
     }
 
-    // All 5 templates should be hit within 50 diverse seeds
-    expect(assignedTemplates.has('EDITORIAL_FINANCE')).toBe(true);
-    expect(assignedTemplates.has('MODERN_FINTECH')).toBe(true);
-    expect(assignedTemplates.has('LUXURY_PROFESSIONAL')).toBe(true);
-    expect(assignedTemplates.has('SWISS_MINIMAL')).toBe(true);
-    expect(assignedTemplates.has('MODERN_INDIAN')).toBe(true);
+    // All 3 Stitch templates should be hit within 50 diverse seeds
+    expect(assignedTemplates.has('design-1-premium')).toBe(true);
+    expect(assignedTemplates.has('design-2-minimalist')).toBe(true);
+    expect(assignedTemplates.has('design-3-contemporary')).toBe(true);
   });
 
   it('maintains deterministic repeatability for the same lead ID', () => {
@@ -130,7 +129,7 @@ describe('Phase 4.2: Modern Website Template System for CA Firms', () => {
     expect(demo).toBeDefined();
     expect(demo.design).toBeDefined();
     expect(WebsiteDesignSchema.safeParse(demo.design).success).toBe(true);
-    expect(TEMPLATE_KEYS).toContain(demo.design?.layout);
+    expect(STITCH_LAYOUT_KEYS).toContain(demo.design?.layout);
 
     // Claim safety verifications:
     // 1. Template-suggested services are marked isConfirmed: false

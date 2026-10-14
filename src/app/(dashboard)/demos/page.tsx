@@ -20,6 +20,7 @@ import {
   Award,
 } from 'lucide-react';
 import { STITCH_TEMPLATES } from '@/lib/demos/stitch-templates';
+import { STITCH_DESIGN_MAP } from '@/lib/demos/stitch-personalizer';
 
 export default function DemosPage() {
   const [demos, setDemos] = useState<WebsiteDemoData[]>([]);
@@ -281,14 +282,23 @@ export default function DemosPage() {
                     &ldquo;{demo.content.hero.headline}&rdquo;
                   </p>
 
-                  <div className="flex items-center gap-2 pt-1">
-                    <span
-                      className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: demo.theme.primaryColor }}
-                    />
-                    <span className="text-[11px] text-muted-foreground font-medium">
-                      Theme: {demo.theme.name || demo.theme.id || 'Executive Navy'}
-                    </span>
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: demo.theme.primaryColor }}
+                        />
+                        <span className="text-muted-foreground font-medium truncate max-w-[120px]">
+                          {demo.theme.name || demo.theme.id || 'Executive Navy'}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-medium truncate max-w-[160px]">
+                        {demo.design?.layout && STITCH_DESIGN_MAP[demo.design.layout]
+                          ? STITCH_DESIGN_MAP[demo.design.layout].name
+                          : demo.design?.layout || 'Design 1: Premium Editorial'}
+                      </Badge>
+                    </div>
                   </div>
                 </CardContent>
               </div>

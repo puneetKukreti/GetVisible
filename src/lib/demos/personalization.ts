@@ -498,8 +498,14 @@ export const INDIAN_CA_ARCHETYPE_KEYS: WebsiteTemplate[] = [
 
 export const CA_THEMES: WebsiteTheme[] = Object.values(THEMES);
 
+export const STITCH_LAYOUT_KEYS: WebsiteLayout[] = [
+  'design-1-premium',
+  'design-2-minimalist',
+  'design-3-contemporary',
+];
+
 const THEME_KEYS = ['executiveNavy', 'corporateSlate', 'emeraldPrestige', 'classicBurgundy'] as const;
-const LAYOUT_KEYS = TEMPLATE_KEYS;
+const LAYOUT_KEYS = STITCH_LAYOUT_KEYS;
 
 /**
  * Fast, stable 32-bit FNV-1a hash implementation for deterministic distribution.

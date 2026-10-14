@@ -20,11 +20,17 @@ import { ExpertiseSection } from './expertise-section';
 import { WhatsAppFloatingButton } from './component-registry';
 import { WebsiteBlueprint } from '@/lib/blueprint/blueprint-schema';
 
+import { isStitchLayout } from '@/lib/demos/stitch-personalizer';
+import { StitchDemoView } from './stitch-demo-view';
+
 interface DemoRendererProps {
   content: WebsiteContent;
   theme?: WebsiteTheme;
   design?: WebsiteDesign;
   blueprint?: WebsiteBlueprint;
+  demoId?: string;
+  leadId?: string;
+  version?: number;
 }
 
 const DEFAULT_SECTION_ORDER: WebsiteSectionType[] = [
@@ -57,7 +63,15 @@ export const TEMPLATE_MAP: Record<string, WebsiteTemplate> = {
   FAMILY_OFFICE_ESTATE: 'LUXURY_PROFESSIONAL',
 };
 
-export function DemoRenderer({ content, theme, design }: DemoRendererProps) {
+export function DemoRenderer({
+  content,
+  theme,
+  design,
+  blueprint,
+  demoId,
+  leadId,
+  version,
+}: DemoRendererProps) {
   // Ensure content and theme are objects in case they were parsed from raw JSON
   const safeContent: WebsiteContent =
     typeof content === 'string' ? JSON.parse(content) : (content || {});
@@ -67,6 +81,21 @@ export function DemoRenderer({ content, theme, design }: DemoRendererProps) {
   const activeTheme: WebsiteTheme =
     typeof rawTheme === 'string' ? JSON.parse(rawTheme) : rawTheme;
 
+  const rawLayout = activeDesign?.layout || safeContent.meta?.templateId || 'design-1-premium';
+
+  // If this layout corresponds to a Google Stitch design (or CA archetype), render the high-fidelity Stitch template view
+  if (isStitchLayout(rawLayout)) {
+    return (
+      <StitchDemoView
+        demoId={demoId}
+        leadId={leadId}
+        layout={rawLayout}
+        version={version}
+        content={safeContent}
+        design={activeDesign}
+      />
+    );
+  }
   const safeTheme: WebsiteTheme = {
     id: activeTheme?.id || 'executive-navy',
     name: activeTheme?.name || 'Executive Navy',
@@ -78,7 +107,6 @@ export function DemoRenderer({ content, theme, design }: DemoRendererProps) {
     borderRadius: activeTheme?.borderRadius || 'md',
   };
 
-  const rawLayout = activeDesign?.layout || safeContent.meta?.templateId || 'MODERN_INDIAN';
   const activeTemplate: WebsiteTemplate =
     activeDesign?.template ||
     TEMPLATE_MAP[rawLayout] ||
