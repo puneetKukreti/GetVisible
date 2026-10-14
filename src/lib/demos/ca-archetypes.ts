@@ -13,8 +13,32 @@ export interface CAArchetypeMeta {
   keyRegulations: string[];
 }
 
+export const CLINIC_HEALTHCARE_ARCHETYPE: CAArchetypeMeta = {
+  id: 'CLINIC_HEALTHCARE',
+  name: 'Design: Healthcare & Dental Clinic',
+  shortName: 'Healthcare & Clinic',
+  tagline: 'Patient-First Healthcare — Advanced Diagnostics & Care',
+  description: 'Clinical teal and clean modern layout designed for dental clinics, multispeciality practices, and healthcare doctors.',
+  defaultLayout: 'CLINIC_HEALTHCARE',
+  defaultThemeId: 'tech-teal',
+  targetAudience: 'Dental Clinics, General Practitioners, Skin Specialists, Diagnostic Centers',
+  keyRegulations: ['NABH Guidelines', 'Clinical Establishments Act', 'Patient Confidentiality', 'IMA Code of Ethics'],
+};
+
+export const INTERIOR_ARCHITECTURE_ARCHETYPE: CAArchetypeMeta = {
+  id: 'INTERIOR_ARCHITECTURE',
+  name: 'Design: Interior Architecture & Studio',
+  shortName: 'Interior & Architecture',
+  tagline: 'Spatial Elegance — Turnkey Architecture & Interior Styling',
+  description: 'Warm slate and luxury serif aesthetic engineered for architectural studios, interior turnkey contractors, and modular design firms.',
+  defaultLayout: 'INTERIOR_ARCHITECTURE',
+  defaultThemeId: 'corporate-slate',
+  targetAudience: 'Residential Interior Studios, Commercial Architects, Turnkey Decorators, Modular Kitchen Designers',
+  keyRegulations: ['Council of Architecture (COA)', 'NBC 2016 Standards', 'Green Building Norms', 'Turnkey Warranties'],
+};
+
 /**
- * 3 Selectable Google Stitch website design templates for CA practices.
+ * Selectable Google Stitch website design templates for CA practices & local SMBs.
  */
 export const INDIAN_CA_ARCHETYPES: CAArchetypeMeta[] = [
   {
@@ -50,18 +74,26 @@ export const INDIAN_CA_ARCHETYPES: CAArchetypeMeta[] = [
     targetAudience: 'Tech Startups, Virtual CFO, High-Net-Worth & NRI Remittance Practices',
     keyRegulations: ['Virtual CFO', 'Form 15CA/15CB', 'Angel Tax Defense', 'Startup Advisory'],
   },
+  CLINIC_HEALTHCARE_ARCHETYPE,
+  INTERIOR_ARCHITECTURE_ARCHETYPE,
 ];
 
 /**
- * Intelligent archetype inference matching lead facts to the best Stitch design.
+ * Intelligent archetype inference matching lead facts to the best Stitch design or SMB template.
  */
 export function inferCAArchetype(facts?: Partial<LeadFacts>): string {
   if (!facts) return 'design-1-premium';
-  const name = (facts.businessName || '').toLowerCase();
-  if (name.includes('gst') || name.includes('indirect') || name.includes('plant') || name.includes('indus')) {
+  const text = `${facts.profession || ''} ${facts.businessName || ''}`.toLowerCase();
+  if (/clinic|dental|dentist|doctor|medical|health|skin|physio/i.test(text)) {
+    return 'CLINIC_HEALTHCARE';
+  }
+  if (/interior|architect|design|decor|modular/i.test(text)) {
+    return 'INTERIOR_ARCHITECTURE';
+  }
+  if (text.includes('gst') || text.includes('indirect') || text.includes('plant') || text.includes('indus')) {
     return 'design-2-minimalist';
   }
-  if (name.includes('startup') || name.includes('cfo') || name.includes('venture') || name.includes('nri') || name.includes('tech')) {
+  if (text.includes('startup') || text.includes('cfo') || text.includes('venture') || text.includes('nri') || text.includes('tech')) {
     return 'design-3-contemporary';
   }
   return 'design-1-premium';

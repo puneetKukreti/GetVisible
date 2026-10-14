@@ -409,12 +409,473 @@ export const DESIGN_3_CONTEMPORARY_TEMPLATE: ProfessionTemplate = {
 };
 
 /**
- * Extensible template registry populated with the 3 Google Stitch designs.
+ * SMB Template: Healthcare & Dental Clinic
+ */
+export const CLINIC_HEALTHCARE_TEMPLATE: ProfessionTemplate = {
+  id: 'CLINIC_HEALTHCARE',
+  name: 'Healthcare & Modern Dental Clinic',
+  profession: 'Healthcare / Clinic',
+  description: 'Clinical teal and clean modern layout designed for dental clinics, multispeciality practices, and healthcare doctors.',
+  themes: [THEMES.techTeal, THEMES.emeraldPrestige],
+  defaultTheme: THEMES.techTeal,
+  buildContent(facts, theme, design) {
+    const brandName = facts.businessName || 'Healthcare & Dental Practice';
+    const city = facts.city || 'Gurgaon';
+    const activeTheme = theme || (design ? design.theme : THEMES.techTeal);
+    const currentYear = new Date().getFullYear();
+
+    return {
+      meta: {
+        title: `${brandName} | Modern Healthcare & Dental Clinic in ${city}`,
+        description: `Patient-centered medical care, advanced diagnostic services, and dental wellness in ${city}.`,
+        profession: 'Healthcare & Clinic',
+        templateId: 'CLINIC_HEALTHCARE',
+      },
+      brand: {
+        businessName: brandName,
+        tagline: `Compassionate Care & Clinical Excellence in ${city}`,
+        provenance: facts.businessName ? 'VERIFIED_LEAD' : 'NEUTRAL_PLACEHOLDER',
+      },
+      theme: activeTheme,
+      design,
+      navigation: {
+        items: [
+          { label: 'Treatments', href: '#services' },
+          { label: 'About Doctor', href: '#about' },
+          { label: 'Why Us', href: '#why-us' },
+          { label: 'Contact', href: '#contact' },
+        ],
+        ctaText: 'Book Appointment',
+        ctaHref: '#contact',
+      },
+      hero: {
+        badge: 'Modern Healthcare & Dental Clinic',
+        headline: 'Advanced Medical Care & Patient-Centered Clinical Excellence',
+        subheadline: `Delivering compassionate consultations, sterile dental treatments, and accurate diagnostics for families in ${city}.`,
+        primaryCta: {
+          label: 'Book Consultation / Appointment',
+          href: '#contact',
+        },
+        secondaryCta: {
+          label: 'View Treatments & Specialties',
+          href: '#services',
+        },
+        provenance: 'NEUTRAL_PLACEHOLDER',
+      },
+      about: {
+        title: 'About Our Clinical Practice',
+        leadParagraph: `${brandName} is a trusted healthcare facility in ${city}, providing comprehensive clinical diagnostics and specialized care.`,
+        body: `We are committed to delivering empathetic, evidence-based medical and dental solutions. With modern diagnostics, strict hygiene protocols, and dedicated patient care, our team prioritizes your health and long-term well-being.`,
+        highlights: [
+          {
+            title: 'Sterilized Clinical Environment',
+            description: 'Strict NABH-aligned sanitization protocols safeguarding patient health.',
+          },
+          {
+            title: 'Experienced Practitioners',
+            description: 'Board-certified specialists with extensive clinical diagnostic experience.',
+          },
+          {
+            title: 'Transparent Care Plans',
+            description: 'Honest medical advice and transparent treatment plans without hidden charges.',
+          },
+          {
+            title: 'Minimal Wait Times',
+            description: 'Organized appointment scheduling designed around your busy lifestyle.',
+          },
+        ],
+        provenance: 'NEUTRAL_PLACEHOLDER',
+      },
+      services: {
+        sectionTitle: 'Treatments & Clinical Specialties',
+        sectionSubtitle: `Comprehensive healthcare and specialized care tailored for patients in ${city}.`,
+        items: [
+          {
+            id: 'med-1',
+            title: 'General Health & Preventive Checkups',
+            description: 'Routine biometric evaluation, chronic disease monitoring, and preventive health screenings.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+          {
+            id: 'med-2',
+            title: 'Advanced Dental & Oral Aesthetics',
+            description: 'Root canals, painless extractions, orthodontic aligners, and cosmetic smile makeovers.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+          {
+            id: 'med-3',
+            title: 'Specialist Diagnostics & Triage',
+            description: 'In-house diagnostic tests, rapid pathology evaluation, and doctor-led symptom assessments.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+          {
+            id: 'med-4',
+            title: 'Family Wellness & Post-Care Support',
+            description: 'Pediatric to geriatric family consultations and structured post-treatment follow-up.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+        ],
+      },
+      whyChooseUs: {
+        sectionTitle: 'Why Choose Our Clinic',
+        sectionSubtitle: 'Uncompromising medical ethics and patient-first clinical standards.',
+        points: [
+          {
+            title: 'Patient-First Philosophy',
+            description: 'Empathetic care and careful attention to your individual comfort and symptoms.',
+            iconName: 'UserCheck',
+          },
+          {
+            title: '100% Sterile Environment',
+            description: 'Autoclave-grade sterilization for all medical equipment and procedural suites.',
+            iconName: 'ShieldCheck',
+          },
+          {
+            title: 'Transparent Treatment Costs',
+            description: 'Clear upfront cost estimates with zero unnecessary lab tests or upsells.',
+            iconName: 'CheckCircle2',
+          },
+          {
+            title: 'Convenient Clinic Hours',
+            description: 'Evening slots and weekend availability for working professionals and families.',
+            iconName: 'Clock',
+          },
+        ],
+      },
+      process: {
+        sectionTitle: 'Your Patient Journey',
+        sectionSubtitle: 'A smooth, transparent clinical workflow designed to keep you informed.',
+        steps: [
+          {
+            number: '01',
+            title: 'Book Appointment',
+            description: `Schedule a consultation online or via WhatsApp with our ${city} reception desk.`,
+          },
+          {
+            number: '02',
+            title: 'Comprehensive Examination',
+            description: 'Thorough clinical evaluation and state-of-the-art diagnostic imaging.',
+          },
+          {
+            number: '03',
+            title: 'Custom Treatment Plan',
+            description: 'Detailed explanation of treatment options, timelines, and costs before proceeding.',
+          },
+          {
+            number: '04',
+            title: 'Gentle Care & Recovery',
+            description: 'Precision treatment followed by ongoing wellness checkups and recovery support.',
+          },
+        ],
+      },
+      ctaBanner: {
+        title: `Ready for Quality Healthcare in ${city}?`,
+        subtitle: 'Schedule your consultation or dental checkup today with our expert team.',
+        primaryCta: {
+          label: 'Book Your Visit Now',
+          href: '#contact',
+        },
+        secondaryCta: {
+          label: 'Explore Our Treatments',
+          href: '#services',
+        },
+      },
+      industries: {
+        enabled: false,
+        sectionTitle: 'Specialties',
+        items: [],
+      },
+      testimonials: {
+        enabled: false,
+        sectionTitle: 'Patient Testimonials',
+        items: [],
+      },
+      faq: {
+        sectionTitle: 'Frequently Asked Questions',
+        items: [
+          {
+            question: 'How do I schedule an appointment?',
+            answer: 'You can book directly via the contact form or our WhatsApp booking line for priority time slots.',
+          },
+          {
+            question: 'Are walk-in consultations accepted?',
+            answer: `While walk-ins are welcome at our ${city} clinic, scheduled appointments ensure zero waiting time.`,
+          },
+          {
+            question: 'What hygiene standards are followed?',
+            answer: 'We enforce hospital-grade autoclaving, single-use disposables, and routine air sanitization.',
+          },
+        ],
+      },
+      contact: {
+        sectionTitle: 'Schedule Your Visit',
+        sectionSubtitle: 'Contact our clinic reception to reserve a consultation slot or ask any questions.',
+        formTitle: 'Book an Appointment',
+        simulatedDisclaimer: 'Demo concept only — appointment requests submitted through this form are simulated.',
+        publicEmail: facts.publicEmail || null,
+        publicPhone: facts.publicPhone || null,
+        ctaSubmitText: 'Request Appointment (Simulated)',
+      },
+      location: {
+        address: facts.address || `${city}, India`,
+        city: facts.city || 'Gurgaon',
+        officeHours: 'Monday – Saturday: 9:00 AM – 8:00 PM IST',
+        mapPlaceholder: true,
+      },
+      footer: {
+        copyright: `© ${currentYear} ${brandName}. All rights reserved.`,
+        disclaimer: 'Personalized website demonstration concept generated by GetVisible. Prepared exclusively for preview and evaluation.',
+      },
+    };
+  },
+};
+
+/**
+ * SMB Template: Interior Architecture & Design Studio
+ */
+export const INTERIOR_ARCHITECTURE_TEMPLATE: ProfessionTemplate = {
+  id: 'INTERIOR_ARCHITECTURE',
+  name: 'Interior Architecture & Studio Design',
+  profession: 'Interior Architecture',
+  description: 'Warm slate and luxury serif aesthetic engineered for architectural studios, interior turnkey contractors, and modular design firms.',
+  themes: [THEMES.corporateSlate, THEMES.executiveNavy],
+  defaultTheme: THEMES.corporateSlate,
+  buildContent(facts, theme, design) {
+    const brandName = facts.businessName || 'Interior Architecture Studio';
+    const city = facts.city || 'Gurgaon';
+    const activeTheme = theme || (design ? design.theme : THEMES.corporateSlate);
+    const currentYear = new Date().getFullYear();
+
+    return {
+      meta: {
+        title: `${brandName} | Luxury Interior Architecture & Design in ${city}`,
+        description: `Bespoke residential interiors, architectural design, and turnkey execution for modern living in ${city}.`,
+        profession: 'Interior Architecture & Design',
+        templateId: 'INTERIOR_ARCHITECTURE',
+      },
+      brand: {
+        businessName: brandName,
+        tagline: `Timeless Architecture & Bespoke Interior Design in ${city}`,
+        provenance: facts.businessName ? 'VERIFIED_LEAD' : 'NEUTRAL_PLACEHOLDER',
+      },
+      theme: activeTheme,
+      design,
+      navigation: {
+        items: [
+          { label: 'Disciplines', href: '#services' },
+          { label: 'Studio Philosophy', href: '#about' },
+          { label: 'Methodology', href: '#process' },
+          { label: 'Contact', href: '#contact' },
+        ],
+        ctaText: 'Start Your Project',
+        ctaHref: '#contact',
+      },
+      hero: {
+        badge: 'Interior Architecture & Design Studio',
+        headline: 'Transforming Spaces into Timeless Architectural Experiences',
+        subheadline: `Bespoke luxury residences, corporate environments, and turnkey styling crafted with architectural precision in ${city}.`,
+        primaryCta: {
+          label: 'Request Design Consultation',
+          href: '#contact',
+        },
+        secondaryCta: {
+          label: 'Explore Studio Disciplines',
+          href: '#services',
+        },
+        provenance: 'NEUTRAL_PLACEHOLDER',
+      },
+      about: {
+        title: 'Studio Philosophy & Craft',
+        leadParagraph: `${brandName} is a multidisciplinary interior architecture studio anchored in ${city}, shaping bespoke spaces of quiet luxury and enduring elegance.`,
+        body: `We bridge architectural integrity with artisanal craftsmanship. From initial concept drawings and 3D visualization to material sourcing and turnkey site execution, every residence and workplace is tailored to elevate how you live and work.`,
+        highlights: [
+          {
+            title: 'Bespoke Architectural Detailing',
+            description: 'Custom millwork, custom lighting plans, and hand-selected natural materials.',
+          },
+          {
+            title: 'Turnkey Project Execution',
+            description: 'End-to-end design and contractor supervision ensuring flawless fidelity to design.',
+          },
+          {
+            title: 'Sustainable Material Curation',
+            description: 'Thoughtfully sourced stones, certified timbers, and energy-conscious architectural elements.',
+          },
+          {
+            title: 'Transparent Budget Governance',
+            description: 'Granular Bill of Quantities (BOQ) with firm delivery milestones and zero surprise costs.',
+          },
+        ],
+        provenance: 'NEUTRAL_PLACEHOLDER',
+      },
+      services: {
+        sectionTitle: 'Disciplines & Studio Capabilities',
+        sectionSubtitle: `Comprehensive architectural and interior design capabilities in ${city}.`,
+        items: [
+          {
+            id: 'arch-1',
+            title: 'Luxury Residential Interior Architecture',
+            description: 'High-end villas, penthouses, and bespoke apartments conceived with refined architectural geometry.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+          {
+            id: 'arch-2',
+            title: 'Commercial Workspaces & Boutique Retail',
+            description: 'Dynamic corporate headquarters, designer studios, and luxury hospitality venues.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+          {
+            id: 'arch-3',
+            title: 'Turnkey Fit-Outs & Site Execution',
+            description: 'Comprehensive civil, MEP, joinery, and structural execution under single-point architectural supervision.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+          {
+            id: 'arch-4',
+            title: 'Modular Systems & Custom Furniture',
+            description: 'Precision Italian/German modular kitchens, walk-in closets, and artisanal statement lighting.',
+            isConfirmed: false,
+            provenance: 'NEUTRAL_PLACEHOLDER',
+          },
+        ],
+      },
+      whyChooseUs: {
+        sectionTitle: 'The Studio Difference',
+        sectionSubtitle: 'Precision engineering meets refined aesthetics for discerning clients.',
+        points: [
+          {
+            title: 'Hyper-Realistic 3D Visualization',
+            description: 'Walk through your space before construction starts with photorealistic 3D renders.',
+            iconName: 'Layers',
+          },
+          {
+            title: 'Dedicated Lead Architect',
+            description: 'A dedicated project architect directly manages your site from concept to key handover.',
+            iconName: 'UserCheck',
+          },
+          {
+            title: 'Stringent Quality Controls',
+            description: 'Multistage quality checks covering waterproofing, joinery, electricals, and surface finishes.',
+            iconName: 'CheckCircle2',
+          },
+          {
+            title: 'Guaranteed Completion Timelines',
+            description: 'Contract-backed milestone schedules with transparent weekly on-site photo reports.',
+            iconName: 'Clock',
+          },
+        ],
+      },
+      process: {
+        sectionTitle: 'Our Design & Build Methodology',
+        sectionSubtitle: 'A structured 4-phase roadmap from sketch to turnkey reality.',
+        steps: [
+          {
+            number: '01',
+            title: 'Discovery & Spatial Brief',
+            description: `We analyze your lifestyle requirements, spatial constraints, and aesthetic goals in ${city}.`,
+          },
+          {
+            number: '02',
+            title: 'Concept & 3D Spatial Modeling',
+            description: 'Developing mood boards, floor plans, material palettes, and photorealistic 3D visuals.',
+          },
+          {
+            number: '03',
+            title: 'BOQ & Material Selection',
+            description: 'Finalizing hardware, stones, timbers, and fixtures with a line-by-line transparent estimate.',
+          },
+          {
+            number: '04',
+            title: 'Turnkey Execution & Handover',
+            description: 'Flawless site execution, precision styling, deep cleaning, and formal key handover.',
+          },
+        ],
+      },
+      ctaBanner: {
+        title: `Ready to Design Your Dream Space in ${city}?`,
+        subtitle: 'Schedule a discovery session with our senior architects to bring your vision to life.',
+        primaryCta: {
+          label: 'Book Design Consultation',
+          href: '#contact',
+        },
+        secondaryCta: {
+          label: 'View Studio Disciplines',
+          href: '#services',
+        },
+      },
+      industries: {
+        enabled: true,
+        sectionTitle: 'Project Typologies',
+        items: [
+          'Luxury Private Residences',
+          'Modern Corporate Offices',
+          'Boutique Hospitality & Cafés',
+          'High-End Retail Showrooms',
+          'Designer Penthouse Suites',
+          'Turnkey Modular Residences',
+        ],
+      },
+      testimonials: {
+        enabled: false,
+        sectionTitle: 'Client Testimonials',
+        items: [],
+      },
+      faq: {
+        sectionTitle: 'Frequently Asked Questions',
+        items: [
+          {
+            question: 'What is your typical project execution timeline?',
+            answer: 'Timelines vary by scope: complete luxury residences typically take 3–5 months, while commercial fit-outs are delivered in 6–10 weeks.',
+          },
+          {
+            question: 'Do you manage both design and construction?',
+            answer: `Yes, we offer complete turnkey design-build services across ${city}, managing materials, contractors, and handover.`,
+          },
+          {
+            question: 'How do you structure project payment schedules?',
+            answer: 'Payments are linked directly to verified construction milestones, with 50% distributed across project phases and 10% upon final inspection.',
+          },
+        ],
+      },
+      contact: {
+        sectionTitle: 'Discuss Your Next Project',
+        sectionSubtitle: 'Connect with our studio team to schedule an initial consultation or site survey.',
+        formTitle: 'Request a Design Consultation',
+        simulatedDisclaimer: 'Demo concept only — inquiries submitted through this form are simulated.',
+        publicEmail: facts.publicEmail || null,
+        publicPhone: facts.publicPhone || null,
+        ctaSubmitText: 'Request Consultation (Simulated)',
+      },
+      location: {
+        address: facts.address || `${city}, India`,
+        city: facts.city || 'Gurgaon',
+        officeHours: 'Monday – Saturday: 10:00 AM – 7:00 PM IST',
+        mapPlaceholder: true,
+      },
+      footer: {
+        copyright: `© ${currentYear} ${brandName}. All rights reserved.`,
+        disclaimer: 'Personalized website demonstration concept generated by GetVisible. Prepared exclusively for preview and evaluation.',
+      },
+    };
+  },
+};
+
+/**
+ * Extensible template registry populated with the Google Stitch designs & SMB templates.
  */
 const TEMPLATE_REGISTRY: Record<string, ProfessionTemplate> = {
   [DESIGN_1_PREMIUM_TEMPLATE.id]: DESIGN_1_PREMIUM_TEMPLATE,
   [DESIGN_2_MINIMALIST_TEMPLATE.id]: DESIGN_2_MINIMALIST_TEMPLATE,
   [DESIGN_3_CONTEMPORARY_TEMPLATE.id]: DESIGN_3_CONTEMPORARY_TEMPLATE,
+  [CLINIC_HEALTHCARE_TEMPLATE.id]: CLINIC_HEALTHCARE_TEMPLATE,
+  [INTERIOR_ARCHITECTURE_TEMPLATE.id]: INTERIOR_ARCHITECTURE_TEMPLATE,
 };
 
 /**
@@ -457,6 +918,19 @@ export function getTemplate(
 ): ProfessionTemplate {
   if (templateId && TEMPLATE_REGISTRY[templateId]) {
     return TEMPLATE_REGISTRY[templateId];
+  }
+
+  // Auto-detect profession regex
+  const text = `${facts?.profession || ''} ${facts?.businessName || ''} ${_profession || ''}`.toLowerCase();
+  if (/clinic|dental|dentist|doctor|medical|health|skin|physio/i.test(text)) {
+    if (TEMPLATE_REGISTRY['CLINIC_HEALTHCARE']) {
+      return TEMPLATE_REGISTRY['CLINIC_HEALTHCARE'];
+    }
+  }
+  if (/interior|architect|design|decor|modular/i.test(text)) {
+    if (TEMPLATE_REGISTRY['INTERIOR_ARCHITECTURE']) {
+      return TEMPLATE_REGISTRY['INTERIOR_ARCHITECTURE'];
+    }
   }
 
   // If facts are provided and match any registered archetype

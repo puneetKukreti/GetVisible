@@ -32,8 +32,8 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(validateStatusTransition('RESPONDED', 'NOT_INTERESTED').valid).toBe(true);
     });
 
-    it('blocks invalid transitions (e.g. jumping directly from NEW to CONTACTED)', () => {
-      const result = validateStatusTransition('NEW', 'CONTACTED');
+    it('blocks invalid transitions (e.g. jumping directly from NEW to CONVERTED)', () => {
+      const result = validateStatusTransition('NEW', 'CONVERTED');
       expect(result.valid).toBe(false);
       expect(result.reason).toBeDefined();
 

@@ -5,7 +5,7 @@ import { LeadData, LeadStatus, WebsiteDemoData } from '@/types';
  * Strictly human-controlled, with DO_NOT_CONTACT available from any state for compliance.
  */
 export const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
-  NEW: ['QUALIFIED', 'DEMO_GENERATED', 'REJECTED', 'NOT_INTERESTED', 'DO_NOT_CONTACT', 'RESEARCHING'],
+  NEW: ['QUALIFIED', 'DEMO_GENERATED', 'REJECTED', 'NOT_INTERESTED', 'DO_NOT_CONTACT', 'RESEARCHING', 'APPROVED', 'INTERESTED', 'PROPOSAL', 'CONTACTED'],
   RESEARCHING: ['QUALIFIED', 'NOT_INTERESTED', 'DO_NOT_CONTACT'],
   QUALIFIED: ['DEMO_GENERATED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'NOT_INTERESTED', 'DO_NOT_CONTACT', 'NEW'],
   DEMO_GENERATED: ['UNDER_REVIEW', 'APPROVED', 'REJECTED', 'QUALIFIED', 'DO_NOT_CONTACT', 'INTERESTED', 'PROPOSAL'],
@@ -17,7 +17,7 @@ export const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   RESPONDED: ['INTERESTED', 'NOT_INTERESTED', 'CONVERTED', 'CUSTOMER', 'DO_NOT_CONTACT', 'PROPOSAL'],
   REPLIED: ['INTERESTED', 'NOT_INTERESTED', 'CONVERTED', 'CUSTOMER', 'DO_NOT_CONTACT', 'PROPOSAL'],
   INTERESTED: ['CONVERTED', 'CUSTOMER', 'NOT_INTERESTED', 'DO_NOT_CONTACT', 'PROPOSAL', 'INTERESTED'],
-  PROPOSAL: ['CONVERTED', 'CUSTOMER', 'LOST', 'NOT_INTERESTED', 'DO_NOT_CONTACT'],
+  PROPOSAL: ['CONVERTED', 'CUSTOMER', 'LOST', 'NOT_INTERESTED', 'DO_NOT_CONTACT', 'INTERESTED', 'CONTACTED'],
   CONVERTED: ['CUSTOMER', 'DO_NOT_CONTACT'],
   CUSTOMER: ['DO_NOT_CONTACT'],
   NOT_INTERESTED: ['QUALIFIED', 'NEW', 'DO_NOT_CONTACT'],
@@ -153,50 +153,21 @@ export function getNextActionRecommendation(
     };
   }
 
-  const approvalStatus = activeDemo.approvalStatus || (lead.leadStatus === 'APPROVED' ? 'APPROVED' : 'PENDING_REVIEW');
-
-  if (approvalStatus === 'PENDING_REVIEW' || lead.leadStatus === 'DEMO_GENERATED' || lead.leadStatus === 'UNDER_REVIEW') {
+  // Post-outreach pipeline stages take highest priority
+  if (lead.leadStatus === 'CONVERTED' || lead.leadStatus === 'CUSTOMER') {
     return {
-      stepNumber: 2,
-      stageTitle: 'Human Demo Review',
-      actionPrompt: `Website concept v${activeDemo.version} is ready. Review the concept and approve it for outreach, or reject with feedback.`,
-      recommendedButton: { label: 'Review & Approve Concept', action: 'REVIEW_DEMO' },
+      stepNumber: 7,
+      stageTitle: 'Converted Customer',
+      actionPrompt: 'Successfully converted! Client is onboarded for custom website design project.',
     };
   }
 
-  if (approvalStatus === 'REJECTED' || lead.leadStatus === 'REJECTED') {
+  if (lead.leadStatus === 'PROPOSAL') {
     return {
-      stepNumber: 2,
-      stageTitle: 'Concept Rejected (Improvement Needed)',
-      actionPrompt: `Website concept was rejected: "${activeDemo.rejectionReason || 'Requires revision'}". Improve the layout, theme, or practice focus and generate a new version.`,
-      recommendedButton: { label: 'Improve Concept', action: 'GENERATE_DEMO' },
-    };
-  }
-
-  if (approvalStatus === 'APPROVED') {
-    return {
-      stepNumber: 3,
-      stageTitle: 'Outreach Preparation',
-      actionPrompt: 'Website demo is approved! Generate personalized outreach copy and copy it to your external email/channel.',
-      recommendedButton: { label: 'Prepare Outreach Message', action: 'PREPARE_OUTREACH' },
-    };
-  }
-
-  if (lead.leadStatus === 'CONTACTED') {
-    return {
-      stepNumber: 4,
-      stageTitle: 'Awaiting Response',
-      actionPrompt: 'Outreach sent manually. Awaiting response from business owner. Track their reply when received.',
-      recommendedButton: { label: 'Record Response', action: 'RECORD_RESPONSE' },
-    };
-  }
-
-  if (lead.leadStatus === 'RESPONDED' || lead.leadStatus === 'REPLIED') {
-    return {
-      stepNumber: 5,
-      stageTitle: 'Lead Responded',
-      actionPrompt: 'The business owner responded. Qualify their interest level to proceed with consultation.',
-      recommendedButton: { label: 'Mark as Interested', action: 'MARK_INTERESTED' },
+      stepNumber: 6,
+      stageTitle: 'Proposal Delivered',
+      actionPrompt: 'Website proposal delivered. Follow up with the business owner to finalize agreement terms and payment.',
+      recommendedButton: { label: 'Mark as Converted', action: 'MARK_CONVERTED' },
     };
   }
 
@@ -209,11 +180,50 @@ export function getNextActionRecommendation(
     };
   }
 
-  if (lead.leadStatus === 'CONVERTED' || lead.leadStatus === 'CUSTOMER') {
+  if (lead.leadStatus === 'RESPONDED' || lead.leadStatus === 'REPLIED') {
     return {
-      stepNumber: 7,
-      stageTitle: 'Converted Customer',
-      actionPrompt: 'Successfully converted! Client is onboarded for custom website design project.',
+      stepNumber: 5,
+      stageTitle: 'Lead Responded',
+      actionPrompt: 'The business owner responded. Qualify their interest level to proceed with consultation.',
+      recommendedButton: { label: 'Mark as Interested', action: 'MARK_INTERESTED' },
+    };
+  }
+
+  if (lead.leadStatus === 'CONTACTED') {
+    return {
+      stepNumber: 4,
+      stageTitle: 'Awaiting Response',
+      actionPrompt: 'Outreach sent manually. Awaiting response from business owner. Track their reply when received.',
+      recommendedButton: { label: 'Record Response', action: 'RECORD_RESPONSE' },
+    };
+  }
+
+  const approvalStatus = activeDemo.approvalStatus || (lead.leadStatus === 'APPROVED' ? 'APPROVED' : 'PENDING_REVIEW');
+
+  if (approvalStatus === 'REJECTED' || lead.leadStatus === 'REJECTED') {
+    return {
+      stepNumber: 2,
+      stageTitle: 'Concept Rejected (Improvement Needed)',
+      actionPrompt: `Website concept was rejected: "${activeDemo.rejectionReason || 'Requires revision'}". Improve the layout, theme, or practice focus and generate a new version.`,
+      recommendedButton: { label: 'Improve Concept', action: 'GENERATE_DEMO' },
+    };
+  }
+
+  if (approvalStatus === 'APPROVED' || lead.leadStatus === 'APPROVED') {
+    return {
+      stepNumber: 3,
+      stageTitle: 'Outreach Preparation',
+      actionPrompt: 'Website demo is approved! Generate personalized outreach copy and copy it to your external email/channel.',
+      recommendedButton: { label: 'Prepare Outreach Message', action: 'PREPARE_OUTREACH' },
+    };
+  }
+
+  if (approvalStatus === 'PENDING_REVIEW' || lead.leadStatus === 'DEMO_GENERATED' || lead.leadStatus === 'UNDER_REVIEW') {
+    return {
+      stepNumber: 2,
+      stageTitle: 'Human Demo Review',
+      actionPrompt: `Website concept v${activeDemo.version} is ready. Review the concept and approve it for outreach, or reject with feedback.`,
+      recommendedButton: { label: 'Review & Approve Concept', action: 'REVIEW_DEMO' },
     };
   }
 

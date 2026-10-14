@@ -33,6 +33,11 @@ export const WebsiteLayoutSchema = z.enum([
   'NRI_CROSS_BORDER_TAX',
   'DIRECT_TAX_LITIGATION',
   'FAMILY_OFFICE_ESTATE',
+  'CLINIC_HEALTHCARE',
+  'INTERIOR_ARCHITECTURE',
+  'design-1-premium',
+  'design-2-minimalist',
+  'design-3-contemporary',
 ]);
 
 export const WebsiteSectionTypeSchema = z.enum([

@@ -163,13 +163,18 @@ export type WebsiteTemplate =
   | 'INSTITUTIONAL_AUDIT_ASSURANCE'
   | 'NRI_CROSS_BORDER_TAX'
   | 'DIRECT_TAX_LITIGATION'
-  | 'FAMILY_OFFICE_ESTATE';
+  | 'FAMILY_OFFICE_ESTATE'
+  | 'CLINIC_HEALTHCARE'
+  | 'INTERIOR_ARCHITECTURE';
 
 export type WebsiteLayout =
   | WebsiteTemplate
   | 'MODERN_CORPORATE'
   | 'PREMIUM_PROFESSIONAL'
-  | 'TRADITIONAL_CA';
+  | 'TRADITIONAL_CA'
+  | 'design-1-premium'
+  | 'design-2-minimalist'
+  | 'design-3-contemporary';
 
 export type WebsiteSectionType =
   | 'HERO'

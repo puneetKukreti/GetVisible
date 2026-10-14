@@ -1,52 +1,524 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
+import {
+  Upload,
+  UserPlus,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  Sparkles,
+  Building2,
+  MapPin,
+  Phone,
+  Mail,
+  Briefcase,
+  FileUp,
+  RefreshCw,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Search, Sparkles, ArrowRight } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+
+interface ImportSummary {
+  found: number;
+  imported: number;
+  duplicates: number;
+  errors: number;
+  jobId?: string;
+}
 
 export default function DiscoveryPage() {
+  // Tab state: 'import' | 'quick-add'
+  const [activeTab, setActiveTab] = useState<'import' | 'quick-add'>('import');
+
+  // CSV/Excel Import State
+  const [file, setFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Quick Add State
+  const [businessName, setBusinessName] = useState('');
+  const [profession, setProfession] = useState('Chartered Accountant');
+  const [city, setCity] = useState('Gurgaon');
+  const [address, setAddress] = useState('');
+  const [publicPhone, setPublicPhone] = useState('');
+  const [publicEmail, setPublicEmail] = useState('');
+  const [addLoading, setAddLoading] = useState(false);
+  const [addSuccessLead, setAddSuccessLead] = useState<{ id: string; name: string } | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
+
+  // CSV Drag & Drop handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0];
+      const name = droppedFile.name.toLowerCase();
+      if (name.endsWith('.csv') || name.endsWith('.xlsx') || name.endsWith('.xls')) {
+        setFile(droppedFile);
+        setImportError(null);
+      } else {
+        setImportError('Please upload a valid .csv or .xlsx file.');
+      }
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      setImportError(null);
+    }
+  };
+
+  // Submit CSV/XLSX
+  const handleImportSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!file) {
+      setImportError('Please select a file to import.');
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError(null);
+    setImportSummary(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('/api/discovery/csv-import', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to import leads.');
+      }
+
+      setImportSummary({
+        found: data.found || 0,
+        imported: data.imported || 0,
+        duplicates: data.duplicates || 0,
+        errors: data.errors || 0,
+        jobId: data.jobId,
+      });
+      setFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err: unknown) {
+      setImportError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // Submit Single Lead
+  const handleQuickAddSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessName.trim()) {
+      setAddError('Business name is required.');
+      return;
+    }
+
+    setAddLoading(true);
+    setAddError(null);
+    setAddSuccessLead(null);
+
+    try {
+      const payload = {
+        businessName: businessName.trim(),
+        profession: profession.trim() || 'Chartered Accountant',
+        city: city.trim() || 'Gurgaon',
+        address: address.trim() || `${city.trim() || 'Gurgaon'}, India`,
+        publicPhone: publicPhone.trim() || undefined,
+        publicEmail: publicEmail.trim() || undefined,
+        websiteStatus: 'NO_WEBSITE',
+        opportunityScore: 85,
+        opportunityReason: 'Identified with no website or outdated web presence; ready for high-converting pitch.',
+        source: 'Manual Quick-Add',
+      };
+
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create lead.');
+      }
+
+      setAddSuccessLead({ id: data.id, name: data.businessName });
+      setBusinessName('');
+      setAddress('');
+      setPublicPhone('');
+      setPublicEmail('');
+    } catch (err: unknown) {
+      setAddError(err instanceof Error ? err.message : 'Failed to create lead');
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Lead Discovery</h1>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Find and extract verified professional business leads across industries and locations.
-        </p>
+    <div className="space-y-6 max-w-5xl">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Lead Discovery &amp; Import Hub</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Acquire prospective SMB &amp; CA firm leads via bulk spreadsheet import or instant 1-click entry.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Link href="/leads">
+            <Button variant="outline" size="sm" className="text-xs gap-1.5">
+              <span>View All CRM Leads</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </Link>
+        </div>
       </div>
 
-      <Card className="border-dashed border-border/80 shadow-none bg-muted/5">
-        <CardContent className="p-12 flex flex-col items-center justify-center text-center space-y-4">
-          <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-            <Search className="w-7 h-7" />
-          </div>
+      {/* Navigation Tabs */}
+      <div className="flex border-b border-border gap-6 text-sm">
+        <button
+          type="button"
+          onClick={() => setActiveTab('import')}
+          className={`pb-2.5 font-medium flex items-center gap-2 transition-colors relative ${
+            activeTab === 'import'
+              ? 'text-primary font-semibold border-b-2 border-primary -mb-px'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" />
+          <span>Bulk CSV / Excel Import</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('quick-add')}
+          className={`pb-2.5 font-medium flex items-center gap-2 transition-colors relative ${
+            activeTab === 'quick-add'
+              ? 'text-primary font-semibold border-b-2 border-primary -mb-px'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <UserPlus className="w-4 h-4" />
+          <span>Quick Add Single Lead</span>
+        </button>
+      </div>
 
-          <div className="space-y-1.5 max-w-md">
-            <h3 className="text-base font-semibold text-foreground">
-              Discovery Engine Cleared
-            </h3>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              This section has been cleared and is awaiting your new discovery specifications and search provider integrations.
-            </p>
-          </div>
+      {/* Tab 1: CSV / Excel Bulk Import */}
+      {activeTab === 'import' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Upload className="w-4 h-4 text-primary" />
+                <span>Upload Prospect Spreadsheet</span>
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Upload a `.csv` or `.xlsx` file containing local business details. Files with columns like{' '}
+                <code className="text-primary font-mono text-[11px]">business_name, profession, city, phone, email, address</code>{' '}
+                will be automatically mapped and validated.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form onSubmit={handleImportSubmit} className="space-y-4">
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                    isDragging
+                      ? 'border-primary bg-primary/5'
+                      : file
+                      ? 'border-emerald-500/50 bg-emerald-500/5'
+                      : 'border-border/80 hover:border-primary/50 hover:bg-muted/10'
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
 
-          <div className="pt-2 flex items-center gap-3">
-            <Link href="/campaigns">
-              <Button size="sm" className="text-xs gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Go to Campaigns &amp; Outreach</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
-            </Link>
-            <Link href="/leads">
-              <Button size="sm" variant="outline" className="text-xs">
-                View CRM Leads
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+                  {file ? (
+                    <div className="flex flex-col items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                      <FileUp className="w-8 h-8" />
+                      <p className="font-semibold text-sm">{file.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {(file.size / 1024).toFixed(1)} KB &bull; Click or drop another file to replace
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <FileSpreadsheet className="w-8 h-8 text-muted-foreground/60" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          Drag and drop your spreadsheet here, or <span className="text-primary underline">browse</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Supports CSV, XLSX, XLS up to 10MB</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {importError && (
+                  <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{importError}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1">
+                  <div className="text-[11px] text-muted-foreground">
+                    Tip: Duplicates are identified by business name and city to keep CRM clean.
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={!file || importLoading}
+                    size="sm"
+                    className="gap-2 text-xs"
+                  >
+                    {importLoading ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Processing &amp; Importing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Import Leads Now</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
+
+              {/* Import Summary Result Banner */}
+              {importSummary && (
+                <div className="mt-4 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 space-y-3">
+                  <div className="flex items-center gap-2 font-semibold text-sm text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>Import Completed Successfully!</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                    <div className="p-2.5 rounded bg-background/60 border border-border/50 text-center">
+                      <div className="text-[11px] text-muted-foreground uppercase font-medium">Found</div>
+                      <div className="text-base font-bold text-foreground mt-0.5">{importSummary.found}</div>
+                    </div>
+                    <div className="p-2.5 rounded bg-background/60 border border-border/50 text-center">
+                      <div className="text-[11px] text-emerald-600 dark:text-emerald-400 uppercase font-medium">Imported</div>
+                      <div className="text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                        {importSummary.imported}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded bg-background/60 border border-border/50 text-center">
+                      <div className="text-[11px] text-amber-600 dark:text-amber-400 uppercase font-medium">Duplicates</div>
+                      <div className="text-base font-bold text-amber-600 dark:text-amber-400 mt-0.5">
+                        {importSummary.duplicates}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded bg-background/60 border border-border/50 text-center">
+                      <div className="text-[11px] text-muted-foreground uppercase font-medium">Errors</div>
+                      <div className="text-base font-bold text-foreground mt-0.5">{importSummary.errors}</div>
+                    </div>
+                  </div>
+                  <div className="pt-2 flex items-center justify-end">
+                    <Link href="/leads">
+                      <Button size="sm" className="text-xs gap-1.5">
+                        <span>Open CRM &amp; Pitch Imported Leads</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Tab 2: Quick Add Single Lead */}
+      {activeTab === 'quick-add' && (
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-primary" />
+              <span>Quick Add Single Business Lead</span>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Found a prospective business on Google Maps or local directory? Enter their details here to immediately generate a custom website preview.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={handleQuickAddSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Business / Practice Name *</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Apex Health Clinic or Sharma & Associates"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    required
+                    className="text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Profession / Industry</span>
+                  </label>
+                  <select
+                    value={profession}
+                    onChange={(e) => setProfession(e.target.value)}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="Chartered Accountant">Chartered Accountant (CA Firm)</option>
+                    <option value="Healthcare / Dental Clinic">Healthcare / Dental Clinic</option>
+                    <option value="Interior Designer & Architect">Interior Designer &amp; Architect</option>
+                    <option value="Tax Consultant">Tax Consultant</option>
+                    <option value="Lawyer / Legal Firm">Lawyer / Legal Practice</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>City</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Gurgaon"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Address / Locality</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. Sector 29, Golf Course Road"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Public Phone / WhatsApp</span>
+                  </label>
+                  <Input
+                    placeholder="e.g. +91 98100 12345"
+                    value={publicPhone}
+                    onChange={(e) => setPublicPhone(e.target.value)}
+                    className="text-xs h-9"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span>Public Email</span>
+                  </label>
+                  <Input
+                    type="email"
+                    placeholder="e.g. contact@business.example"
+                    value={publicEmail}
+                    onChange={(e) => setPublicEmail(e.target.value)}
+                    className="text-xs h-9"
+                  />
+                </div>
+              </div>
+
+              <div className="p-3 rounded-md bg-muted/40 border border-border/60 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Default Website Status:</span>
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 text-[11px]">
+                  No Website Detected (High Opportunity)
+                </Badge>
+              </div>
+
+              {addError && (
+                <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{addError}</span>
+                </div>
+              )}
+
+              {addSuccessLead && (
+                <div className="p-3.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                    <span>
+                      Lead <strong className="font-semibold text-foreground">{addSuccessLead.name}</strong> created!
+                    </span>
+                  </div>
+                  <Link href={`/leads/${addSuccessLead.id}`}>
+                    <Button size="sm" variant="default" className="text-xs h-8 gap-1.5">
+                      <Sparkles className="w-3 h-3" />
+                      <span>Open Lead &amp; Generate Demo</span>
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  type="submit"
+                  disabled={addLoading}
+                  size="sm"
+                  className="gap-2 text-xs"
+                >
+                  {addLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Adding Lead...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>Add Lead to CRM</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

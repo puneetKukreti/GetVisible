@@ -377,6 +377,95 @@ export const CA_LAYOUTS: Record<WebsiteLayout, CALayoutDefinition> = {
     },
     contentDensity: 'spacious',
   },
+  CLINIC_HEALTHCARE: {
+    layout: 'CLINIC_HEALTHCARE',
+    template: 'CLINIC_HEALTHCARE',
+    name: 'Healthcare & Modern Dental Clinic',
+    description:
+      'Clinical teal and clean modern layout designed for dental clinics, multispeciality practices, and healthcare doctors.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'ABOUT',
+      'WHY_CHOOSE_US',
+      'FAQ',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'split-fintech',
+    servicesLayout: 'cards-glow',
+    features: {
+      floatingHeader: true,
+      showVisualArtwork: true,
+    },
+    contentDensity: 'comfortable',
+  },
+  INTERIOR_ARCHITECTURE: {
+    layout: 'INTERIOR_ARCHITECTURE',
+    template: 'INTERIOR_ARCHITECTURE',
+    name: 'Interior Architecture & Design Studio',
+    description:
+      'Warm slate and luxury serif aesthetic engineered for architectural studios, interior turnkey contractors, and modular design firms.',
+    sectionOrder: [
+      'HERO',
+      'SERVICES',
+      'ABOUT',
+      'PROCESS',
+      'CTA',
+      'CONTACT',
+      'LOCATION',
+    ],
+    heroLayout: 'minimal-serif',
+    servicesLayout: 'luxury-rows',
+    features: {
+      hairlineBorders: true,
+      showVisualArtwork: true,
+    },
+    contentDensity: 'spacious',
+  },
+  'design-1-premium': {
+    layout: 'design-1-premium',
+    template: 'EDITORIAL_FINANCE',
+    name: 'Design 1: Premium Editorial',
+    description: 'Deep navy & gold editorial aesthetic engineered for statutory audit, transfer pricing, and corporate tax.',
+    sectionOrder: ['HERO', 'SERVICES', 'ABOUT', 'EXPERTISE', 'CTA', 'CONTACT', 'LOCATION'],
+    heroLayout: 'asymmetric-editorial',
+    servicesLayout: 'numbered-manifesto',
+    features: {
+      showVisualArtwork: true,
+      hairlineBorders: false,
+      floatingHeader: false,
+    },
+    contentDensity: 'comfortable',
+  },
+  'design-2-minimalist': {
+    layout: 'design-2-minimalist',
+    template: 'SWISS_MINIMAL',
+    name: 'Design 2: Minimalist Ledger',
+    description: 'Parchment background with JetBrains Mono data tags and fine-line borders for GST litigation and industrial corridors.',
+    sectionOrder: ['HERO', 'SERVICES', 'ABOUT', 'EXPERTISE', 'WHY_CHOOSE_US', 'CONTACT', 'LOCATION'],
+    heroLayout: 'swiss-grid',
+    servicesLayout: 'swiss-grid',
+    features: {
+      monochromeGrid: true,
+      showVisualArtwork: true,
+    },
+    contentDensity: 'compact',
+  },
+  'design-3-contemporary': {
+    layout: 'design-3-contemporary',
+    template: 'MODERN_FINTECH',
+    name: 'Design 3: Contemporary Corporate',
+    description: 'Corporate navy with warm sand gradients and modern elevation for Virtual CFO and NRI wealth advisory.',
+    sectionOrder: ['HERO', 'SERVICES', 'PROCESS', 'TRUST', 'CTA', 'CONTACT', 'LOCATION'],
+    heroLayout: 'split-fintech',
+    servicesLayout: 'cards-glow',
+    features: {
+      floatingHeader: true,
+      showVisualArtwork: false,
+    },
+    contentDensity: 'comfortable',
+  },
 };
 
 export const TEMPLATE_KEYS: WebsiteTemplate[] = [
@@ -385,6 +474,16 @@ export const TEMPLATE_KEYS: WebsiteTemplate[] = [
   'LUXURY_PROFESSIONAL',
   'SWISS_MINIMAL',
   'MODERN_INDIAN',
+];
+
+export const SMB_TEMPLATE_KEYS: WebsiteTemplate[] = [
+  'CLINIC_HEALTHCARE',
+  'INTERIOR_ARCHITECTURE',
+];
+
+export const ALL_TEMPLATE_KEYS: WebsiteTemplate[] = [
+  ...TEMPLATE_KEYS,
+  ...SMB_TEMPLATE_KEYS,
 ];
 
 export const INDIAN_CA_ARCHETYPE_KEYS: WebsiteTemplate[] = [
