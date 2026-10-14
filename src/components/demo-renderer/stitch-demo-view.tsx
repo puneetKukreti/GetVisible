@@ -44,11 +44,11 @@ export function StitchDemoView({
   }, []);
 
   return (
-    <div className={`relative w-full bg-slate-950 overflow-hidden ${className}`}>
+    <div className={`relative w-full overflow-hidden ${className}`}>
       {loading && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 z-10 pointer-events-none transition-opacity">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/40 z-10 pointer-events-none transition-opacity">
           <div className="w-8 h-8 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin mb-3" />
-          <p className="text-xs text-slate-300 font-medium">Loading Google Stitch Design...</p>
+          <p className="text-xs text-slate-300 font-medium">Loading Website Preview...</p>
         </div>
       )}
 
@@ -56,13 +56,17 @@ export function StitchDemoView({
         ref={iframeRef}
         src={iframeSrc}
         title={content?.brand?.businessName || 'Website Demo'}
-        className="w-full border-0 block transition-all"
+        className="w-full border-0 block"
         style={{
-          height: `${iframeHeight}px`,
-          minHeight: '100vh',
+          height: iframeHeight > 0 ? `${iframeHeight}px` : '100vh',
           width: '100%',
         }}
-        onLoad={() => setLoading(false)}
+        onLoad={() => {
+          setLoading(false);
+          try {
+            iframeRef.current?.contentWindow?.postMessage({ type: 'GETVISIBLE_REQUEST_HEIGHT' }, '*');
+          } catch (e) {}
+        }}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
       />
     </div>

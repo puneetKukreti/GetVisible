@@ -17,6 +17,7 @@ import {
   Loader2,
   Check,
 } from 'lucide-react';
+import { FloatingClaimBar } from '@/components/demos/floating-claim-bar';
 
 interface PublicDemoViewProps {
   demo: WebsiteDemoData;
@@ -152,7 +153,7 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 pb-28 md:pb-24">
+    <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary/20 pb-0">
       {/* Personalized Website Canvas */}
       <DemoRenderer
         content={contentObj}
@@ -170,81 +171,12 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
         version={demo.version}
       />
 
-      {/* Floating Bottom Conversion Bar (Hidden when ?screenshot=true) */}
-      {!isScreenshotMode && (
-        <>
-          {isCollapsed ? (
-            /* Minimized Sleek Pill */
-            <div className="fixed bottom-4 right-4 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-              <button
-                type="button"
-                onClick={() => setIsCollapsed(false)}
-                className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-slate-950/95 hover:bg-slate-900 text-white border border-slate-700/80 rounded-full shadow-2xl backdrop-blur-md text-xs font-semibold transition hover:scale-105 active:scale-95 ring-1 ring-white/10"
-              >
-                <span>💬 Claim This Site</span>
-                <ChevronUp className="w-4 h-4 text-amber-400" />
-              </button>
-            </div>
-          ) : (
-            /* Expanded Full Floating Bar */
-            <div className="fixed bottom-3 inset-x-3 md:bottom-5 md:max-w-4xl md:mx-auto z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="bg-slate-950/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl shadow-black/70 p-3 md:p-4 text-white ring-1 ring-white/10 space-y-2.5">
-                {/* Header row with badge & minimize toggle button */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-semibold">
-                      <span>✨ Preview built for {businessName}</span>
-                    </div>
-                    <p className="text-xs sm:text-sm font-medium text-slate-100 leading-snug">
-                      Want this website live on your own .in / .com domain in 48 hours?
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsCollapsed(true)}
-                    className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition shrink-0"
-                    title="Minimize"
-                    aria-label="Minimize preview banner"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Conversion Buttons Row */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-0.5">
-                  {/* Primary CTA Button (Emerald green, WhatsApp icon) */}
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold rounded-xl text-xs sm:text-sm shadow-lg shadow-emerald-950/40 transition-all hover:scale-[1.01] active:scale-95 text-center"
-                  >
-                    <MessageCircle className="w-4 h-4 fill-white text-emerald-600 shrink-0" />
-                    <span>Claim Website on WhatsApp</span>
-                  </a>
-
-                  {/* Secondary Button: Request Free Changes */}
-                  <button
-                    type="button"
-                    onClick={() => setIsModalOpen(true)}
-                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900/90 hover:bg-slate-800 active:bg-slate-900 text-slate-200 border border-slate-600 hover:border-slate-400 font-semibold rounded-xl text-xs sm:text-sm transition-all hover:scale-[1.01] active:scale-95 text-center"
-                  >
-                    {isSubmitted ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span className="text-emerald-300">Changes Requested ✓</span>
-                      </>
-                    ) : (
-                      <>
-                        <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span>Request Free Changes</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+      {/* Floating Compact Conversion Bar */}
+      <FloatingClaimBar
+        businessName={businessName}
+        onRequestChanges={() => setIsModalOpen(true)}
+        isSubmitted={isSubmitted}
+      />
 
           {/* Request Free Changes Modal Dialog */}
           {isModalOpen && (
@@ -450,8 +382,6 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
               </div>
             </div>
           )}
-        </>
-      )}
-    </div>
-  );
-}
+        </div>
+      );
+    }

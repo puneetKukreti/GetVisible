@@ -10,6 +10,7 @@ import { INDIAN_CA_ARCHETYPES } from '@/lib/demos/ca-archetypes';
 import { getTemplate } from '@/lib/demos/templates';
 import Link from 'next/link';
 import { Sparkles, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { FloatingClaimBar } from '@/components/demos/floating-claim-bar';
 
 interface DemoClientProps {
   initialLead: LeadData;
@@ -264,6 +265,12 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
           onSaved={handleDemoSaved}
         />
       )}
+
+      {/* Sleek Floating Claim Bar */}
+      <FloatingClaimBar
+        businessName={initialLead.businessName}
+        onRequestChanges={() => setIsEditorOpen(true)}
+      />
     </div>
   );
 }

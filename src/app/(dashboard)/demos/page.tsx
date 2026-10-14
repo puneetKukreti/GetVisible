@@ -313,7 +313,7 @@ export default function DemosPage() {
                 </Link>
 
                 <Link
-                  href={`/demo/${demo.leadId}`}
+                  href={demo.publicToken ? `/demo/${demo.publicToken}` : `/demo/${demo.leadId}`}
                   target="_blank"
                   className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 text-xs font-bold shadow-xs transition"
                 >

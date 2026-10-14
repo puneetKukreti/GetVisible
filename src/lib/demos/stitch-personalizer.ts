@@ -190,22 +190,60 @@ export function personalizeStitchHtml(
   html = html.replaceAll('consultations@sharmaassociates-ca.in', escapeHtml(email));
   html = html.replaceAll('mailto:consultations@sharmaassociates-ca.in', `mailto:${escapeHtml(email)}`);
 
-  // 5. Inject client script for smooth scrolling, simulated form submission, and responsive iframe height
+  // 5. Inject CSS to remove unwanted scrollbars and runaway body min-height
+  const injectedStyle = `
+<style>
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+  }
+  body {
+    min-height: auto !important;
+  }
+</style>
+`;
+
+  if (html.includes('</head>')) {
+    html = html.replace('</head>', `${injectedStyle}</head>`);
+  } else {
+    html = injectedStyle + html;
+  }
+
+  // 6. Inject client script for smooth scrolling, simulated form submission, and responsive iframe height
   const injectedScript = `
 <script>
   (function() {
-    // Post height to parent window so iframe resizes seamlessly with zero double scrollbars
+    var lastSentHeight = 0;
+    // Measure exact bottom of website content to prevent runaway empty space
     function notifyHeight() {
       try {
-        var h = document.documentElement.scrollHeight || document.body.scrollHeight;
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'GETVISIBLE_IFRAME_HEIGHT', height: h }, '*');
+        var footer = document.querySelector('footer');
+        var h = 0;
+        if (footer) {
+          var rect = footer.getBoundingClientRect();
+          var scrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+          h = Math.ceil(rect.bottom + scrollY);
+        } else {
+          var body = document.body;
+          h = Math.ceil(Math.max(body.offsetHeight, body.clientHeight));
+        }
+        if (h > 300 && Math.abs(h - lastSentHeight) > 2) {
+          lastSentHeight = h;
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'GETVISIBLE_IFRAME_HEIGHT', height: h }, '*');
+          }
         }
       } catch (e) {}
     }
 
     window.addEventListener('load', notifyHeight);
     window.addEventListener('resize', notifyHeight);
+    window.addEventListener('message', function(ev) {
+      if (ev.data && ev.data.type === 'GETVISIBLE_REQUEST_HEIGHT') {
+        notifyHeight();
+      }
+    });
     if (typeof MutationObserver !== 'undefined') {
       new MutationObserver(notifyHeight).observe(document.body, { childList: true, subtree: true });
     }
