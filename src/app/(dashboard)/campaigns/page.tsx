@@ -110,10 +110,13 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const [intent, setIntent] = useState(DEFAULT_INTENT);
   const [draft, setDraft] = useState('');
   const [emailDraft, setEmailDraft] = useState('');
+  const [whatsappStep, setWhatsappStep] = useState<'step1' | 'step2'>('step1');
   const [whatsappMessage, setWhatsappMessage] = useState('');
+  const [whatsappFollowUpWithLink, setWhatsappFollowUpWithLink] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [whatsappShareUrl, setWhatsappShareUrl] = useState<string | null>(null);
+  const [whatsappFollowUpShareUrl, setWhatsappFollowUpShareUrl] = useState<string | null>(null);
   const [draftSubject, setDraftSubject] = useState('');
   const [draftLoading, setDraftLoading] = useState(false);
   const [draftError, setDraftError] = useState('');
@@ -160,10 +163,19 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
 
   const handleSelectChannel = (ch: OutreachChannel) => {
     setChannel(ch);
-    if (ch === 'WHATSAPP' && whatsappMessage) {
-      setDraft(whatsappMessage);
+    if (ch === 'WHATSAPP') {
+      setDraft(whatsappStep === 'step1' ? whatsappMessage : whatsappFollowUpWithLink);
     } else if (ch === 'EMAIL' && emailDraft) {
       setDraft(emailDraft);
+    }
+  };
+
+  const handleSwitchWhatsappStep = (step: 'step1' | 'step2') => {
+    setWhatsappStep(step);
+    if (step === 'step1') {
+      setDraft(whatsappMessage || '');
+    } else {
+      setDraft(whatsappFollowUpWithLink || '');
     }
   };
 
@@ -185,12 +197,19 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
         throw new Error(errJson.error || `Server error ${res.status}`);
       }
       const data = await res.json();
-      setDraft(data.draft);
       if (data.outreach?.message) setEmailDraft(data.outreach.message);
       if (data.whatsappMessage) setWhatsappMessage(data.whatsappMessage);
+      if (data.whatsappFollowUpWithLink) setWhatsappFollowUpWithLink(data.whatsappFollowUpWithLink);
       if (data.subject) setDraftSubject(data.subject);
       if (data.screenshotUrl) setScreenshotUrl(data.screenshotUrl);
       if (data.whatsappShareUrl) setWhatsappShareUrl(data.whatsappShareUrl);
+      if (data.whatsappFollowUpShareUrl) setWhatsappFollowUpShareUrl(data.whatsappFollowUpShareUrl);
+
+      if (channel === 'WHATSAPP') {
+        setDraft(whatsappStep === 'step1' ? (data.whatsappMessage || data.draft) : (data.whatsappFollowUpWithLink || data.draft));
+      } else {
+        setDraft(data.draft);
+      }
     } catch (err: unknown) {
       setDraftError(err instanceof Error ? err.message : 'Failed to generate draft.');
     } finally {
@@ -530,6 +549,32 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
         {/* WhatsApp Channel: Exact Card Message with Image at Top and Quick Reply Buttons */}
         {channel === 'WHATSAPP' ? (
           <div className="space-y-3">
+            {/* 2-Pill Touch 1 vs Touch 2 Toggle */}
+            <div className="flex p-1 bg-muted/60 rounded-lg border border-border/80 gap-1 select-none text-xs">
+              <button
+                type="button"
+                onClick={() => handleSwitchWhatsappStep('step1')}
+                className={`flex-1 py-1.5 px-2 rounded-md font-semibold text-center transition-all ${
+                  whatsappStep === 'step1'
+                    ? 'bg-background text-emerald-600 dark:text-emerald-400 shadow-xs border border-emerald-500/30'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🛡️ Step 1: Safe Image Pitch (No Link — High Reply)
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSwitchWhatsappStep('step2')}
+                className={`flex-1 py-1.5 px-2 rounded-md font-semibold text-center transition-all ${
+                  whatsappStep === 'step2'
+                    ? 'bg-background text-primary shadow-xs border border-primary/30'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                🔗 Step 2: Send Live Link (After Reply)
+              </button>
+            </div>
+
             {/* Generate / Refresh Button */}
             <Button
               onClick={generateDraft}
@@ -715,15 +760,15 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                     </Button>
                   </div>
 
-                  {whatsappShareUrl && (
+                  {(whatsappStep === 'step1' ? whatsappShareUrl : (whatsappFollowUpShareUrl || whatsappShareUrl)) && (
                     <a
-                      href={whatsappShareUrl}
+                      href={whatsappStep === 'step1' ? whatsappShareUrl! : (whatsappFollowUpShareUrl || whatsappShareUrl)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 py-2 rounded-lg shadow-sm transition-colors"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Open in WhatsApp Web</span>
+                      <span>Open in WhatsApp Web ({whatsappStep === 'step1' ? 'Zero-Link Pitch' : 'Follow-Up Link'})</span>
                     </a>
                   )}
                 </div>
@@ -1022,13 +1067,97 @@ interface OutreachQueueTabProps {
   loading: boolean;
   error: string;
   onRefresh: () => void;
+  missingDemoCount?: number;
+  onBatchGenerate?: () => Promise<void>;
+  batchGenerating?: boolean;
 }
 
-function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTabProps) {
+function OutreachQueueTab({
+  leads,
+  loading,
+  error,
+  onRefresh,
+  missingDemoCount = 0,
+  onBatchGenerate,
+  batchGenerating = false,
+}: OutreachQueueTabProps) {
   const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
   const [contactedIds, setContactedIds] = useState<Set<string>>(new Set());
   const [filterMode, setFilterMode] = useState<'ALL' | 'VIEWED' | 'INTERESTED' | 'PHONE' | 'READY'>('ALL');
   const [approvingAll, setApprovingAll] = useState(false);
+  const [blitzLoadingId, setBlitzLoadingId] = useState<string | null>(null);
+  const [blitzSentIds, setBlitzSentIds] = useState<Set<string>>(new Set());
+
+  const handleBlitzWhatsApp = async (lead: LeadData) => {
+    if (!lead.publicPhone) return;
+    setBlitzLoadingId(lead.id);
+
+    try {
+      // 1. Copy screenshot PNG to OS clipboard if available
+      try {
+        const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
+        const res = await fetch(proxyUrl);
+        if (res.ok) {
+          const blob = await res.blob();
+          const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': pngBlob }),
+          ]);
+        }
+      } catch (clipErr) {
+        console.warn('Clipboard image write skipped/failed:', clipErr);
+      }
+
+      // 2. Format zero-link message
+      const cleanPhone = (lead.publicPhone || '').replace(/[^0-9]/g, '');
+      const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+      const cityText = lead.city ? `${lead.city} practice` : 'practice';
+
+      const zeroLinkMsg = `Hi *${lead.businessName}* team 👋
+
+I noticed your ${cityText} on Google, but saw that no official website comes up when clients search your name online.
+
+I’m Puneet, a web developer in Delhi NCR, and I created a custom website layout specifically for *${lead.businessName}* *(screenshot attached above 👆)*.
+
+Since everyone is cautious with unknown links on WhatsApp nowadays, I haven't put any link in this message. 😊
+
+If you like how the design looks in the photo, just reply *"PREVIEW"* (or *"YES"*) and I’ll share the interactive preview link and details!`;
+
+      // 3. Open WhatsApp Web deep link
+      const waUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(zeroLinkMsg)}`;
+      window.open(waUrl, '_blank');
+
+      // 4. Record contacted via send-whatsapp endpoint
+      await fetch('/api/outreach/send-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: lead.id,
+          phone: waPhone,
+          message: zeroLinkMsg,
+          screenshotUrl: lead.websiteDemos?.[0]?.screenshotUrl || null,
+          notes: 'Dispatched via 1-Click Blitz WhatsApp (Zero-Link Image Pitch + Screenshot in Clipboard)',
+        }),
+      }).catch(() => {
+        fetch('/api/outreach/contacted', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leadId: lead.id,
+            channel: 'WHATSAPP',
+            notes: 'Dispatched via 1-Click Blitz WhatsApp',
+          }),
+        }).catch(() => {});
+      });
+
+      setBlitzSentIds((prev) => new Set([...Array.from(prev), lead.id]));
+      handleContacted(lead.id);
+    } catch (err) {
+      console.error('Blitz WhatsApp failed:', err);
+    } finally {
+      setBlitzLoadingId(null);
+    }
+  };
 
   const handleContacted = useCallback((leadId: string) => {
     setContactedIds((prev) => new Set([...Array.from(prev), leadId]));
@@ -1216,6 +1345,22 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
         </div>
 
         <div className="flex items-center gap-2">
+          {missingDemoCount > 0 && onBatchGenerate && (
+            <Button
+              size="sm"
+              disabled={batchGenerating}
+              onClick={onBatchGenerate}
+              className="h-8 text-xs gap-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold shadow-xs"
+              title="1-Click: Automatically generates and approves website demos for all leads without one"
+            >
+              {batchGenerating ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Zap className="w-3.5 h-3.5 fill-current" />
+              )}
+              <span>{batchGenerating ? 'Generating Websites…' : `⚡ 1-Click Generate All Websites (${missingDemoCount})`}</span>
+            </Button>
+          )}
           {readyCount < uncontacted.length && (
             <Button
               size="sm"
@@ -1309,26 +1454,37 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      {lead.publicPhone && (
+                      {blitzSentIds.has(lead.id) || contactedIds.has(lead.id) ? (
+                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[11px] h-7 px-2 font-bold gap-1">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>✓ Sent / Copied</span>
+                        </Badge>
+                      ) : lead.publicPhone ? (
                         <Button
                           size="sm"
-                          variant="outline"
-                          className="h-7 px-2 text-[11px] gap-1 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10 font-medium"
-                          onClick={() => setSelectedLead(lead)}
-                          title="Open WhatsApp Outreach Drawer (Direct image copy + tailored pitch)"
+                          disabled={blitzLoadingId === lead.id}
+                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-emerald-600 shadow-xs"
+                          onClick={() => handleBlitzWhatsApp(lead)}
+                          title="1-Click Blitz: Copies screenshot to clipboard, opens WhatsApp Web pre-filled, and marks lead as Contacted"
                         >
-                          <MessageSquare className="w-3 h-3" />
-                          WhatsApp
+                          {blitzLoadingId === lead.id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Zap className="w-3 h-3 fill-current" />
+                          )}
+                          <span>⚡ 1-Click WhatsApp</span>
                         </Button>
-                      )}
+                      ) : null}
+
                       <Button
                         size="sm"
-                        variant="default"
-                        className="h-7 px-2.5 text-[11px] gap-1.5 font-medium"
+                        variant="outline"
+                        className="h-7 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground font-medium"
                         onClick={() => setSelectedLead(lead)}
+                        title="Open deep customization drawer"
                       >
-                        <Send className="w-3 h-3" />
-                        Draft &amp; Attach
+                        <Edit3 className="w-3 h-3" />
+                        <span>Customize</span>
                       </Button>
                     </div>
                   </td>
@@ -1382,6 +1538,31 @@ export default function CampaignsPage() {
   ).length;
   const interestedCount = allLeads.filter((l) => l.leadStatus === 'INTERESTED').length;
 
+  const missingDemoCount = allLeads.filter(
+    (l) =>
+      l.websiteStatus === 'NO_WEBSITE' &&
+      (!l.websiteDemos ||
+        l.websiteDemos.length === 0 ||
+        !l.websiteDemos.some((d) => d.approvalStatus === 'APPROVED'))
+  ).length;
+
+  const [batchGenerating, setBatchGenerating] = useState(false);
+
+  const handleBatchGenerateDemos = async () => {
+    setBatchGenerating(true);
+    try {
+      const res = await fetch('/api/demos/batch-generate', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        await fetchLeads();
+      }
+    } catch (err) {
+      console.error('Batch generation failed:', err);
+    } finally {
+      setBatchGenerating(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Page Header */}
@@ -1395,6 +1576,27 @@ export default function CampaignsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {missingDemoCount > 0 && (
+            <Button
+              size="sm"
+              disabled={batchGenerating}
+              onClick={handleBatchGenerateDemos}
+              className="gap-2 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-sm"
+              title="Auto-generates and approves website concept demos for all leads without one"
+            >
+              {batchGenerating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Generating Websites…</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  <span>⚡ 1-Click Generate All Websites ({missingDemoCount})</span>
+                </>
+              )}
+            </Button>
+          )}
           <Link href="/discovery">
             <Button size="sm" className="gap-2 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm">
               <Plus className="w-3.5 h-3.5" />
@@ -1460,7 +1662,15 @@ export default function CampaignsPage() {
       </div>
 
       {/* Main Outreach Workbench */}
-      <OutreachQueueTab leads={allLeads} loading={loading} error={error} onRefresh={fetchLeads} />
+      <OutreachQueueTab
+        leads={allLeads}
+        loading={loading}
+        error={error}
+        onRefresh={fetchLeads}
+        missingDemoCount={missingDemoCount}
+        onBatchGenerate={handleBatchGenerateDemos}
+        batchGenerating={batchGenerating}
+      />
     </div>
   );
 }

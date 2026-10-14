@@ -456,6 +456,8 @@ export interface OutreachMessage {
   screenshotUrl?: string | null;
   whatsappMessage?: string;
   whatsappShareUrl?: string;
+  whatsappFollowUpWithLink?: string;
+  whatsappFollowUpShareUrl?: string;
   businessImprovementPitch?: string;
   interestDetectionHook?: string;
 }

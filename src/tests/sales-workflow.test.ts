@@ -295,16 +295,15 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(outreach.whatsappMessage).toBeDefined();
       const wa = outreach.whatsappMessage!;
 
-      // Verifies no raw screenshot URL link spam in WhatsApp text
+      // Verifies no raw screenshot URL link spam or links in Touch 1 WhatsApp text
       expect(wa).not.toContain('screenshot.png');
-      expect(wa).not.toContain('screenshotUrl');
+      expect(wa).not.toContain('http');
+      expect(wa).toContain('screenshot attached above 👆');
+      expect(wa).toContain('PREVIEW');
 
-      // Verifies direct photo reference
-      expect(wa).toContain('*(Attached a custom visual concept mockup above 👆)*');
-
-      // Verifies business improvement value and low-friction interest question
-      expect(wa).toContain('Statutory Credibility');
-      expect(wa).toContain('1-minute live preview');
+      // Verifies WhatsApp Follow-Up contains the demoUrl
+      expect(outreach.whatsappFollowUpWithLink).toBeDefined();
+      expect(outreach.whatsappFollowUpWithLink).toContain('https://example.com/demo/apex-1');
 
       // Verifies WhatsApp share link is properly populated
       expect(outreach.whatsappShareUrl).toBeDefined();

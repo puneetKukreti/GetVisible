@@ -70,6 +70,8 @@ export async function POST(request: NextRequest) {
       screenshotUrl: result.outreach.screenshotUrl,
       whatsappMessage: result.outreach.whatsappMessage,
       whatsappShareUrl: result.outreach.whatsappShareUrl,
+      whatsappFollowUpWithLink: result.outreach.whatsappFollowUpWithLink,
+      whatsappFollowUpShareUrl: result.outreach.whatsappFollowUpShareUrl,
       businessImprovementPitch: result.outreach.businessImprovementPitch,
       interestDetectionHook: result.outreach.interestDetectionHook,
       outreach: result.outreach,

@@ -243,41 +243,43 @@ GetVisible Digital Team`;
   // - Low friction hook question to gauge interest
   const cleanPhone = (input.publicPhone || '').replace(/[^0-9]/g, '');
   const waRecipient = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-  const salutation = input.contactName || `${input.businessName} Team`;
+  const cityLabel = input.city || 'local';
 
-  const headline = hasWebsite
-    ? `📢 *Digital Concept Update: Modernized Practice Portal!* 📢`
-    : `📢 *Practice Announcement: Official Website Concept Ready!* 📢`;
+  // Touch 1: Zero-Link High-Trust WhatsApp Pitch (Relies on attached screenshot, no link)
+  const whatsappMessage = hasWebsite
+    ? `Hi *${input.businessName}* team 👋
 
-  const keyImpact = hasWebsite
-    ? `⚡ *Key Impact:*
-• *Ultra-Fast Mobile Architecture:* Loads under 1s for smartphone inquiries.
-• *Direct Client Consultation Intake:* Integrated WhatsApp & inquiry forms.`
-    : `🏛️ *Key Impact:*
-• *Immediate Statutory Credibility:* Institutional trust for corporate clients & audits.
-• *24/7 Consultation Capture:* Captures leads directly without competitor directory ads.`;
+I noticed your ${cityLabel} practice on Google, and while reviewing your online presence, I created a modernized, ultra-fast website layout specifically for *${input.businessName}* *(screenshot attached above 👆)*.
 
-  const whatsappMessage = `${headline}
+Since everyone is cautious with unknown links on WhatsApp nowadays, I haven't put any link in this message. 😊
 
-*Dear ${salutation},*
+If you like how the design looks in the photo, just reply *"PREVIEW"* (or *"YES"*) and I’ll share the interactive preview link and details!`
+    : `Hi *${input.businessName}* team 👋
 
-We designed an official, high-authority digital presence concept for *${input.businessName}* in ${input.city || 'your area'}.
+I noticed your ${cityLabel} practice on Google, but saw that no official website comes up when clients search your name online.
 
-*(Attached a custom visual concept mockup above 👆)*
+I’m Puneet, a web developer in Delhi NCR, and I created a custom website layout specifically for *${input.businessName}* *(screenshot attached above 👆)*.
 
-${keyImpact}
+Since everyone is cautious with unknown links on WhatsApp nowadays, I haven't put any link in this message. 😊
 
-🔗 *Live Interactive Demo:*
-${input.demoUrl}
+If you like how the design looks in the photo, just reply *"PREVIEW"* (or *"YES"*) and I’ll share the interactive preview link and details!`;
 
-👉 *Reply "Interested" for a 1-minute live preview on your phone, or reply "stop" to opt out.*
+  // Touch 2: Follow-up Link Reply (Sent after prospect replies "PREVIEW" or "YES")
+  const whatsappFollowUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${input.businessName}*:
 
-- GetVisible Digital Studio`;
+👉 ${input.demoUrl}
+
+You can scroll through it right on your phone. Let me know if you'd like any color or text changes — we can make this live on your own .in / .com domain within 48 hours!`;
 
   const encodedWaText = encodeURIComponent(whatsappMessage);
   const whatsappShareUrl = waRecipient
     ? `https://api.whatsapp.com/send?phone=${waRecipient}&text=${encodedWaText}`
     : `https://api.whatsapp.com/send?text=${encodedWaText}`;
+
+  const encodedFollowUpText = encodeURIComponent(whatsappFollowUpWithLink);
+  const whatsappFollowUpShareUrl = waRecipient
+    ? `https://api.whatsapp.com/send?phone=${waRecipient}&text=${encodedFollowUpText}`
+    : `https://api.whatsapp.com/send?text=${encodedFollowUpText}`;
 
   const personalizationReason = `Referenced ${input.businessName}, ${professionLabel} specialization, ${input.city} location, website status (${hasWebsite ? 'has website' : 'no website'}), and direct demo link.`;
 
@@ -288,6 +290,8 @@ ${input.demoUrl}
     screenshotUrl: input.screenshotUrl,
     whatsappMessage,
     whatsappShareUrl,
+    whatsappFollowUpWithLink,
+    whatsappFollowUpShareUrl,
     businessImprovementPitch: summary,
     interestDetectionHook: hookQuestion,
   };
@@ -388,6 +392,8 @@ export class OutreachGeneratorService {
                 screenshotUrl,
                 whatsappMessage: result.data.whatsappMessage || fallback.whatsappMessage,
                 whatsappShareUrl: fallback.whatsappShareUrl,
+                whatsappFollowUpWithLink: fallback.whatsappFollowUpWithLink,
+                whatsappFollowUpShareUrl: fallback.whatsappFollowUpShareUrl,
                 businessImprovementPitch: fallback.businessImprovementPitch,
                 interestDetectionHook: fallback.interestDetectionHook,
               },
