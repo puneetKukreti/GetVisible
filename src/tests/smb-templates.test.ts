@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getTemplate, CLINIC_HEALTHCARE_TEMPLATE, INTERIOR_ARCHITECTURE_TEMPLATE, LeadFacts } from '@/lib/demos/templates';
+import { selectWebsiteDesign } from '@/lib/demos/personalization';
 import { WebsiteContentSchema } from '@/lib/demos/schema';
 import { ALLOWED_TRANSITIONS, validateStatusTransition, getNextActionRecommendation } from '@/lib/sales/lifecycle';
 import { LeadData, WebsiteDemoData } from '@/types';
@@ -47,6 +48,28 @@ describe('Task 5 & 6: Solo-Operator Lifecycle & SMB Templates', () => {
       };
       const tmpl = getTemplate(undefined, undefined, caLead);
       expect(tmpl.id).toBe('design-1-premium');
+    });
+
+    it('selectWebsiteDesign auto-selects CLINIC_HEALTHCARE for healthcare and dental leads', () => {
+      const design = selectWebsiteDesign({
+        id: 'lead-clinic-101',
+        businessName: 'Dr. Smile Dental Clinic',
+        profession: 'Dentist',
+        city: 'Gurgaon',
+      });
+      expect(design.layout).toBe('CLINIC_HEALTHCARE');
+      expect(design.template).toBe('CLINIC_HEALTHCARE');
+    });
+
+    it('selectWebsiteDesign auto-selects INTERIOR_ARCHITECTURE for interior and architecture leads', () => {
+      const design = selectWebsiteDesign({
+        id: 'lead-interior-102',
+        businessName: 'Apex Interior & Architecture Studio',
+        profession: 'Architect',
+        city: 'Noida',
+      });
+      expect(design.layout).toBe('INTERIOR_ARCHITECTURE');
+      expect(design.template).toBe('INTERIOR_ARCHITECTURE');
     });
   });
 

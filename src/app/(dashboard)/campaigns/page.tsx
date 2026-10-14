@@ -36,6 +36,7 @@ import {
   CheckCheck,
   Edit3,
   Zap,
+  Plus,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -50,8 +51,6 @@ interface DraftResult {
   whatsappMessage?: string;
   whatsappShareUrl?: string;
 }
-
-type PageTab = 'queue' | 'compliance';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -1028,9 +1027,8 @@ interface OutreachQueueTabProps {
 function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTabProps) {
   const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
   const [contactedIds, setContactedIds] = useState<Set<string>>(new Set());
-  const [filterMode, setFilterMode] = useState<'ALL' | 'READY' | 'PHONE'>('ALL');
+  const [filterMode, setFilterMode] = useState<'ALL' | 'VIEWED' | 'INTERESTED' | 'PHONE' | 'READY'>('ALL');
   const [approvingAll, setApprovingAll] = useState(false);
-  const [showInterestGuide, setShowInterestGuide] = useState(false);
 
   const handleContacted = useCallback((leadId: string) => {
     setContactedIds((prev) => new Set([...Array.from(prev), leadId]));
@@ -1039,11 +1037,17 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
   const uncontacted = leads.filter((l) => !contactedIds.has(l.id));
 
   const displayLeads = uncontacted.filter((l) => {
-    if (filterMode === 'READY') {
-      return l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING';
+    if (filterMode === 'VIEWED') {
+      return Boolean(l.websiteDemos?.[0]?.viewCount && l.websiteDemos[0].viewCount > 0);
+    }
+    if (filterMode === 'INTERESTED') {
+      return l.leadStatus === 'INTERESTED';
     }
     if (filterMode === 'PHONE') {
       return Boolean(l.publicPhone);
+    }
+    if (filterMode === 'READY') {
+      return l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING';
     }
     return true; // ALL
   });
@@ -1051,6 +1055,13 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
   const readyCount = uncontacted.filter(
     (l) => l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING'
   ).length;
+  const viewedCount = uncontacted.filter(
+    (l) => Boolean(l.websiteDemos?.[0]?.viewCount && l.websiteDemos[0].viewCount > 0)
+  ).length;
+  const interestedCount = uncontacted.filter(
+    (l) => l.leadStatus === 'INTERESTED'
+  ).length;
+  const phoneCount = uncontacted.filter((l) => Boolean(l.publicPhone)).length;
 
   const handleQuickApproveAll = async () => {
     setApprovingAll(true);
@@ -1147,84 +1158,9 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
         />
       )}
 
-      {/* Playbook: How to detect prospect interest */}
-      <div className="mb-4 rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/20 p-4 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/25 flex items-center justify-center shrink-0">
-              <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <h3 className="text-xs font-bold text-foreground flex items-center gap-2">
-                <span>Playbook: How to Know If a Client is Interested in a Website</span>
-                <Badge variant="outline" className="text-[10px] font-normal py-0">
-                  Agency Conversion Guide
-                </Badge>
-              </h3>
-              <p className="text-[11px] text-muted-foreground">
-                3 concrete signals to identify serious prospects without guessing or cold-calling.
-              </p>
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowInterestGuide(!showInterestGuide)}
-            className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
-          >
-            <span>{showInterestGuide ? 'Hide Guide' : 'View 3 Signals'}</span>
-            {showInterestGuide ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          </Button>
-        </div>
-
-        {showInterestGuide && (
-          <div className="mt-4 pt-3 border-t border-border/60 grid grid-cols-1 md:grid-cols-3 gap-3 animate-in fade-in duration-200">
-            <div className="p-3 rounded-lg border border-border bg-card/60 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                <span>1. The Binary Response Hook</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Our outreach ends with: <em>&ldquo;Would you be open to a 1-minute live preview on your phone, or are you not currently taking on new advisory clients in your city?&rdquo;</em>
-              </p>
-              <div className="text-[10px] font-medium text-foreground bg-muted/40 p-1.5 rounded">
-                <strong>Signal:</strong> Anyone replying &ldquo;Yes&rdquo;, &ldquo;Send link&rdquo;, or &ldquo;What&rsquo;s the cost?&rdquo; is an active buyer.
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg border border-border bg-card/60 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400">
-                <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500 shrink-0" />
-                <span>2. Live Demo View Tracking</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Every concept demo has real-time view telemetry. When a prospect opens the link, the badge updates to <strong>🔥 Viewed (1x)</strong> in the table below.
-              </p>
-              <div className="text-[10px] font-medium text-foreground bg-muted/40 p-1.5 rounded">
-                <strong>Signal:</strong> If <span className="text-amber-600 font-bold">Viewed &ge; 2x</span>, partners are sharing it internally. Reach out within 2 hours.
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg border border-border bg-card/60 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-blue-400">
-                <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-                <span>3. Value Framing for No-Website</span>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Practices without websites lose corporate retainers because clients Google them before signing. They want credibility without ₹50k agency friction.
-              </p>
-              <div className="text-[10px] font-medium text-foreground bg-muted/40 p-1.5 rounded">
-                <strong>Signal:</strong> When they see their own firm name &amp; services already live, their main objection (&ldquo;I have no time to build a site&rdquo;) is erased.
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Filter and Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-        <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-md border border-border/60">
+        <div className="flex items-center gap-1.5 bg-muted/40 p-1 rounded-md border border-border/60 flex-wrap">
           <button
             onClick={() => setFilterMode('ALL')}
             className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
@@ -1233,17 +1169,29 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            All Pipeline Leads ({uncontacted.length})
+            All Leads ({uncontacted.length})
           </button>
           <button
-            onClick={() => setFilterMode('READY')}
-            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-              filterMode === 'READY'
-                ? 'bg-background text-foreground shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
+            onClick={() => setFilterMode('VIEWED')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+              filterMode === 'VIEWED'
+                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shadow-xs font-bold'
+                : 'text-amber-600 dark:text-amber-400 hover:text-amber-700'
             }`}
           >
-            Approved / Ready ({readyCount})
+            <Flame className="w-3 h-3 fill-amber-500 text-amber-500" />
+            <span>🔥 Viewed ({viewedCount})</span>
+          </button>
+          <button
+            onClick={() => setFilterMode('INTERESTED')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+              filterMode === 'INTERESTED'
+                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shadow-xs font-bold'
+                : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-700'
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            <span>🟢 Interested ({interestedCount})</span>
           </button>
           <button
             onClick={() => setFilterMode('PHONE')}
@@ -1253,7 +1201,17 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            WhatsApp Ready ({uncontacted.filter((l) => Boolean(l.publicPhone)).length})
+            WhatsApp Ready ({phoneCount})
+          </button>
+          <button
+            onClick={() => setFilterMode('READY')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+              filterMode === 'READY'
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Ready ({readyCount})
           </button>
         </div>
 
@@ -1384,145 +1342,9 @@ function OutreachQueueTab({ leads, loading, error, onRefresh }: OutreachQueueTab
   );
 }
 
-// ─── Compliance Shield Tab ────────────────────────────────────────────────────
-
-function ComplianceShieldTab() {
-  const pillars = [
-    {
-      icon: Ban,
-      title: 'No Bulk Sending',
-      color: 'text-rose-600 dark:text-rose-400',
-      bg: 'bg-rose-500/10',
-      border: 'border-rose-500/20',
-      body:
-        'Automated mass emails and blast campaigns are architecturally disabled. Every outreach is a single, individual message drafted specifically for one recipient.',
-    },
-    {
-      icon: Users,
-      title: 'Human Required',
-      color: 'text-blue-600 dark:text-blue-400',
-      bg: 'bg-blue-500/10',
-      border: 'border-blue-500/20',
-      body:
-        'Every dispatch requires a human to read, approve, and manually send the message. No message is ever transmitted programmatically without a conscious human decision.',
-    },
-    {
-      icon: ShieldCheck,
-      title: 'Suppression Engine',
-      color: 'text-emerald-600 dark:text-emerald-400',
-      bg: 'bg-emerald-500/10',
-      border: 'border-emerald-500/20',
-      body:
-        'Leads marked DO_NOT_CONTACT are instantly blocked across all channels — Email, WhatsApp, SMS, and Voice. The suppression is enforced at the database layer, not just the UI.',
-    },
-  ];
-
-  return (
-    <div className="space-y-5 max-w-3xl">
-      {/* Hero Shield Card */}
-      <Card className="border-emerald-500/30 bg-emerald-500/5 shadow-none">
-        <CardContent className="p-6 flex items-start gap-5">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div className="space-y-1.5">
-            <h2 className="text-base font-bold text-foreground">Zero-Spam Architecture</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              GetVisible is built on a <strong>consent-first, human-in-the-loop</strong> outreach model.
-              Every interaction with a CA firm is personal, purposeful, and explicitly approved before it
-              reaches the recipient. Bulk spam is not just policy-prohibited — it is technically impossible.
-            </p>
-            <div className="pt-1 flex flex-wrap gap-2">
-              <Badge variant="success" className="text-[11px] gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                GDPR Aligned
-              </Badge>
-              <Badge variant="success" className="text-[11px] gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                Indian IT Act 2000
-              </Badge>
-              <Badge variant="info" className="text-[11px] gap-1">
-                <ShieldCheck className="w-3 h-3" />
-                Consent-First Architecture
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Three Pillars */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {pillars.map((pillar) => {
-          const Icon = pillar.icon;
-          return (
-            <Card key={pillar.title} className={`border shadow-none ${pillar.border}`}>
-              <CardHeader className="pb-2 pt-5 px-5">
-                <div className={`w-9 h-9 rounded-lg ${pillar.bg} flex items-center justify-center mb-3`}>
-                  <Icon className={`w-5 h-5 ${pillar.color}`} />
-                </div>
-                <CardTitle className="text-sm font-semibold">{pillar.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="px-5 pb-5">
-                <p className="text-xs text-muted-foreground leading-relaxed">{pillar.body}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Compliance Detail */}
-      <Card className="border-border/70 shadow-none bg-muted/10">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-            Compliance Assurance Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            {
-              label: 'Data Source',
-              value: 'All leads originate from public business directories (ICAI listings, JustDial, IndiaMart). No scraped personal data.',
-            },
-            {
-              label: 'Contact Gating',
-              value: 'DO_NOT_CONTACT status is checked server-side before any draft is generated. It cannot be bypassed from the UI.',
-            },
-            {
-              label: 'Audit Trail',
-              value: 'Every "Mark as Contacted" action is timestamped and attributed to the logged-in user for full accountability.',
-            },
-            {
-              label: 'Channel Consent',
-              value: 'Only publicly listed business emails and phones are used. Personal contact details are never used without explicit opt-in.',
-            },
-          ].map((item) => (
-            <div key={item.label} className="flex gap-3 text-xs">
-              <span className="w-28 shrink-0 font-semibold text-foreground">{item.label}</span>
-              <span className="text-muted-foreground leading-relaxed">{item.value}</span>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Final note */}
-      <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg border border-blue-500/20 bg-blue-500/5">
-        <MessageSquare className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-        <p className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
-          <strong>Note:</strong> GetVisible&apos;s outreach module is designed to complement — not replace — the
-          relationship-building efforts of your agency team. It generates personalised first-contact drafts
-          that your team reads, edits, and sends manually. Think of it as an intelligent writing assistant,
-          not an email automation tool.
-        </p>
-      </div>
-    </div>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function CampaignsPage() {
-  const [activeTab, setActiveTab] = useState<PageTab>('queue');
   const [allLeads, setAllLeads] = useState<LeadData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1546,64 +1368,99 @@ export default function CampaignsPage() {
     fetchLeads();
   }, [fetchLeads]);
 
-  const readyCount = allLeads.filter(
-    (l) => l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING'
+  // Compute 4 core solo operator KPIs
+  const totalLeads = allLeads.length;
+  const readyOrGenerated = allLeads.filter(
+    (l) =>
+      l.leadStatus === 'APPROVED' ||
+      l.leadStatus === 'OUTREACH_PENDING' ||
+      l.leadStatus === 'DEMO_GENERATED' ||
+      Boolean(l.websiteDemos?.length)
   ).length;
-
-  const tabs: { id: PageTab; label: string; icon: React.ElementType }[] = [
-    { id: 'queue', label: 'Outreach Queue', icon: Send },
-    { id: 'compliance', label: 'Compliance Shield', icon: ShieldCheck },
-  ];
+  const viewedByProspect = allLeads.filter(
+    (l) => Boolean(l.websiteDemos?.[0]?.viewCount && l.websiteDemos[0].viewCount > 0)
+  ).length;
+  const interestedCount = allLeads.filter((l) => l.leadStatus === 'INTERESTED').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1 border-b border-border/50">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-border/60">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            Campaigns &amp; Outreach
+            Outreach Workbench
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Compliance-gated, 1-to-1 personalised outreach to CA firms with automated website screenshots and direct WhatsApp delivery.
+            Direct prospect conversion engine — 1-click WhatsApp card pitches with automated website previews.
           </p>
         </div>
-        {!loading && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
-              Total in CRM: <strong>{allLeads.length}</strong>
-            </span>
-            <div className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              {readyCount} approved / ready
-            </div>
+        <div className="flex items-center gap-2">
+          <Link href="/discovery">
+            <Button size="sm" className="gap-2 text-xs font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm">
+              <Plus className="w-3.5 h-3.5" />
+              <span>+ Add / Import Leads</span>
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      {/* 4-Stat KPI Strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Total Leads */}
+        <Card className="p-3 border-border bg-card shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground mb-1">
+            <span className="text-[11px] font-medium">Total Leads</span>
+            <Users className="w-4 h-4 text-slate-400" />
           </div>
-        )}
+          <div className="text-2xl font-bold text-foreground">{loading ? '…' : totalLeads}</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">In CRM Pipeline</div>
+        </Card>
+
+        {/* Ready / Demos Generated */}
+        <Card className="p-3 border-border bg-card shadow-xs">
+          <div className="flex items-center justify-between text-muted-foreground mb-1">
+            <span className="text-[11px] font-medium">Ready / Demos</span>
+            <Sparkles className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+            {loading ? '…' : readyOrGenerated}
+          </div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">Approved &amp; Pitch Ready</div>
+        </Card>
+
+        {/* Viewed by Prospect */}
+        <Card className="p-3 border-amber-500/30 bg-amber-500/5 shadow-xs">
+          <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 mb-1">
+            <span className="text-[11px] font-semibold flex items-center gap-1">
+              <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+              <span>Viewed by Prospect</span>
+            </span>
+            <Eye className="w-4 h-4 text-amber-500" />
+          </div>
+          <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+            {loading ? '…' : viewedByProspect}
+          </div>
+          <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 mt-0.5">Opened demo link</div>
+        </Card>
+
+        {/* Interested */}
+        <Card className="p-3 border-emerald-500/30 bg-emerald-500/5 shadow-xs">
+          <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-1">
+            <span className="text-[11px] font-semibold flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>🟢 Interested</span>
+            </span>
+            <ArrowRight className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            {loading ? '…' : interestedCount}
+          </div>
+          <div className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">Ready for Proposal</div>
+        </Card>
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-lg border border-border/60 w-fit">
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-colors ${
-              activeTab === id
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Icon className="w-3.5 h-3.5" />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'queue' ? (
-        <OutreachQueueTab leads={allLeads} loading={loading} error={error} onRefresh={fetchLeads} />
-      ) : (
-        <ComplianceShieldTab />
-      )}
+      {/* Main Outreach Workbench */}
+      <OutreachQueueTab leads={allLeads} loading={loading} error={error} onRefresh={fetchLeads} />
     </div>
   );
 }

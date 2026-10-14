@@ -66,7 +66,7 @@ export class WebsiteDemoGeneratorService {
 
     // Deterministically pick layout, theme, and sectionOrder
     const design: WebsiteDesign = selectWebsiteDesign(
-      { id: lead.id, businessName: lead.businessName, city: lead.city },
+      { id: lead.id, businessName: lead.businessName, city: lead.city, profession: lead.profession },
       versionNumber,
       {
         layout: options.layout,

@@ -534,7 +534,7 @@ export interface DesignSelectionOptions {
  * 3. Different leads get distributed across the 5 templates and 4 themes.
  */
 export function selectWebsiteDesign(
-  lead: { id?: string; businessName?: string; city?: string },
+  lead: { id?: string; businessName?: string; city?: string; profession?: string },
   version = 1,
   options?: DesignSelectionOptions
 ): WebsiteDesign {
@@ -543,10 +543,20 @@ export function selectWebsiteDesign(
 
   // Layout selection: 5 modern templates
   const defaultLayoutKey = LAYOUT_KEYS[hash % LAYOUT_KEYS.length];
-  const chosenLayoutKey =
+  let chosenLayoutKey: WebsiteLayout =
     options?.layout && CA_LAYOUTS[options.layout]
       ? options.layout
       : defaultLayoutKey;
+
+  // Auto-route by profession if no explicit layout option is provided
+  if (!options?.layout) {
+    const text = `${lead.profession || ''} ${lead.businessName || ''}`.toLowerCase();
+    if (/clinic|dental|dentist|doctor|medical|health|skin|physio/i.test(text)) {
+      chosenLayoutKey = 'CLINIC_HEALTHCARE';
+    } else if (/interior|architect|design|decor|modular/i.test(text)) {
+      chosenLayoutKey = 'INTERIOR_ARCHITECTURE';
+    }
+  }
 
   const layoutDef = CA_LAYOUTS[chosenLayoutKey];
 
