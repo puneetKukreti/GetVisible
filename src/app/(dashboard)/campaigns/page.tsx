@@ -214,7 +214,7 @@ To help *${lead.businessName}* build that instant digital trust, I designed a cl
 🌐 *View Your Custom Website Preview:*
 ${demoUrl}
 
-If you would like to make this live on your own domain, simply reply *"INTERESTED"* to this message!`;
+If you would like to make this live on your own domain, simply reply *"YES"* to this message!`;
 
   const followUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${lead.businessName}*:
 

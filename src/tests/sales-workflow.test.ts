@@ -299,7 +299,7 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(wa).not.toContain('screenshot.png');
       expect(wa).toContain('preview image attached above 👆');
       expect(wa).toContain('Namaste *Apex Tax Partners CA* 👋');
-      expect(wa).toContain('INTERESTED');
+      expect(wa).toContain('YES');
 
       // Verifies WhatsApp Follow-Up contains the demoUrl
       expect(outreach.whatsappFollowUpWithLink).toBeDefined();

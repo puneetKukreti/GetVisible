@@ -262,7 +262,7 @@ To help *${input.businessName}* build that instant digital trust, I designed a c
 🌐 *View Your Custom Website Preview:*
 ${demoUrl}
 
-If you would like to make this live on your own domain, simply reply *"INTERESTED"* to this message!`;
+If you would like to make this live on your own domain, simply reply *"YES"* to this message!`;
 
   const whatsappMessage = meaningfulMsg;
 
