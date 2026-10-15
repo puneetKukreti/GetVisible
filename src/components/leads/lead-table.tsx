@@ -294,15 +294,25 @@ export function LeadTable() {
               >
                 <option value="ALL">All Professions</option>
                 <option value="Chartered Accountant">Chartered Accountant</option>
-                <option value="Dentist">Dentist</option>
-                <option value="Lawyer">Lawyer</option>
-                <option value="Doctor / Clinic">Doctor / Clinic</option>
-                <option value="Architect">Architect</option>
-                <option value="Interior Designer">Interior Designer</option>
-                <option value="Real Estate Agent">Real Estate Agent</option>
-                <option value="Consultant">Consultant</option>
-                <option value="Gym / Fitness">Gym / Fitness</option>
+                <option value="Dental Clinic">Dental Clinic / Dentist</option>
+                <option value="Healthcare & Medical Clinic">Healthcare &amp; Medical Clinic</option>
+                <option value="Interior Designer & Architect">Interior Designer &amp; Architect</option>
+                <option value="Modular Kitchen Studio">Modular Kitchen Studio</option>
+                <option value="Gym & Fitness Center">Gym &amp; Fitness</option>
+                <option value="Pest Control Services">Pest Control Services</option>
+                <option value="Lawyer / Legal Practice">Lawyer / Legal</option>
+                <option value="Real Estate Consultant">Real Estate Agent</option>
+                <option value="Boutique Salon & Spa">Salon &amp; Spa</option>
+                <option value="Sweet Shop & Bakery">Bakery &amp; Restaurant</option>
+                <option value="Solar Energy Installer">Solar Energy Installer</option>
+                <option value="Diagnostics & Pathology Lab">Diagnostics Lab</option>
+                <option value="Physiotherapy Clinic">Physiotherapy</option>
                 <option value="Coaching Institute">Coaching Institute</option>
+                <option value="Automobile Workshop & Detailing">Car Detailing / Workshop</option>
+                <option value="Security & Facility Management">Facility Management</option>
+                <option value="IT Services & Digital Agency">IT Services</option>
+                <option value="Civil Contractor & Construction">Civil Construction</option>
+                <option value="Event Planner & Photography Studio">Photography / Events</option>
               </select>
             </div>
 
@@ -694,17 +704,28 @@ export function LeadTable() {
                     onChange={(e) => setNewProfession(e.target.value)}
                     className="w-full h-9 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                   >
-                    <option value="Chartered Accountant">Chartered Accountant</option>
-                    <option value="Dentist">Dentist</option>
-                    <option value="Lawyer">Lawyer</option>
-                    <option value="Doctor / Clinic">Doctor / Clinic</option>
-                    <option value="Architect">Architect</option>
-                    <option value="Interior Designer">Interior Designer</option>
-                    <option value="Real Estate Agent">Real Estate Agent</option>
-                    <option value="Consultant">Consultant</option>
-                    <option value="Gym / Fitness">Gym / Fitness</option>
-                    <option value="Coaching Institute">Coaching Institute</option>
-                    <option value="Other">Other</option>
+                    <option value="Chartered Accountant">Chartered Accountant (CA Firm)</option>
+                    <option value="Dental Clinic">Dental Clinic / Dentist</option>
+                    <option value="Healthcare & Medical Clinic">Healthcare &amp; Medical Clinic</option>
+                    <option value="Interior Designer & Architect">Interior Designer &amp; Architect</option>
+                    <option value="Modular Kitchen Studio">Modular Kitchen &amp; Furniture Studio</option>
+                    <option value="Gym & Fitness Center">Gym &amp; Fitness Center</option>
+                    <option value="Pest Control Services">Pest Control Services</option>
+                    <option value="Lawyer / Legal Practice">Lawyer / Legal Practice</option>
+                    <option value="Real Estate Consultant">Real Estate &amp; Property Consultant</option>
+                    <option value="Boutique Salon & Spa">Boutique Salon &amp; Spa</option>
+                    <option value="Sweet Shop & Bakery">Sweet Shop, Bakery &amp; Restaurant</option>
+                    <option value="Solar Energy Installer">Solar Energy &amp; Rooftop Installer</option>
+                    <option value="Diagnostics & Pathology Lab">Diagnostics &amp; Pathology Lab</option>
+                    <option value="Physiotherapy Clinic">Physiotherapy &amp; Wellness Center</option>
+                    <option value="Coaching Institute">Coaching Institute &amp; Academy</option>
+                    <option value="Automobile Workshop & Detailing">Car Detailing &amp; Automobile Workshop</option>
+                    <option value="Security & Facility Management">Security &amp; Facility Management</option>
+                    <option value="IT Services & Digital Agency">IT Services &amp; Digital Agency</option>
+                    <option value="Civil Contractor & Construction">Civil Contractor &amp; Construction</option>
+                    <option value="Event Planner & Photography Studio">Event Planner &amp; Photography Studio</option>
+                    <option value="Tax Consultant">Tax Consultant &amp; Financial Advisor</option>
+                    <option value="Other">Other / Custom Profession (Type your own)</option>
                   </select>
                 </div>
                 <div>

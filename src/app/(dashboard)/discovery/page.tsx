@@ -48,6 +48,7 @@ export default function DiscoveryPage() {
   // Quick Add State
   const [businessName, setBusinessName] = useState('');
   const [profession, setProfession] = useState('Chartered Accountant');
+  const [customProfession, setCustomProfession] = useState('');
   const [city, setCity] = useState('Gurgaon');
   const [address, setAddress] = useState('');
   const [publicPhone, setPublicPhone] = useState('');
@@ -143,6 +144,11 @@ export default function DiscoveryPage() {
       return;
     }
 
+    const effectiveProfession =
+      profession === 'Other'
+        ? customProfession.trim() || 'Professional Practice'
+        : profession.trim() || 'Chartered Accountant';
+
     setAddLoading(true);
     setAddError(null);
     setAddSuccessLead(null);
@@ -150,7 +156,7 @@ export default function DiscoveryPage() {
     try {
       const payload = {
         businessName: businessName.trim(),
-        profession: profession.trim() || 'Chartered Accountant',
+        profession: effectiveProfession,
         city: city.trim() || 'Gurgaon',
         address: address.trim() || `${city.trim() || 'Gurgaon'}, India`,
         publicPhone: publicPhone.trim() || undefined,
@@ -174,6 +180,7 @@ export default function DiscoveryPage() {
 
       setAddSuccessLead({ id: data.id, name: data.businessName });
       setBusinessName('');
+      setCustomProfession('');
       setAddress('');
       setPublicPhone('');
       setPublicEmail('');
@@ -420,34 +427,54 @@ export default function DiscoveryPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span>Profession / Industry *</span>
+                  <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
+                      <span>Profession / Industry *</span>
+                    </span>
+                    <span className="text-[10px] text-muted-foreground font-normal">Select from dropdown</span>
                   </label>
-                  <Input
-                    list="profession-options"
-                    placeholder="e.g. Dental Clinic, Modular Kitchen, Gym, CA Firm, Pest Control..."
+                  <select
                     value={profession}
                     onChange={(e) => setProfession(e.target.value)}
-                    required
-                    className="text-xs h-9"
-                  />
-                  <datalist id="profession-options">
-                    <option value="Chartered Accountant" />
-                    <option value="Dental Clinic" />
-                    <option value="Modular Kitchen Studio" />
-                    <option value="Gym & Fitness Center" />
-                    <option value="Pest Control Services" />
-                    <option value="Interior Designer & Architect" />
-                    <option value="Lawyer / Legal Practice" />
-                    <option value="Real Estate Consultant" />
-                    <option value="Boutique Salon & Spa" />
-                    <option value="Solar Energy Installer" />
-                    <option value="Sweet Shop & Bakery" />
-                    <option value="Diagnostics & Pathology Lab" />
-                    <option value="Physiotherapy Clinic" />
-                    <option value="Tax Consultant" />
-                  </datalist>
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-medium text-foreground cursor-pointer"
+                  >
+                    <option value="Chartered Accountant">Chartered Accountant (CA Firm)</option>
+                    <option value="Dental Clinic">Dental Clinic / Dentist</option>
+                    <option value="Healthcare & Medical Clinic">Healthcare &amp; Medical Clinic</option>
+                    <option value="Interior Designer & Architect">Interior Designer &amp; Architect</option>
+                    <option value="Modular Kitchen Studio">Modular Kitchen &amp; Furniture Studio</option>
+                    <option value="Gym & Fitness Center">Gym &amp; Fitness Center</option>
+                    <option value="Pest Control Services">Pest Control Services</option>
+                    <option value="Lawyer / Legal Practice">Lawyer / Legal Practice</option>
+                    <option value="Real Estate Consultant">Real Estate &amp; Property Consultant</option>
+                    <option value="Boutique Salon & Spa">Boutique Salon &amp; Spa</option>
+                    <option value="Sweet Shop & Bakery">Sweet Shop, Bakery &amp; Restaurant</option>
+                    <option value="Solar Energy Installer">Solar Energy &amp; Rooftop Installer</option>
+                    <option value="Diagnostics & Pathology Lab">Diagnostics &amp; Pathology Lab</option>
+                    <option value="Physiotherapy Clinic">Physiotherapy &amp; Wellness Center</option>
+                    <option value="Coaching Institute">Coaching Institute &amp; Academy</option>
+                    <option value="Automobile Workshop & Detailing">Car Detailing &amp; Automobile Workshop</option>
+                    <option value="Security & Facility Management">Security &amp; Facility Management</option>
+                    <option value="IT Services & Digital Agency">IT Services &amp; Digital Agency</option>
+                    <option value="Civil Contractor & Construction">Civil Contractor &amp; Construction</option>
+                    <option value="Event Planner & Photography Studio">Event Planner &amp; Photography Studio</option>
+                    <option value="Tax Consultant">Tax Consultant &amp; Financial Advisor</option>
+                    <option value="Other">Other / Custom Profession (Type your own)</option>
+                  </select>
+
+                  {profession === 'Other' && (
+                    <div className="pt-1.5 animate-in fade-in slide-in-from-top-1">
+                      <Input
+                        placeholder="Type custom profession (e.g. Pet Clinic, Car Spa, Photography Studio...)"
+                        value={customProfession}
+                        onChange={(e) => setCustomProfession(e.target.value)}
+                        required
+                        className="text-xs h-9 border-amber-500/50 focus-visible:ring-amber-500"
+                        autoFocus
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
