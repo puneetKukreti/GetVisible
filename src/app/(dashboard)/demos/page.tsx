@@ -15,9 +15,9 @@ import {
   ExternalLink,
   ShieldCheck,
   Search,
-  Filter,
   FileCode,
   Award,
+  Trash2,
 } from 'lucide-react';
 import { STITCH_TEMPLATES } from '@/lib/demos/stitch-templates';
 import { STITCH_DESIGN_MAP } from '@/lib/demos/stitch-personalizer';
@@ -55,6 +55,18 @@ export default function DemosPage() {
 
     loadData();
   }, []);
+
+  const handleDeleteDemo = async (demoId: string) => {
+    if (!confirm('Are you sure you want to revoke and delete this demo link?')) return;
+    try {
+      const res = await fetch(`/api/demos/${demoId}`, { method: 'DELETE' });
+      if (res.ok) {
+        setDemos((prev) => prev.filter((d) => d.id !== demoId));
+      }
+    } catch (err) {
+      console.error('Failed to delete demo:', err);
+    }
+  };
 
   const filteredDemos = demos.filter((d) => {
     const q = searchQuery.toLowerCase();
@@ -312,14 +324,25 @@ export default function DemosPage() {
                   <ExternalLink className="w-2.5 h-2.5" />
                 </Link>
 
-                <Link
-                  href={demo.publicToken ? `/demo/${demo.publicToken}` : `/demo/${demo.leadId}`}
-                  target="_blank"
-                  className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 text-xs font-bold shadow-xs transition"
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>Open Demo</span>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 border-rose-500/30"
+                    title="Revoke & Delete Demo Link"
+                    onClick={() => handleDeleteDemo(demo.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Link
+                    href={demo.publicToken ? `/demo/${demo.publicToken}` : `/demo/${demo.leadId}`}
+                    target="_blank"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 hover:bg-amber-600 text-slate-950 px-3 py-1.5 text-xs font-bold shadow-xs transition"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Open Demo</span>
+                  </Link>
+                </div>
               </div>
             </Card>
           ))}

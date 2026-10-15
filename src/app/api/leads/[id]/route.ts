@@ -99,3 +99,20 @@ export async function PATCH(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: RouteProps
+) {
+  try {
+    const orgId = (await getResolvedOrganizationId(request)) || DEMO_ORGANIZATION_ID;
+    const resolvedParams = await Promise.resolve(params);
+    const leadId = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';
+    if (!leadId) return NextResponse.json({ success: false, error: 'Lead ID required' }, { status: 400 });
+    await LeadRepository.deleteLead(leadId, orgId);
+    return NextResponse.json({ success: true, message: 'Lead and associated demos deleted' });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete lead';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}

@@ -35,7 +35,18 @@ export class DatabaseConnectionError extends Error {
   }
 }
 
-const DEMO_STORE_FILE = path.join(os.tmpdir(), 'getvisible_demo_store_v1.json');
+const LOCAL_DATA_DIR = path.join(process.cwd(), '.data');
+function getStoreFilePath(): string {
+  try {
+    if (!fs.existsSync(LOCAL_DATA_DIR)) {
+      fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
+    }
+    return path.join(LOCAL_DATA_DIR, 'getvisible_permanent_store.json');
+  } catch {
+    return path.join(os.tmpdir(), 'getvisible_demo_store_v1.json');
+  }
+}
+const DEMO_STORE_FILE = getStoreFilePath();
 
 // In-memory demo store scoped strictly per organization when DEMO_MODE=true
 class DemoDataStore {
@@ -48,12 +59,31 @@ class DemoDataStore {
   private lastLoadedMtime = 0;
 
   constructor() {
-    this.initializeDemoOrg();
-    this.syncFromDisk();
+    const loaded = this.syncFromDisk();
+    if (!loaded || this.leads.size === 0 || !this.leads.has(DEMO_ORGANIZATION_ID)) {
+      this.initializeDemoOrg();
+      this.saveToDisk();
+    }
   }
 
-  syncFromDisk() {
-    if (process.env.NODE_ENV === 'test') return;
+  getLeadsMap(): Map<string, LeadData[]> {
+    return this.leads;
+  }
+
+  setOrgLeads(orgId: string, leads: LeadData[]): void {
+    this.leads.set(orgId, leads);
+  }
+
+  getDemosMap(): Map<string, WebsiteDemoData[]> {
+    return this.demos;
+  }
+
+  setOrgDemos(orgId: string, demos: WebsiteDemoData[]): void {
+    this.demos.set(orgId, demos);
+  }
+
+  syncFromDisk(): boolean {
+    if (process.env.NODE_ENV === 'test') return false;
     try {
       if (fs.existsSync(DEMO_STORE_FILE)) {
         const stat = fs.statSync(DEMO_STORE_FILE);
@@ -68,12 +98,16 @@ class DemoDataStore {
             if (Array.isArray(data.consentRecords)) this.consentRecords = new Map(data.consentRecords);
             if (Array.isArray(data.demos)) this.demos = new Map(data.demos);
             this.lastLoadedMtime = stat.mtimeMs;
+            return true;
           }
+        } else {
+          return true;
         }
       }
     } catch {
       // Ignore disk read error in restricted environments
     }
+    return false;
   }
 
   saveToDisk() {
@@ -87,7 +121,7 @@ class DemoDataStore {
         consentRecords: Array.from(this.consentRecords.entries()),
         demos: Array.from(this.demos.entries()),
       };
-      fs.writeFileSync(DEMO_STORE_FILE, JSON.stringify(data), 'utf-8');
+      fs.writeFileSync(DEMO_STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
       const stat = fs.statSync(DEMO_STORE_FILE);
       this.lastLoadedMtime = stat.mtimeMs;
     } catch {
@@ -670,8 +704,8 @@ export class LeadRepository {
     if (!cleanId) return null;
 
     if (isExplicitDemoMode()) {
-      const items = demoStore.getOrgLeads(organizationId);
-      const lead = items.find(
+      let items = demoStore.getOrgLeads(organizationId);
+      let lead = items.find(
         (l) =>
           l.id === cleanId ||
           generatePublicDemoToken(l.businessName).toLowerCase() === cleanId.toLowerCase()
@@ -834,6 +868,41 @@ export class LeadRepository {
   }
 
   /**
+   * Permanently delete a lead and all associated demos.
+   */
+  static async deleteLead(leadId: string, organizationId: string): Promise<boolean> {
+    await ensureDatabaseMode();
+    const cleanId = leadId ? leadId.trim() : '';
+    if (!cleanId) return false;
+
+    // 1. Delete associated website demos
+    await WebsiteDemoRepository.deleteDemosForLead(organizationId, cleanId);
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      let deleted = false;
+      for (const [org, leads] of Array.from(demoStore.getLeadsMap().entries())) {
+        const initialLen = leads.length;
+        const filtered = leads.filter((l) => l.id !== cleanId);
+        if (filtered.length !== initialLen) {
+          demoStore.setOrgLeads(org, filtered);
+          deleted = true;
+        }
+      }
+      if (deleted) {
+        demoStore.saveToDisk();
+      }
+      return deleted;
+    }
+
+    const { prisma } = await import('./prisma');
+    await prisma.lead.delete({
+      where: { id: cleanId },
+    }).catch(() => null);
+    return true;
+  }
+
+  /**
    * Update lead status with audit logging and DO_NOT_CONTACT suppression sync.
    */
   static async updateLeadStatus(
@@ -913,6 +982,12 @@ export class LeadRepository {
         });
       }
 
+      // Auto-revoke public website demo if prospect is not interested / opt-out / lost
+      if (newStatus === 'NOT_INTERESTED' || newStatus === 'DO_NOT_CONTACT' || newStatus === 'LOST') {
+        await WebsiteDemoRepository.deleteDemosForLead(organizationId, leadId);
+        lead.websiteDemos = [];
+      }
+
       demoStore.saveToDisk();
       return lead;
     }
@@ -966,6 +1041,11 @@ export class LeadRepository {
           },
         });
       }
+    }
+
+    // Auto-revoke public website demo if prospect is not interested / opt-out / lost
+    if (newStatus === 'NOT_INTERESTED' || newStatus === 'DO_NOT_CONTACT' || newStatus === 'LOST') {
+      await WebsiteDemoRepository.deleteDemosForLead(organizationId, leadId);
     }
 
     return updated as unknown as LeadData;
@@ -1230,6 +1310,83 @@ export class LeadRepository {
 }
 
 export class WebsiteDemoRepository {
+  /**
+   * Delete a website demo by demoId, leadId, or publicToken.
+   */
+  static async deleteDemo(organizationId: string, demoId: string): Promise<boolean> {
+    await ensureDatabaseMode();
+    const cleanId = demoId ? demoId.trim() : '';
+    if (!cleanId) return false;
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      let deleted = false;
+      for (const [org, demos] of Array.from(demoStore.getDemosMap().entries())) {
+        const initialLen = demos.length;
+        const filtered = demos.filter(
+          (d) =>
+            d.id !== cleanId &&
+            d.leadId !== cleanId &&
+            d.publicToken !== cleanId &&
+            generatePublicDemoToken(d.content?.brand?.businessName || (d.content as any)?.brandName).toLowerCase() !== cleanId.toLowerCase()
+        );
+        if (filtered.length !== initialLen) {
+          demoStore.setOrgDemos(org, filtered);
+          deleted = true;
+        }
+      }
+      if (deleted) {
+        demoStore.saveToDisk();
+      }
+      return deleted;
+    }
+
+    const { prisma } = await import('./prisma');
+    const res = await prisma.websiteDemo.deleteMany({
+      where: {
+        OR: [
+          { id: cleanId },
+          { leadId: cleanId },
+          { publicToken: cleanId },
+        ],
+      },
+    });
+    return res.count > 0;
+  }
+
+  /**
+   * Delete all website demos for a lead.
+   */
+  static async deleteDemosForLead(organizationId: string, leadId: string): Promise<number> {
+    await ensureDatabaseMode();
+    const cleanId = leadId ? leadId.trim() : '';
+    if (!cleanId) return 0;
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      let count = 0;
+      for (const [org, demos] of Array.from(demoStore.getDemosMap().entries())) {
+        const initialLen = demos.length;
+        const filtered = demos.filter((d) => d.leadId !== cleanId && d.id !== cleanId);
+        const removed = initialLen - filtered.length;
+        if (removed > 0) {
+          count += removed;
+          demoStore.setOrgDemos(org, filtered);
+        }
+      }
+      if (count > 0) {
+        demoStore.saveToDisk();
+      }
+      return count;
+    }
+
+    const { prisma } = await import('./prisma');
+    const res = await prisma.websiteDemo.deleteMany({
+      where: { leadId: cleanId },
+    });
+    return res.count;
+  }
+
   /**
    * List website demos strictly scoped by organizationId, optionally filtered by leadId.
    */

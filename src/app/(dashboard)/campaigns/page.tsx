@@ -38,6 +38,7 @@ import {
   Zap,
   Plus,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { generatePublicDemoToken, getAppBaseUrl } from '@/lib/demos/public';
 
@@ -480,12 +481,12 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       setInterestStatus(newStatus);
       if (newStatus === 'INTERESTED') {
         setInterestNotice('🎉 Prospect marked as INTERESTED! Ready to send website proposal.');
-      } else if (newStatus === 'NOT_INTERESTED') {
-        setInterestNotice('Lead marked as Not Interested.');
-      } else if (newStatus === 'DO_NOT_CONTACT') {
-        setInterestNotice('Compliance suppression active: Marked as DO NOT CONTACT.');
+      } else if (newStatus === 'NOT_INTERESTED' || newStatus === 'DO_NOT_CONTACT') {
+        setInterestNotice('Lead marked Not Interested & public demo website link has been deactivated.');
       }
+      lead.leadStatus = newStatus;
       onContacted(lead.id);
+      if (onRefresh) onRefresh();
     } catch (err: unknown) {
       setDraftError(err instanceof Error ? err.message : 'Failed to update interest status');
     } finally {
@@ -516,7 +517,9 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       }
       setEmailSent(true);
       setContactedDone(true);
+      lead.leadStatus = 'CONTACTED';
       onContacted(lead.id);
+      if (onRefresh) onRefresh();
     } catch (err: unknown) {
       setDraftError(err instanceof Error ? err.message : 'Failed to dispatch email.');
     } finally {
@@ -541,7 +544,9 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
         throw new Error(errJson.error || `Server error ${res.status}`);
       }
       setContactedDone(true);
+      lead.leadStatus = 'CONTACTED';
       onContacted(lead.id);
+      if (onRefresh) onRefresh();
     } catch (err: unknown) {
       setDraftError(err instanceof Error ? err.message : 'Failed to mark as contacted.');
     } finally {
@@ -560,13 +565,31 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
           <h2 className="text-sm font-bold text-foreground">{lead.businessName}</h2>
           <p className="text-xs text-muted-foreground">{lead.city} · {lead.profession}</p>
         </div>
-        <button
-          onClick={onClose}
-          className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-          aria-label="Close panel"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 px-2 text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 gap-1 text-xs"
+            title="Delete Lead & Associated Demos"
+            onClick={async () => {
+              if (confirm(`Are you sure you want to permanently delete ${lead.businessName} and its website demos?`)) {
+                await fetch(`/api/leads/${lead.id}`, { method: 'DELETE' });
+                if (onRefresh) onRefresh();
+                onClose();
+              }
+            }}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Delete Lead</span>
+          </Button>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            aria-label="Close panel"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Compliance Notice */}
@@ -1359,10 +1382,18 @@ function OutreachQueueTab({
 }: OutreachQueueTabProps) {
   const [selectedLead, setSelectedLead] = useState<LeadData | null>(null);
   const [contactedIds, setContactedIds] = useState<Set<string>>(new Set());
-  const [filterMode, setFilterMode] = useState<'ALL' | 'VIEWED' | 'INTERESTED' | 'PHONE' | 'READY'>('ALL');
+  const [filterMode, setFilterMode] = useState<
+    'ALL' | 'UNCONTACTED' | 'CONTACTED' | 'VIEWED' | 'INTERESTED' | 'PHONE'
+  >('ALL');
   const [approvingAll, setApprovingAll] = useState(false);
   const [blitzLoadingId, setBlitzLoadingId] = useState<string | null>(null);
   const [blitzSentIds, setBlitzSentIds] = useState<Set<string>>(new Set());
+
+  const isLeadContacted = useCallback(
+    (l: LeadData) =>
+      l.leadStatus === 'CONTACTED' || blitzSentIds.has(l.id) || contactedIds.has(l.id),
+    [blitzSentIds, contactedIds]
+  );
 
   const handleBlitzWhatsApp = async (lead: LeadData) => {
     if (!lead.publicPhone) return;
@@ -1390,6 +1421,11 @@ function OutreachQueueTab({
       const waUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(meaningfulMsg)}`;
       window.open(waUrl, '_blank');
 
+      // Optimistically mark lead status as CONTACTED
+      lead.leadStatus = 'CONTACTED';
+      setBlitzSentIds((prev) => new Set([...Array.from(prev), lead.id]));
+      handleContacted(lead.id);
+
       // 4. Record contacted via send-whatsapp endpoint
       await fetch('/api/outreach/send-whatsapp', {
         method: 'POST',
@@ -1399,7 +1435,7 @@ function OutreachQueueTab({
           phone: waPhone,
           message: meaningfulMsg,
           screenshotUrl: lead.websiteDemos?.[0]?.screenshotUrl || null,
-          notes: 'Dispatched via 1-Click Blitz WhatsApp (Meaningful Value Hook + Branded Demo Link + Screenshot in Clipboard)',
+          notes: 'Dispatched via 1-Click Blitz WhatsApp',
         }),
       }).catch(() => {
         fetch('/api/outreach/contacted', {
@@ -1413,8 +1449,7 @@ function OutreachQueueTab({
         }).catch(() => {});
       });
 
-      setBlitzSentIds((prev) => new Set([...Array.from(prev), lead.id]));
-      handleContacted(lead.id);
+      if (onRefresh) onRefresh();
     } catch (err) {
       console.error('Blitz WhatsApp failed:', err);
     } finally {
@@ -1426,9 +1461,38 @@ function OutreachQueueTab({
     setContactedIds((prev) => new Set([...Array.from(prev), leadId]));
   }, []);
 
-  const uncontacted = leads.filter((l) => !contactedIds.has(l.id));
+  const handleDeleteLead = async (leadId: string, leadName: string) => {
+    if (!confirm(`Are you sure you want to permanently delete ${leadName} and its demo link?`)) return;
+    try {
+      const res = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
+      if (res.ok && onRefresh) {
+        onRefresh();
+      }
+    } catch (err) {
+      console.error('Failed to delete lead:', err);
+    }
+  };
 
-  const displayLeads = uncontacted.filter((l) => {
+  const uncontacted = leads.filter((l) => !isLeadContacted(l));
+  const contacted = leads.filter(isLeadContacted);
+  const contactedCount = contacted.length;
+  const uncontactedCount = uncontacted.length;
+  const readyCount = uncontacted.filter((l) => l.leadStatus === 'APPROVED').length;
+  const viewedCount = leads.filter(
+    (l) => Boolean(l.websiteDemos?.[0]?.viewCount && l.websiteDemos[0].viewCount > 0)
+  ).length;
+  const interestedCount = leads.filter(
+    (l) => l.leadStatus === 'INTERESTED'
+  ).length;
+  const phoneCount = leads.filter((l) => Boolean(l.publicPhone)).length;
+
+  const displayLeads = leads.filter((l) => {
+    if (filterMode === 'UNCONTACTED') {
+      return !isLeadContacted(l);
+    }
+    if (filterMode === 'CONTACTED') {
+      return isLeadContacted(l);
+    }
     if (filterMode === 'VIEWED') {
       return Boolean(l.websiteDemos?.[0]?.viewCount && l.websiteDemos[0].viewCount > 0);
     }
@@ -1438,22 +1502,8 @@ function OutreachQueueTab({
     if (filterMode === 'PHONE') {
       return Boolean(l.publicPhone);
     }
-    if (filterMode === 'READY') {
-      return l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING';
-    }
     return true; // ALL
   });
-
-  const readyCount = uncontacted.filter(
-    (l) => l.leadStatus === 'APPROVED' || l.leadStatus === 'OUTREACH_PENDING'
-  ).length;
-  const viewedCount = uncontacted.filter(
-    (l) => Boolean(l.websiteDemos?.[0]?.viewCount && l.websiteDemos[0].viewCount > 0)
-  ).length;
-  const interestedCount = uncontacted.filter(
-    (l) => l.leadStatus === 'INTERESTED'
-  ).length;
-  const phoneCount = uncontacted.filter((l) => Boolean(l.publicPhone)).length;
 
   const handleQuickApproveAll = async () => {
     setApprovingAll(true);
@@ -1561,7 +1611,28 @@ function OutreachQueueTab({
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            All Leads ({uncontacted.length})
+            All Leads ({leads.length})
+          </button>
+          <button
+            onClick={() => setFilterMode('UNCONTACTED')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+              filterMode === 'UNCONTACTED'
+                ? 'bg-background text-foreground shadow-xs font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            Uncontacted ({uncontactedCount})
+          </button>
+          <button
+            onClick={() => setFilterMode('CONTACTED')}
+            className={`px-3 py-1 rounded text-xs font-medium transition-colors flex items-center gap-1 ${
+              filterMode === 'CONTACTED'
+                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 shadow-xs font-bold'
+                : 'text-emerald-600 dark:text-emerald-400 hover:text-emerald-700'
+            }`}
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            <span>Contacted ({contactedCount})</span>
           </button>
           <button
             onClick={() => setFilterMode('VIEWED')}
@@ -1594,16 +1665,6 @@ function OutreachQueueTab({
             }`}
           >
             WhatsApp Ready ({phoneCount})
-          </button>
-          <button
-            onClick={() => setFilterMode('READY')}
-            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-              filterMode === 'READY'
-                ? 'bg-background text-foreground shadow-xs font-semibold'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Ready ({readyCount})
           </button>
         </div>
 
@@ -1717,37 +1778,62 @@ function OutreachQueueTab({
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      {blitzSentIds.has(lead.id) || contactedIds.has(lead.id) ? (
-                        <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[11px] h-7 px-2 font-bold gap-1">
-                          <Check className="w-3.5 h-3.5" />
-                          <span>✓ Sent / Copied</span>
-                        </Badge>
-                      ) : lead.publicPhone ? (
-                        <Button
-                          size="sm"
-                          disabled={blitzLoadingId === lead.id}
-                          className="h-7 px-2.5 text-[11px] gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-emerald-600 shadow-xs"
-                          onClick={() => handleBlitzWhatsApp(lead)}
-                          title="1-Click Blitz: Copies screenshot to clipboard, opens WhatsApp Web pre-filled, and marks lead as Contacted"
-                        >
-                          {blitzLoadingId === lead.id ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Zap className="w-3 h-3 fill-current" />
+                      {isLeadContacted(lead) ? (
+                        <>
+                          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[11px] h-7 px-2 font-bold gap-1">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>✓ Sent / Contacted</span>
+                          </Badge>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground font-medium"
+                            onClick={() => setSelectedLead(lead)}
+                            title="Open drawer to re-send or send follow-up link"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Re-send</span>
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          {lead.publicPhone && (
+                            <Button
+                              size="sm"
+                              disabled={blitzLoadingId === lead.id}
+                              className="h-7 px-2.5 text-[11px] gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-emerald-600 shadow-xs"
+                              onClick={() => handleBlitzWhatsApp(lead)}
+                              title="1-Click Blitz: Copies screenshot to clipboard, opens WhatsApp Web pre-filled, and marks lead as Contacted"
+                            >
+                              {blitzLoadingId === lead.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Zap className="w-3 h-3 fill-current" />
+                              )}
+                              <span>⚡ 1-Click WhatsApp</span>
+                            </Button>
                           )}
-                          <span>⚡ 1-Click WhatsApp</span>
-                        </Button>
-                      ) : null}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground font-medium"
+                            onClick={() => setSelectedLead(lead)}
+                            title="Open deep customization drawer"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>Customize</span>
+                          </Button>
+                        </>
+                      )}
 
                       <Button
                         size="sm"
-                        variant="outline"
-                        className="h-7 px-2 text-[11px] gap-1 text-muted-foreground hover:text-foreground font-medium"
-                        onClick={() => setSelectedLead(lead)}
-                        title="Open deep customization drawer"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                        title="Delete Lead & Demo"
+                        onClick={() => handleDeleteLead(lead.id, lead.businessName)}
                       >
-                        <Edit3 className="w-3 h-3" />
-                        <span>Customize</span>
+                        <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
                   </td>

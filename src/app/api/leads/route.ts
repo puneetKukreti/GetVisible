@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { z } from 'zod';
 import { LeadFilterParams, LeadStatus, WebsiteStatus, Channel } from '@/types';
 
@@ -59,7 +60,14 @@ export async function GET(request: NextRequest) {
       params.maxScore = parseInt(searchParams.get('maxScore')!, 10);
     }
 
-    const result = await LeadRepository.listLeads(orgId, params);
+    let result = await LeadRepository.listLeads(orgId, params);
+    if (result.total === 0 && (orgId === DEMO_ORGANIZATION_ID || orgId === PILOT_ORGANIZATION_ID)) {
+      const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
+      const altResult = await LeadRepository.listLeads(altOrgId, params);
+      if (altResult.total > 0) {
+        result = altResult;
+      }
+    }
     return NextResponse.json(result);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch leads';

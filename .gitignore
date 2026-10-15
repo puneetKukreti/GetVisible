@@ -35,3 +35,6 @@ project-dump.txt
 
 public/generated-screenshots/*
 !public/generated-screenshots/.gitkeep
+
+# Local database store
+/.data/

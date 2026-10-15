@@ -167,3 +167,18 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest, { params }: RouteProps) {
+  try {
+    const orgId = (await getResolvedOrganizationId(request)) || DEMO_ORGANIZATION_ID;
+    const resolvedParams = await Promise.resolve(params);
+    const id = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';
+    if (!id) return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 });
+    await WebsiteDemoRepository.deleteDemo(orgId, id);
+    await WebsiteDemoRepository.deleteDemosForLead(orgId, id);
+    return NextResponse.json({ success: true, message: 'Demo deleted and public link revoked' });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to delete demo';
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
+  }
+}
