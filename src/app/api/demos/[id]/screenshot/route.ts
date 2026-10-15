@@ -146,16 +146,20 @@ export async function GET(
         ? getPublicDemoUrl(demo.publicToken, baseUrl)
         : `${baseUrl}/demo/${leadId || id}`;
       const sep = demoUrl.includes('?') ? '&' : '?';
-      targetUrl = `${demoUrl}${sep}screenshot=true`;
+      targetUrl = `${demoUrl}${sep}screenshot=true&v=${demo?.version || 1}`;
     }
 
     let finalScreenshotUrl = templateScreenshotRelPath;
     let source = 'template';
 
     const provider = new CloudScreenshotProvider();
-    if (process.env.SCREENSHOTONE_API_KEY && !targetUrl.includes('localhost')) {
+    if (!targetUrl.includes('localhost') && !targetUrl.includes('127.0.0.1')) {
       try {
-        const result = await provider.captureWebsite(targetUrl, { width: 1280, height: 800 });
+        const result = await provider.captureWebsite(targetUrl, {
+          width: 1024,
+          height: 640,
+          deviceScaleFactor: 2,
+        });
         if (result.success && result.data?.screenshotUrl) {
           finalScreenshotUrl = result.data.screenshotUrl;
           source = result.data.source;

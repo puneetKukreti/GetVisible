@@ -171,6 +171,22 @@ export function personalizeStitchHtml(
   html = html.replaceAll('SHARMA &amp; ASSOCIATES', escapedBrand.toUpperCase());
   html = html.replaceAll('SHARMA & ASSOCIATES', escapedBrand.toUpperCase());
 
+  // 2b. Hero Business Name & Firm Identity Injection (Huge, unmissable branding in Hero section)
+  const heroBadgePill = `
+<div style="margin-bottom: 12px; display: inline-flex; align-items: center; gap: 8px; background: rgba(212, 175, 55, 0.18); border: 1px solid rgba(212, 175, 55, 0.5); padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 700; color: #b45309; letter-spacing: 0.06em; text-transform: uppercase;">
+  <span>✦ ${escapedBrand} • ${escapeHtml(city)}</span>
+</div>`;
+
+  const heroHeadlineContent = `
+${heroBadgePill}
+<span style="display:block; color:inherit; font-size:1.15em; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; line-height:1.15;">${escapedBrand}</span>
+<span style="display:block; font-size:0.75em; font-weight:500; opacity:0.9; line-height:1.25;">Trusted Financial Clarity &amp; Strategic Tax Advisory in ${escapeHtml(city)}</span>`;
+
+  // Inject the prominent business name & badge right into the primary Hero <h1>
+  html = html.replace(/(<h1[^>]*>)([\s\S]*?)(<\/h1>)/i, (_match, openTag, _inner, closeTag) => {
+    return `${openTag}\n${heroHeadlineContent}\n${closeTag}`;
+  });
+
   // 3. City & Address substitutions
   html = html.replaceAll('Connaught Place, New Delhi', escapeHtml(rawAddress));
   html = html.replaceAll('Barakhamba Road, Connaught Place,<br/>New Delhi – 110001, India', escapeHtml(rawAddress));
@@ -235,6 +251,11 @@ export function personalizeStitchHtml(
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(100, 116, 139, 0.8) !important;
   }
+  /* Hero Zoom Mode when screenshot=true */
+  html.screenshot-mode, body.screenshot-mode {
+    zoom: 1.22 !important;
+    overflow: hidden !important;
+  }
 </style>
 `;
 
@@ -244,10 +265,17 @@ export function personalizeStitchHtml(
     html = injectedStyle + html;
   }
 
-  // 6. Inject client script for simulated form submission
+  // 6. Inject client script for simulated form submission and screenshot zoom mode
   const injectedScript = `
 <script>
   (function() {
+    // Zoom in on Hero section when capturing automated screenshot
+    if (typeof window !== 'undefined' && window.location.search.includes('screenshot=true')) {
+      document.documentElement.style.zoom = '1.22';
+      document.body.style.overflow = 'hidden';
+      document.documentElement.classList.add('screenshot-mode');
+      document.body.classList.add('screenshot-mode');
+    }
 
     // Interactive simulated form submission
     document.addEventListener('DOMContentLoaded', function() {

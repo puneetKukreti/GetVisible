@@ -50,8 +50,8 @@ export class CloudScreenshotProvider implements IScreenshotProvider {
     targetUrl: string,
     options?: ScreenshotOptions
   ): Promise<ProviderExecutionResult<ScreenshotResult>> {
-    const width = options?.width || 1280;
-    const height = options?.height || 800;
+    const width = options?.width || 1024;
+    const height = options?.height || 640;
 
     try {
       const isLocalUrl =
@@ -106,7 +106,8 @@ export class CloudScreenshotProvider implements IScreenshotProvider {
 
       // 3. Default Zero-Config: Microlink API CDN for public URLs
       const encodedUrl = encodeURIComponent(targetUrl);
-      const microlinkUrl = `https://api.microlink.io?url=${encodedUrl}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=${width}&viewport.height=${height}`;
+      const deviceScaleFactor = options?.deviceScaleFactor || 2;
+      const microlinkUrl = `https://api.microlink.io?url=${encodedUrl}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=${width}&viewport.height=${height}&viewport.deviceScaleFactor=${deviceScaleFactor}`;
 
       return {
         success: true,
@@ -151,8 +152,8 @@ export class MockScreenshotProvider implements IScreenshotProvider {
     targetUrl: string,
     options?: ScreenshotOptions
   ): Promise<ProviderExecutionResult<ScreenshotResult>> {
-    const width = options?.width || 1280;
-    const height = options?.height || 800;
+    const width = options?.width || 1024;
+    const height = options?.height || 640;
 
     // Use a clean placeholder preview image with CA theme
     const mockPreviewUrl = `https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=${width}&h=${height}&q=80`;

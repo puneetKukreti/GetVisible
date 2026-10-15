@@ -37,6 +37,7 @@ import {
   Edit3,
   Zap,
   Plus,
+  RefreshCw,
 } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -121,6 +122,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       : '/demo-templates/design-1-premium/screen.png';
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(initialScreenshot);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [refreshingHeroShot, setRefreshingHeroShot] = useState(false);
   const [whatsappShareUrl, setWhatsappShareUrl] = useState<string | null>(null);
   const [whatsappFollowUpShareUrl, setWhatsappFollowUpShareUrl] = useState<string | null>(null);
   const [draftSubject, setDraftSubject] = useState('');
@@ -323,6 +325,27 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       URL.revokeObjectURL(url);
     } catch {
       if (screenshotUrl) window.open(screenshotUrl, '_blank');
+    }
+  };
+
+  const handleRefreshHeroShot = async () => {
+    setRefreshingHeroShot(true);
+    setScreenshotLoading(true);
+    try {
+      const res = await fetch(`/api/demos/${lead.id}/screenshot?refresh=true`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.screenshotUrl) {
+          const sep = data.screenshotUrl.includes('?') ? '&' : '?';
+          setScreenshotUrl(`${data.screenshotUrl}${sep}t=${Date.now()}`);
+        }
+      }
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.warn('Failed to refresh hero screenshot:', err);
+    } finally {
+      setRefreshingHeroShot(false);
+      setScreenshotLoading(false);
     }
   };
 
@@ -682,7 +705,23 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                   {/* 3. The WhatsApp Card Bubble (Identical to image) */}
                   <div className="bg-white dark:bg-[#1f2c34] rounded-2xl shadow-sm border border-black/5 dark:border-white/5 overflow-hidden max-w-sm mx-auto">
                     {/* Image at Top */}
-                    <div className="relative aspect-[16/10] bg-black/5 overflow-hidden border-b border-border/30">
+                    <div className="relative aspect-[16/10] bg-black/5 overflow-hidden border-b border-border/30 group">
+                      {/* 1-Click Refresh Hero Shot button overlay */}
+                      <button
+                        type="button"
+                        onClick={handleRefreshHeroShot}
+                        disabled={refreshingHeroShot || screenshotLoading}
+                        className="absolute top-2 right-2 z-20 px-2 py-1 rounded bg-black/75 hover:bg-black/90 text-white text-[10px] font-semibold flex items-center gap-1 shadow-md backdrop-blur-xs transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                        title="Force re-capture zoomed hero section screenshot"
+                      >
+                        {refreshingHeroShot ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+                        ) : (
+                          <RefreshCw className="w-3 h-3" />
+                        )}
+                        <span>{refreshingHeroShot ? 'Zooming…' : '🔄 Refresh Hero Shot'}</span>
+                      </button>
+
                       {screenshotUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
@@ -748,14 +787,14 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                   </div>
 
                   {/* Action Toolbar */}
-                  <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <div className="grid grid-cols-3 gap-2 pt-0.5">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={copyScreenshotImage}
                       disabled={copyImageStatus === 'COPYING' || !screenshotUrl}
-                      className={`text-xs h-8 gap-1.5 font-medium bg-white dark:bg-card shadow-xs ${
+                      className={`text-xs h-8 gap-1 font-medium bg-white dark:bg-card shadow-xs ${
                         copyImageStatus === 'COPIED'
                           ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
                           : 'border-border'
@@ -769,7 +808,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       ) : (
                         <Copy className="w-3.5 h-3.5 text-primary" />
                       )}
-                      <span>{copyImageStatus === 'COPIED' ? 'Image Copied!' : '📋 Copy Image'}</span>
+                      <span>{copyImageStatus === 'COPIED' ? 'Copied!' : '📋 Copy Image'}</span>
                     </Button>
 
                     <Button
@@ -778,14 +817,31 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       size="sm"
                       onClick={copyDraftText}
                       disabled={!draft}
-                      className="text-xs h-8 gap-1.5 font-medium bg-white dark:bg-card border-border shadow-xs hover:bg-muted"
+                      className="text-xs h-8 gap-1 font-medium bg-white dark:bg-card border-border shadow-xs hover:bg-muted"
                     >
                       {copyTextStatus === 'COPIED' ? (
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
                       ) : (
                         <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                       )}
-                      <span>{copyTextStatus === 'COPIED' ? 'Text Copied!' : '📋 Copy Text'}</span>
+                      <span>{copyTextStatus === 'COPIED' ? 'Copied!' : '📋 Copy Text'}</span>
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRefreshHeroShot}
+                      disabled={refreshingHeroShot || screenshotLoading}
+                      className="text-xs h-8 gap-1 font-medium bg-white dark:bg-card border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 shadow-xs"
+                      title="Force re-capture zoomed hero section screenshot"
+                    >
+                      {refreshingHeroShot ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      <span>{refreshingHeroShot ? 'Zooming…' : '🔄 Refresh Hero'}</span>
                     </Button>
                   </div>
 
@@ -816,16 +872,48 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                     Direct Image Ready
                   </Badge>
                 </p>
-                {screenshotLoading && (
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Capturing snapshot…
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {screenshotLoading && (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Capturing snapshot…
+                    </span>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRefreshHeroShot}
+                    disabled={refreshingHeroShot || screenshotLoading}
+                    className="h-6 text-[10px] px-2 gap-1 text-muted-foreground hover:text-foreground border border-border/60"
+                  >
+                    {refreshingHeroShot ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3" />
+                    )}
+                    <span>{refreshingHeroShot ? 'Zooming…' : 'Refresh Hero Shot'}</span>
+                  </Button>
+                </div>
               </div>
 
               {screenshotUrl ? (
                 <div className="space-y-2">
-                  <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-black/5 shadow-inner">
+                  <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-black/5 shadow-inner group">
+                    <button
+                      type="button"
+                      onClick={handleRefreshHeroShot}
+                      disabled={refreshingHeroShot || screenshotLoading}
+                      className="absolute top-2 right-2 z-20 px-2 py-1 rounded bg-black/75 hover:bg-black/90 text-white text-[10px] font-semibold flex items-center gap-1 shadow-md backdrop-blur-xs transition transform hover:scale-105 active:scale-95 cursor-pointer"
+                      title="Force re-capture zoomed hero section screenshot"
+                    >
+                      {refreshingHeroShot ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+                      ) : (
+                        <RefreshCw className="w-3 h-3" />
+                      )}
+                      <span>{refreshingHeroShot ? 'Zooming…' : '🔄 Refresh Hero Shot'}</span>
+                    </button>
+
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={screenshotUrl}
@@ -836,31 +924,47 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       }}
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={copyScreenshotImage}
                       disabled={copyImageStatus === 'COPYING'}
-                      className="text-xs h-8 gap-1.5 font-medium border-border"
+                      className="text-xs h-8 gap-1 font-medium border-border"
                     >
                       {copyImageStatus === 'COPIED' ? (
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
                       ) : (
                         <Copy className="w-3.5 h-3.5 text-primary" />
                       )}
-                      <span>{copyImageStatus === 'COPIED' ? 'Image Copied!' : '📋 Copy Image'}</span>
+                      <span>{copyImageStatus === 'COPIED' ? 'Copied!' : '📋 Copy Image'}</span>
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       onClick={downloadScreenshot}
-                      className="text-xs h-8 gap-1.5 font-medium border-border"
+                      className="text-xs h-8 gap-1 font-medium border-border"
                     >
                       <Download className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>⬇️ Download PNG</span>
+                      <span>⬇️ Download</span>
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRefreshHeroShot}
+                      disabled={refreshingHeroShot || screenshotLoading}
+                      className="text-xs h-8 gap-1 font-medium border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 shadow-xs"
+                      title="Force re-capture zoomed hero section screenshot"
+                    >
+                      {refreshingHeroShot ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                      <span>{refreshingHeroShot ? 'Zooming…' : '🔄 Refresh Hero'}</span>
                     </Button>
                   </div>
                 </div>
