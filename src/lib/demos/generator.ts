@@ -7,6 +7,7 @@ import { getTemplateScreenshotPath } from './stitch-templates';
 import { generateAiBusinessContent, getDeterministicProfessionProfile, getGeminiApiKey } from './ai-content-generator';
 import { classifyProfession } from './profession-engine';
 import { buildWebsiteImagesObject } from './image-engine';
+import { getIndustryImages } from './industry-images';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -216,8 +217,25 @@ export class WebsiteDemoGeneratorService {
       }
     }
 
-    // Contextual imagery injection from Image Engine
+    // Contextual imagery injection from Industry & Image Engines
+    const industryImgs = getIndustryImages(lead.profession, lead.businessName);
     const imageSet = buildWebsiteImagesObject(lead.profession, lead.businessName);
+    if (industryImgs.heroImage) {
+      imageSet.heroImage = {
+        url: industryImgs.heroImage,
+        alt: `${lead.businessName} - ${lead.profession}`,
+        slot: 'HERO' as const,
+        aspectRatio: '16:9',
+      };
+    }
+    if (industryImgs.aboutImage) {
+      imageSet.aboutImage = {
+        url: industryImgs.aboutImage,
+        alt: `About ${lead.businessName}`,
+        slot: 'ABOUT' as const,
+        aspectRatio: '4:5',
+      };
+    }
     content.images = imageSet;
 
     // Profession classification for trust badges and specialized sections

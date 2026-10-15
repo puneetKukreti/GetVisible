@@ -93,8 +93,8 @@ export function DemoRenderer({
     safeContent.hero?.provenance === 'AI_SYNTHESIZED' ||
     safeContent.brand?.provenance === 'AI_SYNTHESIZED';
 
-  // Only render static CA Stitch HTML iframe if the lead is specifically an un-synthesized CA practice
-  if (isStitchLayout(rawLayout) && isCaOrAccounting && !isAiSynthesized) {
+  // Render high-end Stitch template for any layout matching Google Stitch designs
+  if (isStitchLayout(rawLayout)) {
     return (
       <StitchDemoView
         demoId={demoId}

@@ -4,6 +4,7 @@ import { getResolvedOrganizationId } from '@/lib/auth';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { personalizeStitchHtml, isStitchLayout } from '@/lib/demos/stitch-personalizer';
+import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { WebsiteContent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -54,6 +55,36 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
         lead = await LeadRepository.getLeadById(demo.leadId, demo.organizationId || orgId);
         if (!lead) {
           lead = await LeadRepository.getLeadById(demo.leadId, altOrgId);
+        }
+      }
+    } else if (demo?.leadId) {
+      lead = await LeadRepository.getLeadById(demo.leadId, demo.organizationId || DEMO_ORGANIZATION_ID);
+      if (!lead) {
+        lead = await LeadRepository.getLeadById(demo.leadId, PILOT_ORGANIZATION_ID);
+      }
+    }
+
+    // Auto-regenerate if non-CA lead has stale CA content or missing demo
+    const effectiveOrgId = lead?.organizationId || demo?.organizationId || DEMO_ORGANIZATION_ID;
+    const isCaPractice = /chartered accountant|ca firm|tax advisory|auditor|accounting practice/i.test(
+      `${lead?.profession || ''} ${lead?.businessName || ''}`
+    );
+
+    if (lead && !isCaPractice) {
+      const contentStr = typeof demo?.content === 'string' ? demo.content : JSON.stringify(demo?.content || {});
+      const hasStaleCaContent =
+        !demo ||
+        /statutory audit|transfer pricing|form 15ca/i.test(contentStr);
+
+      if (hasStaleCaContent) {
+        try {
+          const freshDemo = await WebsiteDemoGeneratorService.generateDemo(lead, {
+            useAiEnrichment: true,
+            organizationId: effectiveOrgId,
+          });
+          demo = await WebsiteDemoRepository.saveDemo(effectiveOrgId, freshDemo, 'system');
+        } catch (genErr) {
+          console.warn('Auto-regeneration of non-CA demo failed:', genErr);
         }
       }
     }

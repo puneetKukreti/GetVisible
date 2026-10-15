@@ -1,5 +1,6 @@
 import { WebsiteContent } from '@/types';
 import { LeadFacts } from './templates';
+import { getIndustryImages } from './industry-images';
 
 export interface StitchDesignMeta {
   id: string;
@@ -113,7 +114,9 @@ export function isStitchLayout(layoutKey?: string): boolean {
 
 /**
  * Dynamic personalizer that replaces placeholder business facts in the Stitch HTML
- * with real prospect details (firm name, city, address, phone, email, WhatsApp).
+ * with real prospect details (firm name, city, address, phone, email, WhatsApp),
+ * scrubs hardcoded CA references for non-CA businesses, and injects a client-side
+ * DOM hydrator to keep the high-end Stitch template structure looking 100% authentic.
  */
 export function personalizeStitchHtml(
   rawHtml: string,
@@ -125,7 +128,7 @@ export function personalizeStitchHtml(
   const brandName =
     contentOrFacts?.brand?.businessName ||
     contentOrFacts?.businessName ||
-    'Chartered Accountants';
+    'Professional Practice';
 
   const city =
     contentOrFacts?.location?.city ||
@@ -154,19 +157,16 @@ export function personalizeStitchHtml(
   const profession =
     contentOrFacts?.meta?.profession ||
     contentOrFacts?.profession ||
-    'Chartered Accountants';
+    'Professional Practice';
 
   const isCaPractice = /chartered accountant|ca firm|tax advisory|auditor|accounting practice/i.test(
     `${profession} ${brandName}`
   );
-  const isAiSynthesized =
-    contentOrFacts?.hero?.provenance === 'AI_SYNTHESIZED' ||
-    contentOrFacts?.brand?.provenance === 'AI_SYNTHESIZED';
 
-  // If this is an SMB / non-CA profession OR has AI synthesized custom content, render the dedicated standalone HTML
-  if (!isCaPractice || isAiSynthesized) {
-    return generateStandaloneProfessionHtml(contentOrFacts);
-  }
+  const industryImgs = getIndustryImages(profession, brandName);
+  const heroImgUrl = contentOrFacts?.images?.heroImage?.url || industryImgs.heroImage;
+  const aboutImgUrl = contentOrFacts?.images?.aboutImage?.url || industryImgs.aboutImage;
+  const secondaryImgUrl = industryImgs.secondaryImage;
 
   let html = rawHtml;
 
@@ -183,7 +183,18 @@ export function personalizeStitchHtml(
   html = html.replaceAll('SHARMA &amp; ASSOCIATES', escapedBrand.toUpperCase());
   html = html.replaceAll('SHARMA & ASSOCIATES', escapedBrand.toUpperCase());
 
-  // 2b. Hero Business Name & Firm Identity Injection (Huge, unmissable branding in Hero section)
+  // Monogram replacement for logo marks
+  const monogram = brandName
+    .split(/\s+/)
+    .map((w: string) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'GV';
+  html = html.replaceAll('>S&amp;A<', `>${monogram}<`);
+  html = html.replaceAll('>S&A<', `>${monogram}<`);
+
+  // 2b. Hero Business Name & Firm Identity Injection
   const aiBadge = contentOrFacts?.hero?.badge;
   const badgeText = aiBadge ? escapeHtml(aiBadge) : `✦ ${escapedBrand} • ${escapeHtml(city)}`;
 
@@ -221,15 +232,46 @@ export function personalizeStitchHtml(
     html = html.replaceAll('Schedule A Consultation', escapedCta);
   }
 
-  // 2d. Dynamic Services replacement if custom/AI services provided
+  // 2d. Clean up hardcoded CA terms when the prospect is not a CA practice
+  if (!isCaPractice) {
+    const escapedProfession = escapeHtml(profession);
+    html = html.replaceAll('Chartered Accountants • New Delhi', `${escapedProfession} • ${escapeHtml(city)}`);
+    html = html.replaceAll('Chartered Accountants', escapedProfession);
+    html = html.replaceAll('CHARTERED ACCOUNTANTS', escapedProfession.toUpperCase());
+    html = html.replaceAll('Chartered Accountancy', escapedProfession);
+    html = html.replaceAll('ICAI Regulated Practice', 'Verified &amp; Licensed Practice');
+    html = html.replaceAll('ICAI Statutory Disclaimer &amp; Regulatory Disclosure', 'Professional Practice Notice &amp; Disclaimer');
+    html = html.replaceAll('ICAI Statutory Disclaimer & Regulatory Disclosure', 'Professional Practice Notice & Disclaimer');
+    html = html.replaceAll('ICAI Disclaimer', 'Disclaimer');
+    html = html.replaceAll('ICAI ethical guidelines', 'professional industry standards');
+    html = html.replaceAll('ICAI', 'Accredited');
+    html = html.replaceAll('Direct Partner Oversight', 'Expert Service Delivery');
+    html = html.replaceAll('Initial Consultation', 'Get In Touch');
+    html = html.replaceAll('Let’s Discuss Your Requirement', 'Let’s Connect &amp; Discuss');
+    html = html.replaceAll("Let's Discuss Your Requirement", "Let's Connect &amp; Discuss");
+    html = html.replaceAll('Useful Tax &amp; Compliance Insights', `Useful Insights for ${escapedProfession}`);
+    html = html.replaceAll('Useful Tax & Compliance Insights', `Useful Insights for ${escapedProfession}`);
+    html = html.replaceAll(
+      'Professional tax, GST, audit and business compliance services for individuals, startups and established enterprises. Receive grounded, partner-supervised guidance calibrated to current statutory frameworks.',
+      escapeHtml(aiSubheadline || `Dedicated professional ${profession} services tailored for clients in ${city} and surrounding areas.`)
+    );
+    html = html.replaceAll(
+      'As per the rules of the Institute of Chartered Accountants of India (ICAI), this website does not solicit work or advertise. The information provided herein is strictly for informational and guidance purposes only. Sharma &amp; Associates is not liable for any action taken by the user relying on material or information provided on this website.',
+      `The information provided on this website is for preview and informational purposes only. ${escapedBrand} delivers certified, high-quality ${escapedProfession} solutions for clients across ${escapeHtml(city)}.`
+    );
+  }
+
+  // 2e. Dynamic Services replacement if custom/AI services provided
   if (Array.isArray(contentOrFacts?.services?.items) && contentOrFacts.services.items.length > 0) {
     const defaultServices = [
       'Statutory Audit &amp; Assurance',
       'Corporate Tax &amp; Advisory',
       'GST &amp; Indirect Tax Litigation',
       'Transfer Pricing &amp; Cross-Border',
+      'Accounting &amp; MIS Payroll',
+      'Specialized &amp; NRI Taxation',
     ];
-    contentOrFacts.services.items.slice(0, 4).forEach((srv: any, idx: number) => {
+    contentOrFacts.services.items.slice(0, 6).forEach((srv: any, idx: number) => {
       if (srv?.title && defaultServices[idx]) {
         const escapedTitle = escapeHtml(srv.title);
         html = html.replaceAll(defaultServices[idx], escapedTitle);
@@ -242,6 +284,7 @@ export function personalizeStitchHtml(
       html = html.replaceAll('Practice Areas &amp; Core Disciplines', escapedSecTitle);
       html = html.replaceAll('Practice Areas & Core Disciplines', escapedSecTitle);
       html = html.replaceAll('Areas of Practice', escapedSecTitle);
+      html = html.replaceAll('Our Services', escapedSecTitle);
     }
   }
 
@@ -264,7 +307,21 @@ export function personalizeStitchHtml(
   html = html.replaceAll('consultations@sharmaassociates-ca.in', escapeHtml(email));
   html = html.replaceAll('mailto:consultations@sharmaassociates-ca.in', `mailto:${escapeHtml(email)}`);
 
-  // 4b. Remove any embedded styles that lock scrolling or hide scrollbars
+  // 4b. Hero and profile image substitutions
+  if (heroImgUrl) {
+    html = html.replaceAll(
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuCpghOWlH9V22TfzRWOpl67evU1cFFi8XiyKKu9obITIcnd5mPd1Rs681Bch7QtzYVE52ivMBIxWOUnZAY9armTGSHS_2e_hBoswcVINrlgJxq02H77tNwre6m3CBH8QCQITPG9E3zs8_8eycTCKKhmocAO_vEBAoPp3eyrw3OIFX7Ccb1yuvUieRNfCmcNM7trFJZxAbZ4NWYnmlq1-KyYiv_8PjlVxlpbs14pXszyrrzLCfWrE8eU',
+      heroImgUrl
+    );
+  }
+  if (secondaryImgUrl) {
+    html = html.replaceAll(
+      'https://lh3.googleusercontent.com/aida-public/AB6AXuAe5OCw4z1MaF-l-Maiz1U9Ra4gffPomw-ysqViKtciru8s7VcpfDdgYghTkBvIDaVADi-5aziz92oMz_Qr8ruT_5HhUukCPRoSmXqufunM2Uz9D6Ooqae5QtRKCsrFBN75Cv-5MQ1WZjlQNhEOfWKFnoQZULvR_uM8wPeVM0zZ-9IhmFu88Aq8RWfRJ9LlJR0UxUBgBahWiDjiyYRE-3snpVs0z00VKp9pMipvJIXf4TCRZZ1k4L7O',
+      secondaryImgUrl
+    );
+  }
+
+  // 4c. Remove any embedded styles that lock scrolling or hide scrollbars
   html = html.replaceAll('overscroll-behavior:none;', 'overscroll-behavior:auto;');
   html = html.replaceAll('overscroll-behavior: none;', 'overscroll-behavior: auto;');
   html = html.replaceAll('overscroll-behavior:none', 'overscroll-behavior:auto');
@@ -323,9 +380,56 @@ export function personalizeStitchHtml(
     html = injectedStyle + html;
   }
 
-  // 6. Inject client script for simulated form submission and screenshot zoom mode
+  // 6. Build Hydration Data Payload for Client-Side Dynamic DOM Hydration
+  const hydrationData = {
+    brandName,
+    profession,
+    city,
+    address: rawAddress,
+    phone,
+    email,
+    title: `${brandName} | ${profession} — ${city}`,
+    heroBadge: contentOrFacts?.hero?.badge || `✦ ${brandName} • ${city}`,
+    heroHeadline: contentOrFacts?.hero?.headline || `${brandName}`,
+    heroSubheadline:
+      contentOrFacts?.hero?.subheadline ||
+      `Dedicated professional ${profession} services tailored for clients in ${city} and surrounding areas.`,
+    primaryCtaLabel: contentOrFacts?.hero?.primaryCta?.label || 'Book Consultation',
+    heroImage: heroImgUrl,
+    aboutImage: aboutImgUrl,
+    secondaryImage: secondaryImgUrl,
+    services: Array.isArray(contentOrFacts?.services?.items)
+      ? contentOrFacts.services.items.slice(0, 8).map((s: any) => ({
+          title: s?.title || '',
+          description: s?.description || '',
+        }))
+      : [],
+    faqs: Array.isArray(contentOrFacts?.faq?.items)
+      ? contentOrFacts.faq.items.slice(0, 6).map((f: any) => ({
+          question: f?.question || '',
+          answer: f?.answer || '',
+        }))
+      : [],
+    whyChooseUs: Array.isArray(contentOrFacts?.whyChooseUs?.points)
+      ? contentOrFacts.whyChooseUs.points.slice(0, 6).map((w: any) => ({
+          title: w?.title || '',
+          description: w?.description || '',
+        }))
+      : [],
+    processSteps: Array.isArray(contentOrFacts?.process?.steps)
+      ? contentOrFacts.process.steps.slice(0, 4).map((p: any) => ({
+          number: p?.number || '',
+          title: p?.title || '',
+          description: p?.description || '',
+        }))
+      : [],
+    isCaPractice,
+  };
+
+  // 7. Inject client script: Hydrator + screenshot zoom + simulated form submission
   const injectedScript = `
 <script>
+  window.__GV_DEMO_CONTENT__ = ${JSON.stringify(hydrationData)};
   (function() {
     // Zoom in on Hero section when capturing automated screenshot
     if (typeof window !== 'undefined' && window.location.search.includes('screenshot=true')) {
@@ -333,6 +437,112 @@ export function personalizeStitchHtml(
       document.body.style.overflow = 'hidden';
       document.documentElement.classList.add('screenshot-mode');
       document.body.classList.add('screenshot-mode');
+    }
+
+    function hydrateStitchDom() {
+      var c = window.__GV_DEMO_CONTENT__;
+      if (!c) return;
+
+      // 1. Update Document Title
+      if (c.title) {
+        document.title = c.title;
+      }
+
+      // 2. Hydrate Hero Section
+      if (c.heroImage) {
+        var heroImgs = document.querySelectorAll('main section:first-of-type img, section img, [data-alt]');
+        if (heroImgs.length > 0) {
+          heroImgs[0].src = c.heroImage;
+          heroImgs[0].removeAttribute('srcset');
+        }
+      }
+
+      // 3. Hydrate Services Section (Cards & Grids)
+      if (c.services && c.services.length > 0) {
+        // Find service card headings inside #services-grid, #services-ledger, or any service container
+        var serviceCards = document.querySelectorAll(
+          '#services-grid > div, #services-ledger > div, [id*="service"] .grid > div, #services-grid .bg-surface-container-lowest'
+        );
+        if (serviceCards.length === 0) {
+          serviceCards = document.querySelectorAll('#services-grid div[class*="rounded"]');
+        }
+
+        serviceCards.forEach(function(card, idx) {
+          if (idx < c.services.length) {
+            var item = c.services[idx];
+            var heading = card.querySelector('h3, h4, .font-headline-sm');
+            var desc = card.querySelector('p');
+            if (heading && item.title) heading.textContent = item.title;
+            if (desc && item.description) desc.textContent = item.description;
+          }
+        });
+
+        // Also update navigation dropdown links for services
+        var navDropdownLinks = document.querySelectorAll('header nav a[data-path="services"] + div a, header nav .group a');
+        navDropdownLinks.forEach(function(link, idx) {
+          if (idx < c.services.length && c.services[idx] && c.services[idx].title) {
+            link.textContent = c.services[idx].title;
+          }
+        });
+
+        // Update ticker strip items if present
+        var tickerSpans = document.querySelectorAll('.overflow-hidden span:not(.select-none)');
+        var tIdx = 0;
+        tickerSpans.forEach(function(s) {
+          var txt = s.textContent ? s.textContent.trim() : '';
+          if (txt && txt !== '•' && tIdx < c.services.length) {
+            s.textContent = c.services[tIdx].title;
+            tIdx++;
+          }
+        });
+      }
+
+      // 4. Hydrate FAQs
+      if (c.faqs && c.faqs.length > 0) {
+        var faqItems = document.querySelectorAll('#faq-accordion details, details');
+        faqItems.forEach(function(faq, idx) {
+          if (idx < c.faqs.length) {
+            var f = c.faqs[idx];
+            var summary = faq.querySelector('summary span');
+            var body = faq.querySelector('div');
+            if (summary && f.question) summary.textContent = f.question;
+            if (body && f.answer) body.textContent = f.answer;
+          }
+        });
+      }
+
+      // 5. Hydrate Process / Workflow steps
+      if (c.processSteps && c.processSteps.length > 0) {
+        var stepHeadings = document.querySelectorAll('section:has(.w-14) h3, [id*="workflow"] h3, [id*="process"] h3');
+        stepHeadings.forEach(function(h3, idx) {
+          if (idx < c.processSteps.length) {
+            var pStep = c.processSteps[idx];
+            h3.textContent = pStep.title;
+            var desc = h3.nextElementSibling;
+            if (desc && pStep.description) desc.textContent = pStep.description;
+          }
+        });
+      }
+
+      // 6. For non-CA businesses, hide hardcoded CA retainer pricing tables and Form 15CA references
+      if (!c.isCaPractice) {
+        document.querySelectorAll('section, div').forEach(function(el) {
+          var t = el.textContent || '';
+          if (t.includes('₹49,999') || t.includes('₹1,25,000') || t.includes('Form 15CA/15CB')) {
+            if (el.tagName === 'DIV' && el.classList.contains('grid')) {
+              // don't hide grid parent
+            } else if (el.classList.contains('rounded') || el.classList.contains('p-6')) {
+              el.style.display = 'none';
+            }
+          }
+        });
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', hydrateStitchDom);
+    } else {
+      hydrateStitchDom();
     }
 
     // Interactive simulated form submission

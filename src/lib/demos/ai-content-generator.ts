@@ -456,7 +456,7 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
     servicesSectionSubtitle: String(
       parsed.servicesSectionSubtitle || `Comprehensive ${profession.toLowerCase()} solutions tailored to your needs.`
     ).slice(0, 190),
-    services: (parsed.services || []).slice(0, 4).map((s: any, i: number) => ({
+    services: (parsed.services || []).slice(0, 6).map((s: any, i: number) => ({
       title: String(s?.title || `Specialized Service ${i + 1}`).slice(0, 95),
       description: String(
         s?.description || `Professional execution and dedicated advisory in ${city}.`
@@ -478,7 +478,7 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
         }))
       : [],
     faqs: Array.isArray(parsed.faqs)
-      ? parsed.faqs.slice(0, 3).map((f: any, i: number) => ({
+      ? parsed.faqs.slice(0, 4).map((f: any, i: number) => ({
           question: String(f?.question || `How do I engage your services in ${city}?`).slice(0, 140),
           answer: String(
             f?.answer || `You can get in touch directly via phone or our online consultation request form.`
@@ -490,7 +490,7 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
 
 /**
  * Calls Gemini Flash via REST API with a structured JSON schema prompt.
- * Tries gemini-1.5-flash and gemini-2.0-flash.
+ * Tries gemini-2.5-flash, gemini-1.5-flash, and gemini-2.0-flash.
  * Gracefully returns null if no API key is configured or upon error,
  * allowing the caller to seamlessly fall back to getDeterministicProfessionProfile.
  */
@@ -519,6 +519,8 @@ Generate authentic, high-converting, realistic website content for:
 - City / Region: "${city}", India
 - Address: "${address}"
 
+CRITICAL MANDATE: NEVER generate Chartered Accountant, ICAI, Tax, or Audit terms unless the business is specifically a Chartered Accountant. The content MUST 100% reflect the specified profession (${profession}).
+
 ${
   isLegalOrCa
     ? 'COMPLIANCE MANDATE: This profession is governed by strict regulatory ethical rules in India (ICAI / Bar Council of India). Strictly follow an informational pull-model. Do NOT use superlatives (e.g. "Best", "Top", "No. 1") and do NOT claim fee discounts.'
@@ -527,7 +529,7 @@ ${
 
 Return ONLY a valid JSON object matching this exact schema:
 {
-  "heroBadge": "Short 3-5 word category badge (e.g. 'Modern Dental & Implant Center', 'Trusted Chartered Accountants', 'Boutique Modular Kitchen Studio')",
+  "heroBadge": "Short 3-5 word category badge (e.g. 'Premier Dental & Implant Center', 'Boutique Modular Kitchen Studio', 'Trusted Chartered Accountants')",
   "heroHeadline": "Compelling 6-10 word headline tailored to their exact profession and local standing",
   "heroSubheadline": "1-sentence value proposition mentioning their core offerings, client commitment, and ${city}",
   "primaryCtaLabel": "Action-oriented CTA button text (e.g. 'Schedule Consultation', 'Book Appointment', 'Get Free Quote', 'Request Estimate')",
@@ -545,7 +547,9 @@ Return ONLY a valid JSON object matching this exact schema:
     { "title": "Specific Service 1 for this profession", "description": "Clear 1-2 sentence explanation of this service" },
     { "title": "Specific Service 2 for this profession", "description": "Clear 1-2 sentence explanation of this service" },
     { "title": "Specific Service 3 for this profession", "description": "Clear 1-2 sentence explanation of this service" },
-    { "title": "Specific Service 4 for this profession", "description": "Clear 1-2 sentence explanation of this service" }
+    { "title": "Specific Service 4 for this profession", "description": "Clear 1-2 sentence explanation of this service" },
+    { "title": "Specific Service 5 for this profession", "description": "Clear 1-2 sentence explanation of this service" },
+    { "title": "Specific Service 6 for this profession", "description": "Clear 1-2 sentence explanation of this service" }
   ],
   "whyChooseUs": [
     { "title": "Trust Factor 1 (2-4 words)", "description": "1 clear sentence explaining this trust factor" },
@@ -562,11 +566,13 @@ Return ONLY a valid JSON object matching this exact schema:
   "faqs": [
     { "question": "Realistic question clients ask for this profession?", "answer": "Helpful 1-2 sentence answer" },
     { "question": "Second common client question?", "answer": "Helpful 1-2 sentence answer" },
-    { "question": "Third common client question regarding location or process?", "answer": "Helpful 1-2 sentence answer" }
+    { "question": "Third common client question regarding location or process?", "answer": "Helpful 1-2 sentence answer" },
+    { "question": "Fourth client question regarding appointments or turnaround?", "answer": "Helpful 1-2 sentence answer" }
   ]
-}`;
+}
+`;
 
-  const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+  const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
   for (const model of candidateModels) {
     try {
