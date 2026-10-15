@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { LeadData, WebsiteDemoData, OutreachMessage, OutreachInput } from '@/types';
 import { canPrepareOutreach } from './lifecycle';
 import { GeminiAIProvider } from '@/lib/providers/ai.provider';
-import { getAppBaseUrl, getPublicDemoUrl } from '@/lib/demos/public';
+import { getAppBaseUrl, getPublicDemoUrl, generatePublicDemoToken } from '@/lib/demos/public';
 import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
 
 export const OutreachMessageSchema = z.object({
@@ -244,33 +244,47 @@ GetVisible Digital Team`;
   // - Low friction hook question to gauge interest
   const cleanPhone = (input.publicPhone || '').replace(/[^0-9]/g, '');
   const waRecipient = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-  const cityLabel = input.city || 'local';
+  const businessSlug = generatePublicDemoToken(input.businessName);
+  const baseOrigin = getAppBaseUrl();
+  const demoUrl =
+    input.demoUrl && !input.demoUrl.includes('localhost')
+      ? input.demoUrl
+      : `${baseOrigin}/demo/${businessSlug}`;
 
-  // Touch 1: Zero-Link High-Trust WhatsApp Pitch (Relies on attached screenshot, no link)
-  const whatsappMessage = hasWebsite
-    ? `Hi *${input.businessName}* team 👋
+  const myWhatsApp = (
+    process.env.NEXT_PUBLIC_PUNEET_WHATSAPP ||
+    process.env.NEXT_PUBLIC_AGENCY_WHATSAPP ||
+    '919811122233'
+  ).replace(/[^0-9]/g, '');
 
-I noticed your ${cityLabel} practice on Google, and while reviewing your online presence, I created a modernized, ultra-fast website layout specifically for *${input.businessName}* *(screenshot attached above 👆)*.
+  const quickInterestedUrl = `https://wa.me/${myWhatsApp}?text=${encodeURIComponent(
+    `Hi Puneet, I viewed the website preview for ${input.businessName} (${demoUrl}) and I am INTERESTED in making it live.`
+  )}`;
 
-Since everyone is cautious with unknown links on WhatsApp nowadays, I haven't put any link in this message. 😊
+  const cityLabel = input.city || 'Delhi NCR';
 
-If you like how the design looks in the photo, just reply *"PREVIEW"* (or *"YES"*) and I’ll share the interactive preview link and details!`
-    : `Hi *${input.businessName}* team 👋
+  const meaningfulMsg = `Namaste *${input.businessName}* 👋
 
-I noticed your ${cityLabel} practice on Google, but saw that no official website comes up when clients search your name online.
+When prospective clients or businesses in *${cityLabel}* are referred to you, the first thing they do before reaching out is search your name online to view your profile and services.
 
-I’m Puneet, a web developer in Delhi NCR, and I created a custom website layout specifically for *${input.businessName}* *(screenshot attached above 👆)*.
+To help *${input.businessName}* build that instant digital trust, I designed a clean, professional website concept tailored specifically for you *(preview image attached above 👆)*.
 
-Since everyone is cautious with unknown links on WhatsApp nowadays, I haven't put any link in this message. 😊
+🌐 *View Your Custom Website Preview:*
+${demoUrl}
 
-If you like how the design looks in the photo, just reply *"PREVIEW"* (or *"YES"*) and I’ll share the interactive preview link and details!`;
+━━━━━━━━━━━━━━━━━━━━
+✅ *Interested in making this live on your own domain?*
+👉 *Click here if Interested:* ${quickInterestedUrl}
+*(Or simply reply *"INTERESTED"* to this message)*`;
+
+  const whatsappMessage = meaningfulMsg;
 
   // Touch 2: Follow-up Link Reply (Sent after prospect replies "PREVIEW" or "YES")
   const whatsappFollowUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${input.businessName}*:
 
-👉 ${input.demoUrl}
+👉 ${demoUrl}
 
-You can scroll through it right on your phone. Let me know if you'd like any color or text changes — we can make this live on your own .in / .com domain within 48 hours!`;
+You can scroll through it right on your phone. Let me know if you'd like any color or text changes — we can make this live on your own domain within 48 hours!`;
 
   const encodedWaText = encodeURIComponent(whatsappMessage);
   const whatsappShareUrl = waRecipient
@@ -330,11 +344,12 @@ export class OutreachGeneratorService {
       }
     }
 
-    // 2. Strict Demo URL Construction (Prefer cryptographically secure publicToken if requested)
+    // 2. Strict Demo URL Construction (Prefer readable business slug or publicToken if requested)
     const base = options?.baseUrl ? options.baseUrl.replace(/\/+$/, '') : getAppBaseUrl();
+    const token = activeDemo?.publicToken || generatePublicDemoToken(lead.businessName);
     const demoUrl =
-      options?.usePublicToken && activeDemo?.publicToken
-        ? getPublicDemoUrl(activeDemo.publicToken, base)
+      options?.usePublicToken
+        ? `${base}/demo/${token}`
         : `${base}/demo/${lead.id}`;
 
     let screenshotUrl = activeDemo?.screenshotUrl || null;

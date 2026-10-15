@@ -336,8 +336,23 @@ class DemoDataStore {
 
   getDemoByPublicToken(token: string): WebsiteDemoData | null {
     this.syncFromDisk();
+    const cleanToken = token.trim().toLowerCase();
     for (const demos of Array.from(this.demos.values())) {
-      const found = demos.find((d: WebsiteDemoData) => d.publicToken === token);
+      const found = demos.find((d: WebsiteDemoData) => {
+        if (d.publicToken && d.publicToken.toLowerCase() === cleanToken) {
+          return true;
+        }
+        const brandName =
+          (d.content as any)?.brand?.businessName ||
+          (d.content as any)?.brandName;
+        if (brandName) {
+          const slug = generatePublicDemoToken(brandName).toLowerCase();
+          if (slug === cleanToken) {
+            return true;
+          }
+        }
+        return false;
+      });
       if (found) {
         return JSON.parse(JSON.stringify(found));
       }
@@ -656,13 +671,17 @@ export class LeadRepository {
 
     if (isExplicitDemoMode()) {
       const items = demoStore.getOrgLeads(organizationId);
-      const lead = items.find((l) => l.id === cleanId);
+      const lead = items.find(
+        (l) =>
+          l.id === cleanId ||
+          generatePublicDemoToken(l.businessName).toLowerCase() === cleanId.toLowerCase()
+      );
       if (!lead) return null;
 
       // Attach org suppressions, consents, and demos
-      const suppressions = demoStore.getOrgSuppressions(organizationId).filter((s) => s.leadId === cleanId);
-      const consents = demoStore.getOrgConsents(organizationId).filter((c) => c.leadId === cleanId);
-      const demos = demoStore.getDemosForLead(organizationId, cleanId).map(normalizeWebsiteDemo);
+      const suppressions = demoStore.getOrgSuppressions(organizationId).filter((s) => s.leadId === lead.id);
+      const consents = demoStore.getOrgConsents(organizationId).filter((c) => c.leadId === lead.id);
+      const demos = demoStore.getDemosForLead(organizationId, lead.id).map(normalizeWebsiteDemo);
       return {
         ...lead,
         suppressionRecords: suppressions,
@@ -673,7 +692,13 @@ export class LeadRepository {
 
     const { prisma } = await import('./prisma');
     const lead = await prisma.lead.findFirst({
-      where: { id: cleanId, organizationId },
+      where: {
+        organizationId,
+        OR: [
+          { id: cleanId },
+          { businessName: { equals: cleanId.replace(/-/g, ' '), mode: 'insensitive' } },
+        ],
+      },
       include: {
         contacts: true,
         websites: true,
@@ -1276,9 +1301,15 @@ export class WebsiteDemoRepository {
       throw new Error('Unauthorized: organizationId is required for data isolation.');
     }
 
+    const brandName =
+      (demo.content as any)?.brand?.businessName ||
+      (demo.content as any)?.brandName ||
+      (demo as any).businessName;
+    const publicToken = demo.publicToken || generatePublicDemoToken(brandName);
+
     const demoWithToken: WebsiteDemoData = {
       ...demo,
-      publicToken: demo.publicToken || generatePublicDemoToken(),
+      publicToken,
       approvalStatus: demo.approvalStatus || 'PENDING_REVIEW',
       viewCount: demo.viewCount || 0,
     };
@@ -1410,7 +1441,12 @@ export class WebsiteDemoRepository {
     }
 
     const now = new Date().toISOString();
-    const publicToken = demo.publicToken || generatePublicDemoToken();
+    const lead = await LeadRepository.getLeadById(demo.leadId, organizationId);
+    const brandName =
+      (demo.content as any)?.brand?.businessName ||
+      (demo.content as any)?.brandName ||
+      lead?.businessName;
+    const publicToken = generatePublicDemoToken(brandName) || demo.publicToken || generatePublicDemoToken();
     const updatedDemo = await this.updateDemo(
       organizationId,
       demoId,
@@ -1535,12 +1571,30 @@ export class WebsiteDemoRepository {
     }
 
     const { prisma } = await import('./prisma');
-    const demo = await prisma.websiteDemo.findFirst({
+    let demo = await prisma.websiteDemo.findFirst({
       where: {
         publicToken: cleanToken,
         approvalStatus: 'APPROVED',
       },
     });
+
+    if (!demo) {
+      const allApproved = await prisma.websiteDemo.findMany({
+        where: { approvalStatus: 'APPROVED' },
+      });
+      demo =
+        allApproved.find((d) => {
+          if (d.publicToken?.toLowerCase() === cleanToken.toLowerCase()) return true;
+          const brandName =
+            (d.content as any)?.brand?.businessName ||
+            (d.content as any)?.brandName;
+          if (brandName) {
+            const slug = generatePublicDemoToken(brandName).toLowerCase();
+            if (slug === cleanToken.toLowerCase()) return true;
+          }
+          return false;
+        }) || null;
+    }
 
     return demo ? normalizeWebsiteDemo(demo) : null;
   }

@@ -295,11 +295,11 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(outreach.whatsappMessage).toBeDefined();
       const wa = outreach.whatsappMessage!;
 
-      // Verifies no raw screenshot URL link spam or links in Touch 1 WhatsApp text
+      // Verifies no raw screenshot URL link spam
       expect(wa).not.toContain('screenshot.png');
-      expect(wa).not.toContain('http');
-      expect(wa).toContain('screenshot attached above 👆');
-      expect(wa).toContain('PREVIEW');
+      expect(wa).toContain('preview image attached above 👆');
+      expect(wa).toContain('Namaste *Apex Tax Partners CA* 👋');
+      expect(wa).toContain('INTERESTED');
 
       // Verifies WhatsApp Follow-Up contains the demoUrl
       expect(outreach.whatsappFollowUpWithLink).toBeDefined();

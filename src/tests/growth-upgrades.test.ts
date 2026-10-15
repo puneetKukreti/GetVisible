@@ -14,8 +14,8 @@ describe('Growth & Workflow Upgrades', () => {
     // Reset/ensure data clean state
   });
 
-  describe('Upgrade 1: Zero-Link WhatsApp Strategy', () => {
-    it('generates a Touch 1 zero-link message with NO URLs and references screenshot and PREVIEW hook', () => {
+  describe('Upgrade 1: High-Converting Branded WhatsApp Strategy', () => {
+    it('generates a Touch 1 WhatsApp message with value hook, branded demo link, and 1-click interested link', () => {
       const outreach = generateDeterministicOutreach({
         businessName: 'Sharma & Singhal CA',
         profession: 'Chartered Accountant',
@@ -29,17 +29,16 @@ describe('Growth & Workflow Upgrades', () => {
       expect(outreach.whatsappMessage).toBeDefined();
       const touch1 = outreach.whatsappMessage!;
 
-      // ZERO-LINK check: must not contain http, https, or domain links
-      expect(touch1).not.toContain('http://');
-      expect(touch1).not.toContain('https://');
-      expect(touch1).not.toContain('.com');
-      expect(touch1).not.toContain('.in');
+      // Direct greeting without generic "team"
+      expect(touch1).toContain('Namaste *Sharma & Singhal CA* 👋');
+      expect(touch1).not.toContain('team 👋');
 
-      // Trust building elements
-      expect(touch1).toContain('Sharma & Singhal CA');
-      expect(touch1).toContain('screenshot attached above 👆');
-      expect(touch1).toContain('cautious with unknown links');
-      expect(touch1).toContain('PREVIEW');
+      // Value hook and trust building
+      expect(touch1).toContain('preview image attached above 👆');
+      expect(touch1).toContain('instant digital trust');
+      expect(touch1).toContain('https://getvisible.in/demo/sharma-ca');
+      expect(touch1).toContain('INTERESTED');
+      expect(touch1).toContain('https://wa.me/');
     });
 
     it('generates a Touch 2 follow-up reply that includes the demo live link', () => {

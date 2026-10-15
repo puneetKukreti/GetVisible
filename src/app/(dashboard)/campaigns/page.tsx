@@ -39,6 +39,7 @@ import {
   Plus,
   RefreshCw,
 } from 'lucide-react';
+import { generatePublicDemoToken, getAppBaseUrl } from '@/lib/demos/public';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -194,6 +195,51 @@ async function renderUrlToPngBlob(imageUrl: string): Promise<Blob> {
   });
 }
 
+function getMeaningfulWhatsAppMessage(lead: LeadData): {
+  message: string;
+  demoUrl: string;
+  quickInterestedUrl: string;
+  followUpWithLink: string;
+} {
+  const businessSlug = generatePublicDemoToken(lead.businessName);
+  const baseOrigin = typeof window !== 'undefined' ? window.location.origin : getAppBaseUrl();
+  const demoUrl = `${baseOrigin}/demo/${lead.websiteDemos?.[0]?.publicToken || businessSlug}`;
+
+  const myWhatsApp = (
+    process.env.NEXT_PUBLIC_PUNEET_WHATSAPP ||
+    process.env.NEXT_PUBLIC_AGENCY_WHATSAPP ||
+    '919811122233'
+  ).replace(/[^0-9]/g, '');
+
+  const quickInterestedUrl = `https://wa.me/${myWhatsApp}?text=${encodeURIComponent(
+    `Hi Puneet, I viewed the website preview for ${lead.businessName} (${demoUrl}) and I am INTERESTED in making it live.`
+  )}`;
+
+  const cityLabel = lead.city || 'Delhi NCR';
+
+  const message = `Namaste *${lead.businessName}* 👋
+
+When prospective clients or businesses in *${cityLabel}* are referred to you, the first thing they do before reaching out is search your name online to view your profile and services.
+
+To help *${lead.businessName}* build that instant digital trust, I designed a clean, professional website concept tailored specifically for you *(preview image attached above 👆)*.
+
+🌐 *View Your Custom Website Preview:*
+${demoUrl}
+
+━━━━━━━━━━━━━━━━━━━━
+✅ *Interested in making this live on your own domain?*
+👉 *Click here if Interested:* ${quickInterestedUrl}
+*(Or simply reply *"INTERESTED"* to this message)*`;
+
+  const followUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${lead.businessName}*:
+
+👉 ${demoUrl}
+
+You can scroll through it right on your phone. Let me know if you'd like any color or text changes — we can make this live on your own domain within 48 hours!`;
+
+  return { message, demoUrl, quickInterestedUrl, followUpWithLink };
+}
+
 // ─── Outreach Panel ──────────────────────────────────────────────────────────
 
 interface OutreachPanelProps {
@@ -206,11 +252,12 @@ interface OutreachPanelProps {
 function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelProps) {
   const [channel, setChannel] = useState<OutreachChannel>('WHATSAPP');
   const [intent, setIntent] = useState(DEFAULT_INTENT);
-  const [draft, setDraft] = useState('');
+  const initialWa = getMeaningfulWhatsAppMessage(lead);
+  const [draft, setDraft] = useState(initialWa.message);
   const [emailDraft, setEmailDraft] = useState('');
   const [whatsappStep, setWhatsappStep] = useState<'step1' | 'step2'>('step1');
-  const [whatsappMessage, setWhatsappMessage] = useState('');
-  const [whatsappFollowUpWithLink, setWhatsappFollowUpWithLink] = useState('');
+  const [whatsappMessage, setWhatsappMessage] = useState(initialWa.message);
+  const [whatsappFollowUpWithLink, setWhatsappFollowUpWithLink] = useState(initialWa.followUpWithLink);
   const [screenshotUrl, setScreenshotUrl] = useState<string>(() => getScreenshotImageUrl(lead));
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -236,8 +283,22 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const [updatingInterest, setUpdatingInterest] = useState(false);
   const [interestNotice, setInterestNotice] = useState<string | null>(null);
 
-  // Automatically ensure hero screenshot is ready with zero-stuck hard timer
+  // Automatically ensure hero screenshot and tailored copy are ready with zero-stuck hard timer
   useEffect(() => {
+    const wa = getMeaningfulWhatsAppMessage(lead);
+    setWhatsappMessage(wa.message);
+    setWhatsappFollowUpWithLink(wa.followUpWithLink);
+    if (channel === 'WHATSAPP') {
+      setDraft(whatsappStep === 'step1' ? wa.message : wa.followUpWithLink);
+    }
+
+    const cleanPhone = (lead.publicPhone || '').replace(/[^0-9]/g, '');
+    const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+    if (waPhone) {
+      setWhatsappShareUrl(`https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(wa.message)}`);
+      setWhatsappFollowUpShareUrl(`https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(wa.followUpWithLink)}`);
+    }
+
     setScreenshotUrl(getScreenshotImageUrl(lead));
     setImgLoaded(false);
 
@@ -1334,23 +1395,14 @@ function OutreachQueueTab({
         console.warn('Clipboard image copy skipped/unsupported:', clipErr);
       }
 
-      // 2. Format zero-link message
+      // 2. Format high-converting WhatsApp message
       const cleanPhone = (lead.publicPhone || '').replace(/[^0-9]/g, '');
       const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-      const cityText = lead.city ? `${lead.city} practice` : 'practice';
 
-      const zeroLinkMsg = `Hi *${lead.businessName}* team 👋
-
-I noticed your ${cityText} on Google, but saw that no official website comes up when clients search your name online.
-
-I’m Puneet, a web developer in Delhi NCR, and I created a custom website layout specifically for *${lead.businessName}* *(screenshot attached above 👆)*.
-
-Since everyone is cautious with unknown links on WhatsApp nowadays, I haven't put any link in this message. 😊
-
-If you like how the design looks in the photo, just reply *"PREVIEW"* (or *"YES"*) and I’ll share the interactive preview link and details!`;
+      const { message: meaningfulMsg } = getMeaningfulWhatsAppMessage(lead);
 
       // 3. Open WhatsApp Web deep link
-      const waUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(zeroLinkMsg)}`;
+      const waUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(meaningfulMsg)}`;
       window.open(waUrl, '_blank');
 
       // 4. Record contacted via send-whatsapp endpoint
@@ -1360,9 +1412,9 @@ If you like how the design looks in the photo, just reply *"PREVIEW"* (or *"YES"
         body: JSON.stringify({
           leadId: lead.id,
           phone: waPhone,
-          message: zeroLinkMsg,
+          message: meaningfulMsg,
           screenshotUrl: lead.websiteDemos?.[0]?.screenshotUrl || null,
-          notes: 'Dispatched via 1-Click Blitz WhatsApp (Zero-Link Image Pitch + Screenshot in Clipboard)',
+          notes: 'Dispatched via 1-Click Blitz WhatsApp (Meaningful Value Hook + Branded Demo Link + Screenshot in Clipboard)',
         }),
       }).catch(() => {
         fetch('/api/outreach/contacted', {

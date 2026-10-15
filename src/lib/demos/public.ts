@@ -1,14 +1,22 @@
 import crypto from 'crypto';
 
 /**
- * Generates a cryptographically random, URL-safe public token for shareable website demos.
- * Uses 9 bytes of cryptographically secure random entropy converted to base64url,
- * producing a 12-character collision-resistant, non-sequential token.
- *
- * Example: '8f3Kx92LmQ7w'
+ * Generates a clean, readable URL slug from the business name for shareable website demos
+ * (e.g. 'sharma-and-associates'). Falls back to a random URL-safe token if businessName is absent.
  */
-export function generatePublicDemoToken(): string {
-  return crypto.randomBytes(9).toString('base64url');
+export function generatePublicDemoToken(businessName?: string): string {
+  if (businessName && businessName.trim().length > 0) {
+    const slug = businessName
+      .toLowerCase()
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 45);
+    if (slug.length >= 3) {
+      return slug;
+    }
+  }
+  return crypto.randomBytes(6).toString('base64url');
 }
 
 /**
