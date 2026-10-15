@@ -198,23 +198,11 @@ async function renderUrlToPngBlob(imageUrl: string): Promise<Blob> {
 function getMeaningfulWhatsAppMessage(lead: LeadData): {
   message: string;
   demoUrl: string;
-  quickInterestedUrl: string;
   followUpWithLink: string;
 } {
   const businessSlug = generatePublicDemoToken(lead.businessName);
   const baseOrigin = typeof window !== 'undefined' ? window.location.origin : getAppBaseUrl();
   const demoUrl = `${baseOrigin}/demo/${lead.websiteDemos?.[0]?.publicToken || businessSlug}`;
-
-  const myWhatsApp = (
-    process.env.NEXT_PUBLIC_PUNEET_WHATSAPP ||
-    process.env.NEXT_PUBLIC_AGENCY_WHATSAPP ||
-    '919811122233'
-  ).replace(/[^0-9]/g, '');
-
-  const quickInterestedUrl = `https://wa.me/${myWhatsApp}?text=${encodeURIComponent(
-    `Hi Puneet, I viewed the website preview for ${lead.businessName} (${demoUrl}) and I am INTERESTED in making it live.`
-  )}`;
-
   const cityLabel = lead.city || 'Delhi NCR';
 
   const message = `Namaste *${lead.businessName}* 👋
@@ -226,10 +214,7 @@ To help *${lead.businessName}* build that instant digital trust, I designed a cl
 🌐 *View Your Custom Website Preview:*
 ${demoUrl}
 
-━━━━━━━━━━━━━━━━━━━━
-✅ *Interested in making this live on your own domain?*
-👉 *Click here if Interested:* ${quickInterestedUrl}
-*(Or simply reply *"INTERESTED"* to this message)*`;
+If you would like to make this live on your own domain, simply reply *"INTERESTED"* to this message!`;
 
   const followUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${lead.businessName}*:
 
@@ -237,7 +222,7 @@ ${demoUrl}
 
 You can scroll through it right on your phone. Let me know if you'd like any color or text changes — we can make this live on your own domain within 48 hours!`;
 
-  return { message, demoUrl, quickInterestedUrl, followUpWithLink };
+  return { message, demoUrl, followUpWithLink };
 }
 
 // ─── Outreach Panel ──────────────────────────────────────────────────────────

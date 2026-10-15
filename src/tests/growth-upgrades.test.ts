@@ -38,7 +38,7 @@ describe('Growth & Workflow Upgrades', () => {
       expect(touch1).toContain('instant digital trust');
       expect(touch1).toContain('https://getvisible.in/demo/sharma-ca');
       expect(touch1).toContain('INTERESTED');
-      expect(touch1).toContain('https://wa.me/');
+      expect(touch1).not.toContain('https://wa.me/');
     });
 
     it('generates a Touch 2 follow-up reply that includes the demo live link', () => {

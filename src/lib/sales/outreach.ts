@@ -251,16 +251,6 @@ GetVisible Digital Team`;
       ? input.demoUrl
       : `${baseOrigin}/demo/${businessSlug}`;
 
-  const myWhatsApp = (
-    process.env.NEXT_PUBLIC_PUNEET_WHATSAPP ||
-    process.env.NEXT_PUBLIC_AGENCY_WHATSAPP ||
-    '919811122233'
-  ).replace(/[^0-9]/g, '');
-
-  const quickInterestedUrl = `https://wa.me/${myWhatsApp}?text=${encodeURIComponent(
-    `Hi Puneet, I viewed the website preview for ${input.businessName} (${demoUrl}) and I am INTERESTED in making it live.`
-  )}`;
-
   const cityLabel = input.city || 'Delhi NCR';
 
   const meaningfulMsg = `Namaste *${input.businessName}* 👋
@@ -272,10 +262,7 @@ To help *${input.businessName}* build that instant digital trust, I designed a c
 🌐 *View Your Custom Website Preview:*
 ${demoUrl}
 
-━━━━━━━━━━━━━━━━━━━━
-✅ *Interested in making this live on your own domain?*
-👉 *Click here if Interested:* ${quickInterestedUrl}
-*(Or simply reply *"INTERESTED"* to this message)*`;
+If you would like to make this live on your own domain, simply reply *"INTERESTED"* to this message!`;
 
   const whatsappMessage = meaningfulMsg;
 
