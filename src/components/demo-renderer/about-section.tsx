@@ -10,9 +10,10 @@ interface AboutSectionProps {
   brand?: WebsiteContent['brand'];
   theme: WebsiteTheme;
   template?: WebsiteTemplate;
+  images?: WebsiteContent['images'];
 }
 
-export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH' }: AboutSectionProps) {
+export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH', images }: AboutSectionProps) {
   const firmName = brand?.businessName || '';
   const heading = getAboutHeading(firmName, template, about.title);
   const category = categorizeFirmName(firmName);
@@ -179,6 +180,26 @@ export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH' 
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
               {about.body}
             </p>
+            {(() => {
+              const aboutUrl = typeof images?.aboutImage === 'string' ? images.aboutImage : images?.aboutImage?.url;
+              const aboutAlt = (typeof images?.aboutImage === 'object' && images?.aboutImage?.alt) || firmName;
+              if (!aboutUrl) return null;
+              return (
+                <div className="pt-2">
+                  <div className="relative rounded-xl overflow-hidden shadow-md aspect-[16/9] border border-slate-200/80 dark:border-slate-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={aboutUrl}
+                      alt={aboutAlt}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">

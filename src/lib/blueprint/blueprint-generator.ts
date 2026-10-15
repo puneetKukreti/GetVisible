@@ -251,7 +251,7 @@ export class BlueprintGeneratorService {
       },
       navigation: content.navigation,
       sections,
-      content,
+      content: content as any,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

@@ -5,6 +5,8 @@ import { GeminiAIProvider, MockAIProvider } from '@/lib/providers/ai.provider';
 import { selectWebsiteDesign } from './personalization';
 import { getTemplateScreenshotPath } from './stitch-templates';
 import { generateAiBusinessContent, getDeterministicProfessionProfile, getGeminiApiKey } from './ai-content-generator';
+import { classifyProfession } from './profession-engine';
+import { buildWebsiteImagesObject } from './image-engine';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -211,6 +213,100 @@ export class WebsiteDemoGeneratorService {
         };
       } else {
         content = await this.enrichWithAi(content, leadFacts, design.layout);
+      }
+    }
+
+    // Contextual imagery injection from Image Engine
+    const imageSet = buildWebsiteImagesObject(lead.profession, lead.businessName);
+    content.images = imageSet;
+
+    // Profession classification for trust badges and specialized sections
+    const professionProfile = classifyProfession(lead.profession);
+
+    if (professionProfile.trustBadges && professionProfile.trustBadges.length > 0) {
+      content.trust = {
+        sectionTitle: 'Accreditations & Trust Standards',
+        badges: professionProfile.trustBadges.map((b: any) => ({
+          title: typeof b === 'string' ? b : b.title,
+          description: typeof b === 'string' ? 'Verified industry standards and client satisfaction.' : b.description,
+          iconName: (typeof b === 'object' && b.iconName) || 'ShieldCheck',
+        })),
+      };
+    }
+
+    // Attach Gallery for visual/creative professions
+    const isVisualProfession =
+      ['INTERIOR_DESIGNER', 'SALON_SPA', 'GYM_FITNESS', 'PHOTOGRAPHER_EVENT', 'RESTAURANT_CAFE'].includes(
+        professionProfile.id
+      ) ||
+      /interior|architect|decor|salon|spa|gym|fitness|photo|studio|wedding|bakery|cafe/i.test(
+        `${lead.profession} ${lead.businessName}`
+      );
+
+    if (isVisualProfession && !content.gallery && imageSet.gallery && imageSet.gallery.length > 0) {
+      content.gallery = {
+        sectionTitle: 'Portfolio & Work Gallery',
+        sectionSubtitle: `Explore our signature projects and craftsmanship across ${lead.city}`,
+        items: imageSet.gallery.map((g, idx) => ({
+          id: `gal-${idx + 1}`,
+          title: `${lead.businessName} Showcase ${idx + 1}`,
+          category: lead.profession,
+          imageUrl: g.url,
+          url: g.url,
+          description: `Signature delivery and professional execution in ${lead.city}`,
+        })),
+      };
+      if (!design.sectionOrder.includes('GALLERY')) {
+        const contactIdx = design.sectionOrder.indexOf('CONTACT');
+        if (contactIdx !== -1) {
+          design.sectionOrder.splice(contactIdx, 0, 'GALLERY');
+        } else {
+          design.sectionOrder.push('GALLERY');
+        }
+      }
+    }
+
+    // Attach Menu for dining/food professions
+    const isFoodProfession =
+      professionProfile.id === 'RESTAURANT_CAFE' ||
+      /restaurant|cafe|bakery|sweet|food|dhaba|bistro/i.test(`${lead.profession} ${lead.businessName}`);
+
+    if (isFoodProfession && !content.menu) {
+      content.menu = {
+        sectionTitle: 'Signature Menu & Specialties',
+        sectionSubtitle: 'Handcrafted daily using authentic, fresh ingredients',
+        categories: [
+          {
+            name: 'Chef Recommendations',
+            items: [
+              {
+                name: 'Specialty Platter',
+                description: 'Curated assortment of bestsellers and local favorites',
+                price: '₹450',
+                badge: 'Popular',
+              },
+              {
+                name: 'Signature Brew / Drink',
+                description: 'Artisanal beverage crafted fresh to order',
+                price: '₹180',
+                badge: 'Must Try',
+              },
+              {
+                name: 'Gourmet Main Course',
+                description: 'Cooked with slow-simmered regional spices and farm-fresh ingredients',
+                price: '₹380',
+              },
+            ],
+          },
+        ],
+      };
+      if (!design.sectionOrder.includes('MENU')) {
+        const contactIdx = design.sectionOrder.indexOf('CONTACT');
+        if (contactIdx !== -1) {
+          design.sectionOrder.splice(contactIdx, 0, 'MENU');
+        } else {
+          design.sectionOrder.push('MENU');
+        }
       }
     }
 

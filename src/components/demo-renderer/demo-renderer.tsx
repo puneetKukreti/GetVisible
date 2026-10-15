@@ -22,6 +22,8 @@ import { WebsiteBlueprint } from '@/lib/blueprint/blueprint-schema';
 
 import { isStitchLayout } from '@/lib/demos/stitch-personalizer';
 import { StitchDemoView } from './stitch-demo-view';
+import { GallerySection } from './gallery-section';
+import { MenuPricingSection } from './menu-pricing-section';
 
 interface DemoRendererProps {
   content: WebsiteContent;
@@ -155,7 +157,14 @@ export function DemoRenderer({
     switch (sectionType) {
       case 'HERO':
         return safeContent.hero ? (
-          <TemplateHero key="hero" hero={safeContent.hero} brand={brandData} theme={safeTheme} template={activeTemplate} />
+          <TemplateHero
+            key="hero"
+            hero={safeContent.hero}
+            brand={brandData}
+            theme={safeTheme}
+            template={activeTemplate}
+            images={safeContent.images}
+          />
         ) : null;
       case 'TRUST':
         return safeContent.trust ? (
@@ -167,7 +176,14 @@ export function DemoRenderer({
         ) : null;
       case 'ABOUT':
         return safeContent.about ? (
-          <AboutSection key="about" about={safeContent.about} brand={brandData} theme={safeTheme} template={activeTemplate} />
+          <AboutSection
+            key="about"
+            about={safeContent.about}
+            brand={brandData}
+            theme={safeTheme}
+            template={activeTemplate}
+            images={safeContent.images}
+          />
         ) : null;
       case 'EXPERTISE':
         return safeContent.expertise ? (
@@ -176,6 +192,14 @@ export function DemoRenderer({
       case 'PROCESS':
         return safeContent.process ? (
           <ProcessSection key="process" process={safeContent.process} theme={safeTheme} layout={layout} />
+        ) : null;
+      case 'GALLERY':
+        return safeContent.gallery ? (
+          <GallerySection key="gallery" gallery={safeContent.gallery} theme={safeTheme} />
+        ) : null;
+      case 'MENU':
+        return safeContent.menu ? (
+          <MenuPricingSection key="menu" menu={safeContent.menu} theme={safeTheme} />
         ) : null;
       case 'WHY_CHOOSE_US':
         return safeContent.whyChooseUs && safeContent.whyChooseUs.points?.length > 0 ? (
@@ -194,6 +218,7 @@ export function DemoRenderer({
           <FaqSection key="faq" faq={safeContent.faq} theme={safeTheme} />
         ) : null;
       case 'CTA':
+      case 'CTA_BANNER' as any:
         return safeContent.ctaBanner ? (
           <TemplateCta key="cta" ctaBanner={safeContent.ctaBanner} brand={brandData} theme={safeTheme} template={activeTemplate} />
         ) : null;

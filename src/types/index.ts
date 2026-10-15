@@ -189,7 +189,9 @@ export type WebsiteSectionType =
   | 'FAQ'
   | 'CONTACT'
   | 'CTA'
-  | 'LOCATION';
+  | 'LOCATION'
+  | 'GALLERY'
+  | 'MENU';
 
 export interface WebsiteDesign {
   layout: WebsiteLayout;
@@ -237,6 +239,54 @@ export interface WebsiteCtaBanner {
 export interface WebsiteNavigationItem {
   label: string;
   href: string;
+}
+
+export interface WebsiteImageSlot {
+  url: string;
+  alt: string;
+  caption?: string;
+  slot: 'HERO' | 'ABOUT' | 'SERVICE' | 'GALLERY';
+  aspectRatio?: string;
+}
+
+export interface WebsiteImages {
+  heroImage?: WebsiteImageSlot;
+  aboutImage?: WebsiteImageSlot;
+  serviceImages?: WebsiteImageSlot[];
+  gallery?: WebsiteImageSlot[];
+  logoUrl?: string;
+}
+
+export interface WebsiteGalleryItem {
+  id: string;
+  title: string;
+  category?: string;
+  imageUrl: string;
+  description?: string;
+}
+
+export interface WebsiteGallery {
+  sectionTitle: string;
+  sectionSubtitle?: string;
+  items: WebsiteGalleryItem[];
+}
+
+export interface WebsiteMenuItem {
+  name: string;
+  description?: string;
+  price: string;
+  badge?: string;
+}
+
+export interface WebsiteMenuCategory {
+  name: string;
+  items: WebsiteMenuItem[];
+}
+
+export interface WebsiteMenuSection {
+  sectionTitle: string;
+  sectionSubtitle?: string;
+  categories: WebsiteMenuCategory[];
 }
 
 export interface WebsiteContent {
@@ -349,6 +399,9 @@ export interface WebsiteContent {
     copyright: string;
     disclaimer: string;
   };
+  images?: WebsiteImages;
+  gallery?: WebsiteGallery;
+  menu?: WebsiteMenuSection;
 }
 
 export type DemoApprovalStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';

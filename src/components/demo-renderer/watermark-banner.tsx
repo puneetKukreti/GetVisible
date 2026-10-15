@@ -4,7 +4,19 @@ import React from 'react';
 import Link from 'next/link';
 import { WebsiteTheme, WebsiteLayout } from '@/types';
 import { THEMES } from '@/lib/demos/templates';
-import { Eye, ArrowLeft, Palette, Edit3, Check, LayoutGrid } from 'lucide-react';
+import {
+  Eye,
+  ArrowLeft,
+  Palette,
+  Edit3,
+  Check,
+  LayoutGrid,
+  Monitor,
+  Tablet,
+  Smartphone,
+  Sparkles,
+  Loader2,
+} from 'lucide-react';
 
 interface WatermarkBannerProps {
   leadId: string;
@@ -17,6 +29,10 @@ interface WatermarkBannerProps {
   version?: number;
   availableVersions?: number[];
   onSelectVersion?: (version: number) => void;
+  viewport?: 'desktop' | 'tablet' | 'mobile';
+  onViewportChange?: (vp: 'desktop' | 'tablet' | 'mobile') => void;
+  onRegenerateSection?: (sectionType: string) => Promise<void> | void;
+  isRegeneratingSection?: boolean;
 }
 
 const LAYOUT_NAMES: Record<string, string> = {
@@ -59,6 +75,10 @@ export function WatermarkBanner({
   version = 1,
   availableVersions = [1],
   onSelectVersion,
+  viewport,
+  onViewportChange,
+  onRegenerateSection,
+  isRegeneratingSection,
 }: WatermarkBannerProps) {
   const themeList = Object.values(THEMES);
 
@@ -155,6 +175,65 @@ export function WatermarkBanner({
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Device Viewport Switcher */}
+          {onViewportChange && (
+            <div className="hidden sm:flex items-center rounded-lg bg-amber-900/60 p-0.5 border border-amber-700/60">
+              <button
+                onClick={() => onViewportChange('desktop')}
+                title="Desktop View"
+                className={`p-1.5 rounded-md transition ${
+                  viewport === 'desktop' ? 'bg-amber-700 text-white shadow-xs' : 'text-amber-300 hover:text-white'
+                }`}
+              >
+                <Monitor className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onViewportChange('tablet')}
+                title="Tablet View (768px)"
+                className={`p-1.5 rounded-md transition ${
+                  viewport === 'tablet' ? 'bg-amber-700 text-white shadow-xs' : 'text-amber-300 hover:text-white'
+                }`}
+              >
+                <Tablet className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onViewportChange('mobile')}
+                title="Mobile View (390px)"
+                className={`p-1.5 rounded-md transition ${
+                  viewport === 'mobile' ? 'bg-amber-700 text-white shadow-xs' : 'text-amber-300 hover:text-white'
+                }`}
+              >
+                <Smartphone className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* AI Section Regeneration */}
+          {onRegenerateSection && (
+            <div className="flex items-center gap-1">
+              <select
+                disabled={isRegeneratingSection}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onRegenerateSection(e.target.value);
+                    e.target.value = '';
+                  }
+                }}
+                defaultValue=""
+                className="rounded border border-amber-500/60 bg-amber-800/80 px-2.5 py-1 text-xs font-semibold text-white focus:outline-none cursor-pointer"
+              >
+                <option value="" disabled>
+                  {isRegeneratingSection ? '⚡ Regenerating...' : '✨ Regenerate Section'}
+                </option>
+                <option value="HERO">⚡ Hero Section</option>
+                <option value="SERVICES">⚡ Core Services</option>
+                <option value="ABOUT">⚡ About Story</option>
+                <option value="WHY_CHOOSE_US">⚡ Why Choose Us</option>
+                <option value="FAQ">⚡ FAQ Answers</option>
+              </select>
             </div>
           )}
 

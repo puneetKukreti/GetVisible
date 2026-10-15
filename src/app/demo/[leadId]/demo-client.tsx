@@ -40,6 +40,8 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
   const [selectedArchetype, setSelectedArchetype] = useState<string>('');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [isRegeneratingSection, setIsRegeneratingSection] = useState(false);
+  const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [error, setError] = useState<string | null>(null);
 
   const activeDemo: WebsiteDemoData =
@@ -140,6 +142,27 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
     );
   };
 
+  const handleRegenerateSection = async (sectionType: string) => {
+    setIsRegeneratingSection(true);
+    try {
+      const res = await fetch(`/api/demos/${activeDemo.id}/regenerate-section`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectionType }),
+      });
+      const data = await res.json();
+      if (data.success && data.demo) {
+        setDemos((prev) =>
+          prev.map((d) => (d.id === data.demo.id ? data.demo : d))
+        );
+      }
+    } catch (err) {
+      console.error('Failed regenerating section:', err);
+    } finally {
+      setIsRegeneratingSection(false);
+    }
+  };
+
   const availableVersions = demos.length > 0 ? demos.map((d) => d.version).sort((a, b) => b - a) : [1];
 
   return (
@@ -155,6 +178,10 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
         onOpenEditor={() => setIsEditorOpen(true)}
         version={activeVersion}
         availableVersions={availableVersions}
+        viewport={viewport}
+        onViewportChange={setViewport}
+        onRegenerateSection={handleRegenerateSection}
+        isRegeneratingSection={isRegeneratingSection}
         onSelectVersion={(v) => {
           setActiveVersion(v);
           const sel = demos.find((d) => d.version === v);
@@ -167,28 +194,38 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
         }}
       />
 
-      {/* Rendered Public Site Demonstration */}
-      <div className="flex-1 min-h-[calc(100vh-52px)]">
-        <DemoRenderer
-          content={renderedContent || activeDemo.content}
-          theme={activeTheme}
-          design={{
-            ...activeDemo.design,
-            layout: activeLayout,
-            template: (activeLayout as WebsiteTemplate),
-            theme: activeTheme,
-            sectionOrder:
-              (CA_LAYOUTS[activeLayout]?.sectionOrder && CA_LAYOUTS[activeLayout].sectionOrder.length > 0)
-                ? CA_LAYOUTS[activeLayout].sectionOrder
-                : (activeDemo.design?.sectionOrder && activeDemo.design.sectionOrder.length > 0)
-                ? activeDemo.design.sectionOrder
-                : CA_LAYOUTS.MODERN_INDIAN.sectionOrder,
-          }}
-          blueprint={activeDemo.blueprint}
-          demoId={activeDemo?.id}
-          leadId={initialLead.id}
-          version={activeVersion}
-        />
+      {/* Rendered Site Demonstration Container with Viewport Resizing */}
+      <div className="flex-1 min-h-[calc(100vh-52px)] flex justify-center bg-slate-200/50 dark:bg-slate-900/50 overflow-x-auto py-2">
+        <div
+          className={`transition-all duration-300 w-full ${
+            viewport === 'mobile'
+              ? 'max-w-[390px] shadow-2xl my-4 rounded-3xl overflow-hidden border-8 border-slate-800'
+              : viewport === 'tablet'
+              ? 'max-w-[768px] shadow-2xl my-4 rounded-2xl overflow-hidden border-4 border-slate-800'
+              : 'max-w-full'
+          }`}
+        >
+          <DemoRenderer
+            content={renderedContent || activeDemo.content}
+            theme={activeTheme}
+            design={{
+              ...activeDemo.design,
+              layout: activeLayout,
+              template: (activeLayout as WebsiteTemplate),
+              theme: activeTheme,
+              sectionOrder:
+                (CA_LAYOUTS[activeLayout]?.sectionOrder && CA_LAYOUTS[activeLayout].sectionOrder.length > 0)
+                  ? CA_LAYOUTS[activeLayout].sectionOrder
+                  : (activeDemo.design?.sectionOrder && activeDemo.design.sectionOrder.length > 0)
+                  ? activeDemo.design.sectionOrder
+                  : CA_LAYOUTS.MODERN_INDIAN.sectionOrder,
+            }}
+            blueprint={activeDemo.blueprint}
+            demoId={activeDemo?.id}
+            leadId={initialLead.id}
+            version={activeVersion}
+          />
+        </div>
       </div>
 
       {/* Human Review & Edit Modal */}

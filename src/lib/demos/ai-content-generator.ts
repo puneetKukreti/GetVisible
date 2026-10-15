@@ -624,3 +624,192 @@ Return ONLY a valid JSON object matching this exact schema:
 
   return null;
 }
+
+export type RegeneratableSectionType =
+  | 'HERO'
+  | 'ABOUT'
+  | 'SERVICES'
+  | 'WHY_CHOOSE_US'
+  | 'PROCESS'
+  | 'FAQ'
+  | 'GALLERY'
+  | 'MENU';
+
+export interface RegenerateSectionParams {
+  sectionType: RegeneratableSectionType;
+  facts: GenerateAiContentFacts;
+  customPrompt?: string;
+}
+
+/**
+ * Regenerates an individual section's content using Gemini AI, with fallback to deterministic data.
+ */
+export async function regenerateSectionContent(params: RegenerateSectionParams): Promise<any> {
+  const { sectionType, facts, customPrompt } = params;
+  const apiKey = getGeminiApiKey();
+  const businessName = facts.businessName?.trim() || 'Local Enterprise';
+  const profession = facts.profession?.trim() || 'Professional Practice';
+  const city = facts.city?.trim() || 'Delhi NCR';
+
+  if (apiKey) {
+    const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+    const sectionPrompt = `You are an elite Indian B2B & SMB copywriter for:
+- Business: "${businessName}"
+- Profession: "${profession}"
+- City: "${city}", India
+${customPrompt ? `Client Instruction: ${customPrompt}` : ''}
+
+Generate updated, high-converting copy specifically for the section: "${sectionType}".
+Return ONLY a valid JSON object matching this schema for ${sectionType}:
+
+${
+  sectionType === 'HERO'
+    ? `{
+  "badge": "Short 3-5 word category badge",
+  "headline": "Compelling 6-10 word headline tailored to profession",
+  "subheadline": "1-sentence value proposition mentioning ${city}",
+  "primaryCta": { "label": "Direct action CTA", "href": "#contact" },
+  "secondaryCta": { "label": "Explore Services", "href": "#services" }
+}`
+    : sectionType === 'ABOUT'
+    ? `{
+  "title": "About ${businessName}",
+  "leadParagraph": "1-sentence overview of ${businessName} in ${city}",
+  "body": "2-sentence description of experience and standards",
+  "highlights": [
+    { "title": "Highlight 1 (2-4 words)", "description": "1 short sentence" },
+    { "title": "Highlight 2 (2-4 words)", "description": "1 short sentence" },
+    { "title": "Highlight 3 (2-4 words)", "description": "1 short sentence" },
+    { "title": "Highlight 4 (2-4 words)", "description": "1 short sentence" }
+  ]
+}`
+    : sectionType === 'SERVICES'
+    ? `{
+  "sectionTitle": "Services Section Title",
+  "sectionSubtitle": "1-sentence subtitle describing service scope",
+  "items": [
+    { "id": "srv-1", "title": "Service 1", "description": "1-2 sentence description", "isConfirmed": true, "provenance": "AI_SYNTHESIZED" },
+    { "id": "srv-2", "title": "Service 2", "description": "1-2 sentence description", "isConfirmed": true, "provenance": "AI_SYNTHESIZED" },
+    { "id": "srv-3", "title": "Service 3", "description": "1-2 sentence description", "isConfirmed": true, "provenance": "AI_SYNTHESIZED" },
+    { "id": "srv-4", "title": "Service 4", "description": "1-2 sentence description", "isConfirmed": true, "provenance": "AI_SYNTHESIZED" }
+  ]
+}`
+    : sectionType === 'WHY_CHOOSE_US'
+    ? `{
+  "sectionTitle": "Why Choose ${businessName}",
+  "sectionSubtitle": "Key advantages of partnering with us",
+  "points": [
+    { "title": "Advantage 1", "description": "1 sentence explanation" },
+    { "title": "Advantage 2", "description": "1 sentence explanation" },
+    { "title": "Advantage 3", "description": "1 sentence explanation" },
+    { "title": "Advantage 4", "description": "1 sentence explanation" }
+  ]
+}`
+    : sectionType === 'PROCESS'
+    ? `{
+  "sectionTitle": "Our Process",
+  "sectionSubtitle": "How we work together",
+  "steps": [
+    { "number": "01", "title": "Initial Consultation", "description": "Understanding your exact requirements." },
+    { "number": "02", "title": "Strategic Planning", "description": "Tailoring an actionable solution." },
+    { "number": "03", "title": "Execution", "description": "Disciplined delivery with quality assurance." },
+    { "number": "04", "title": "Ongoing Support", "description": "Continuous monitoring and assistance." }
+  ]
+}`
+    : sectionType === 'FAQ'
+    ? `{
+  "sectionTitle": "Frequently Asked Questions",
+  "items": [
+    { "question": "Question 1 for this profession?", "answer": "Clear helpful answer." },
+    { "question": "Question 2 for this profession?", "answer": "Clear helpful answer." },
+    { "question": "Question 3 regarding consultation in ${city}?", "answer": "Clear helpful answer." }
+  ]
+}`
+    : `{ "status": "ok" }`
+}`;
+
+    for (const model of candidateModels) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: sectionPrompt }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0.5 },
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (raw) {
+            const cleaned = raw.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim();
+            const parsed = JSON.parse(cleaned);
+            if (parsed && typeof parsed === 'object') {
+              return parsed;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[Gemini AI] Failed regenerating ${sectionType} with ${model}:`, err);
+      }
+    }
+  }
+
+  // Fallback to deterministic profile
+  const fallback = getDeterministicProfessionProfile(facts);
+  if (sectionType === 'HERO') {
+    return {
+      badge: fallback.heroBadge,
+      headline: fallback.heroHeadline,
+      subheadline: fallback.heroSubheadline,
+      primaryCta: { label: fallback.primaryCtaLabel, href: '#contact' },
+      secondaryCta: { label: 'Explore Services', href: '#services' },
+    };
+  }
+  if (sectionType === 'ABOUT') {
+    return {
+      title: `About ${businessName}`,
+      leadParagraph: fallback.aboutLead,
+      body: fallback.aboutBody,
+      highlights: fallback.highlights,
+    };
+  }
+  if (sectionType === 'SERVICES') {
+    return {
+      sectionTitle: fallback.servicesSectionTitle,
+      sectionSubtitle: fallback.servicesSectionSubtitle,
+      items: fallback.services.map((s, i) => ({
+        id: `srv-${i + 1}`,
+        title: s.title,
+        description: s.description,
+        isConfirmed: true,
+        provenance: 'AI_SYNTHESIZED' as const,
+      })),
+    };
+  }
+  if (sectionType === 'WHY_CHOOSE_US') {
+    return {
+      sectionTitle: `Why Choose ${businessName}`,
+      sectionSubtitle: `Delivering predictable excellence for clients in ${city}`,
+      points: fallback.whyChooseUs,
+    };
+  }
+  if (sectionType === 'PROCESS') {
+    return {
+      sectionTitle: 'How We Work',
+      sectionSubtitle: 'A structured approach delivering transparent results',
+      steps: fallback.processSteps,
+    };
+  }
+  if (sectionType === 'FAQ') {
+    return {
+      sectionTitle: 'Frequently Asked Questions',
+      items: fallback.faqs,
+    };
+  }
+
+  return null;
+}

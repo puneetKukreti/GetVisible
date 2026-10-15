@@ -16,9 +16,46 @@ interface HeroProps {
   brand: WebsiteContent['brand'];
   theme: WebsiteTheme;
   template?: WebsiteTemplate;
+  images?: WebsiteContent['images'];
 }
 
-export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }: HeroProps) {
+function HeroVisual({
+  images,
+  theme,
+  fallback,
+  firmName,
+}: {
+  images?: any;
+  theme: WebsiteTheme;
+  fallback: React.ReactNode;
+  firmName: string;
+}) {
+  const heroUrl = typeof images?.heroImage === 'string' ? images.heroImage : images?.heroImage?.url;
+  const heroAlt = (typeof images?.heroImage === 'object' && images?.heroImage?.alt) || firmName;
+
+  if (heroUrl) {
+    return (
+      <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-slate-200/80 dark:border-slate-800/80 aspect-[16/10] bg-slate-100 dark:bg-slate-900 group">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={heroUrl}
+          alt={heroAlt}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          onError={(e) => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full text-[11px] font-semibold bg-black/60 backdrop-blur-md text-white border border-white/20">
+          ✦ Verified Presence
+        </div>
+      </div>
+    );
+  }
+  return <>{fallback}</>;
+}
+
+export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH', images }: HeroProps) {
   const firmName = brand?.businessName || 'Chartered Accountants';
   const typo = getHeroTypographyConfig(firmName, template);
   const split = splitFirmName(firmName);
@@ -83,7 +120,12 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
             </div>
 
             <div className="lg:col-span-5">
-              <FinancialGeometricArtwork theme={theme} />
+              <HeroVisual
+                images={images}
+                theme={theme}
+                firmName={firmName}
+                fallback={<FinancialGeometricArtwork theme={theme} />}
+              />
             </div>
           </div>
         </div>
@@ -154,7 +196,12 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
             </div>
 
             <div className="lg:col-span-5">
-              <FintechDashboardVisual theme={theme} />
+              <HeroVisual
+                images={images}
+                theme={theme}
+                firmName={firmName}
+                fallback={<FintechDashboardVisual theme={theme} />}
+              />
             </div>
           </div>
         </div>
@@ -271,7 +318,12 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
 
           {/* Right Block: Strict Grid Visual */}
           <div className="lg:col-span-4 p-8 sm:p-12 flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-            <SwissGridVisual theme={theme} />
+            <HeroVisual
+              images={images}
+              theme={theme}
+              firmName={firmName}
+              fallback={<SwissGridVisual theme={theme} />}
+            />
           </div>
         </div>
       </section>
@@ -333,7 +385,12 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
           </div>
 
           <div className="lg:col-span-5">
-            <IndianGeometricMotif theme={theme} />
+            <HeroVisual
+              images={images}
+              theme={theme}
+              firmName={firmName}
+              fallback={<IndianGeometricMotif theme={theme} />}
+            />
           </div>
         </div>
       </div>

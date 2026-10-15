@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import { ContentProvenance } from '@/types';
 
-// Safe URL validator: strictly permits http, https, mailto, tel, or relative hash anchors
-const safeUrlRegex = /^(https?:\/\/|mailto:|tel:|#)/i;
+// Safe URL validator: strictly permits http, https, mailto, tel, relative paths, or relative hash anchors
+const safeUrlRegex = /^(https?:\/\/|mailto:|tel:|#|\/|data:image\/)/i;
 const safeUrlSchema = z
   .string()
   .refine((url) => !url || safeUrlRegex.test(url.trim()), {
-    message: 'URL must use https, http, mailto, tel, or anchor links. Dangerous protocols are forbidden.',
+    message: 'URL must use https, http, mailto, tel, relative path, or anchor links. Dangerous protocols are forbidden.',
   });
 
 export const ContentProvenanceSchema: z.ZodType<ContentProvenance> = z.enum([
@@ -54,6 +54,8 @@ export const WebsiteSectionTypeSchema = z.enum([
   'CONTACT',
   'CTA',
   'LOCATION',
+  'GALLERY',
+  'MENU',
 ]);
 
 export const WebsiteThemeSchema = z.object({
@@ -137,6 +139,54 @@ export const FaqItemSchema = z.object({
   answer: z.string().min(10).max(600),
 });
 
+export const WebsiteImageSlotSchema = z.object({
+  url: safeUrlSchema,
+  alt: z.string(),
+  caption: z.string().optional(),
+  slot: z.enum(['HERO', 'ABOUT', 'SERVICE', 'GALLERY']),
+  aspectRatio: z.string().optional(),
+});
+
+export const WebsiteImagesSchema = z.object({
+  heroImage: WebsiteImageSlotSchema.optional(),
+  aboutImage: WebsiteImageSlotSchema.optional(),
+  serviceImages: z.array(WebsiteImageSlotSchema).optional(),
+  gallery: z.array(WebsiteImageSlotSchema).optional(),
+  logoUrl: safeUrlSchema.optional(),
+});
+
+export const WebsiteGallerySchema = z.object({
+  sectionTitle: z.string().min(2).max(80),
+  sectionSubtitle: z.string().min(5).max(200).optional(),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      title: z.string().min(2).max(100),
+      category: z.string().optional(),
+      imageUrl: safeUrlSchema,
+      description: z.string().max(200).optional(),
+    })
+  ).min(1).max(20),
+});
+
+export const WebsiteMenuSectionSchema = z.object({
+  sectionTitle: z.string().min(2).max(80),
+  sectionSubtitle: z.string().min(5).max(200).optional(),
+  categories: z.array(
+    z.object({
+      name: z.string().min(2).max(60),
+      items: z.array(
+        z.object({
+          name: z.string().min(2).max(80),
+          description: z.string().max(200).optional(),
+          price: z.string().max(40),
+          badge: z.string().max(30).optional(),
+        })
+      ).min(1).max(20),
+    })
+  ).min(1).max(10),
+});
+
 export const WebsiteContentSchema = z.object({
   meta: z.object({
     title: z.string().min(2).max(150),
@@ -213,6 +263,9 @@ export const WebsiteContentSchema = z.object({
     })
     .optional(),
   ctaBanner: WebsiteCtaBannerSchema.optional(),
+  gallery: WebsiteGallerySchema.optional(),
+  menu: WebsiteMenuSectionSchema.optional(),
+  images: WebsiteImagesSchema.optional(),
   industries: z.object({
     enabled: z.boolean(),
     sectionTitle: z.string().min(2).max(80),
