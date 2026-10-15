@@ -117,7 +117,7 @@ export class WebsiteDemoGeneratorService {
 
     const demoId = `demo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-    const screenshotUrl = getTemplateScreenshotPath(design.layout || template.id);
+    const screenshotUrl = `/generated-screenshots/${lead.id}.png`;
 
     const websiteDemo: WebsiteDemoData = {
       id: demoId,

@@ -173,16 +173,20 @@ export function personalizeStitchHtml(
 
   // 2b. Hero Business Name & Firm Identity Injection (Huge, unmissable branding in Hero section)
   const heroBadgePill = `
-<div style="margin-bottom: 12px; display: inline-flex; align-items: center; gap: 8px; background: rgba(212, 175, 55, 0.18); border: 1px solid rgba(212, 175, 55, 0.5); padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 700; color: #b45309; letter-spacing: 0.06em; text-transform: uppercase;">
+<div style="margin-bottom: 14px; display: inline-flex; align-items: center; gap: 8px; background: rgba(212, 175, 55, 0.18); border: 1px solid rgba(212, 175, 55, 0.5); padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 700; color: #b45309; letter-spacing: 0.06em; text-transform: uppercase;">
   <span>✦ ${escapedBrand} • ${escapeHtml(city)}</span>
 </div>`;
 
-  const heroHeadlineContent = `
-${heroBadgePill}
-<span style="display:block; color:inherit; font-size:1.15em; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; line-height:1.15;">${escapedBrand}</span>
-<span style="display:block; font-size:0.75em; font-weight:500; opacity:0.9; line-height:1.25;">Trusted Financial Clarity &amp; Strategic Tax Advisory in ${escapeHtml(city)}</span>`;
+  // Replace any existing generic eyebrow badge before the h1 with the gold firm badge pill
+  if (/<div[^>]*class="[^"]*inline-flex items-center gap-2[^"]*mb-6"[^>]*>[\s\S]*?<\/div>/i.test(html)) {
+    html = html.replace(/<div[^>]*class="[^"]*inline-flex items-center gap-2[^"]*mb-6"[^>]*>[\s\S]*?<\/div>/i, heroBadgePill);
+  }
 
-  // Inject the prominent business name & badge right into the primary Hero <h1>
+  const heroHeadlineContent = `
+<span style="display:block; color:inherit; font-size:1.12em; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; line-height:1.15;">${escapedBrand}</span>
+<span style="display:block; font-size:0.70em; font-weight:500; opacity:0.9; line-height:1.25;">Trusted Financial Clarity &amp; Strategic Tax Advisory in ${escapeHtml(city)}</span>`;
+
+  // Inject the prominent business name & headline right into the primary Hero <h1>
   html = html.replace(/(<h1[^>]*>)([\s\S]*?)(<\/h1>)/i, (_match, openTag, _inner, closeTag) => {
     return `${openTag}\n${heroHeadlineContent}\n${closeTag}`;
   });

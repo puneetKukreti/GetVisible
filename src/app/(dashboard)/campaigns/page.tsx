@@ -117,9 +117,10 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const initialScreenshot =
     lead.websiteDemos?.[0]?.screenshotUrl &&
     !lead.websiteDemos[0].screenshotUrl.includes('localhost') &&
-    !lead.websiteDemos[0].screenshotUrl.includes('api.microlink.io')
+    !lead.websiteDemos[0].screenshotUrl.includes('api.microlink.io') &&
+    !lead.websiteDemos[0].screenshotUrl.includes('demo-templates')
       ? lead.websiteDemos[0].screenshotUrl
-      : '/demo-templates/design-1-premium/screen.png';
+      : `/api/demos/${lead.id}/screenshot?format=image`;
   const [screenshotUrl, setScreenshotUrl] = useState<string | null>(initialScreenshot);
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [refreshingHeroShot, setRefreshingHeroShot] = useState(false);
@@ -279,7 +280,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
         res = await fetch(screenshotUrl);
       }
       if (!res.ok) {
-        res = await fetch('/demo-templates/design-1-premium/screen.png');
+        res = await fetch(`/api/demos/${lead.id}/screenshot?format=image&refresh=true`);
       }
       if (!res.ok) throw new Error('Could not fetch screenshot image');
       const blob = await res.blob();
@@ -291,20 +292,6 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       setTimeout(() => setCopyImageStatus('IDLE'), 3500);
     } catch (err) {
       console.warn('Clipboard image copy error:', err);
-      // Extra fallback attempt from static template
-      try {
-        const fallbackRes = await fetch('/demo-templates/design-1-premium/screen.png');
-        if (fallbackRes.ok) {
-          const blob = await fallbackRes.blob();
-          const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });
-          await navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': pngBlob }),
-          ]);
-          setCopyImageStatus('COPIED');
-          setTimeout(() => setCopyImageStatus('IDLE'), 3500);
-          return;
-        }
-      } catch {}
       setCopyImageStatus('FAILED');
       setTimeout(() => setCopyImageStatus('IDLE'), 3500);
     }
@@ -729,7 +716,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                           alt={`Website concept for ${lead.businessName}`}
                           className="w-full h-full object-cover object-top"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = '/demo-templates/design-1-premium/screen.png';
+                            (e.target as HTMLImageElement).src = `/api/demos/${lead.id}/screenshot?format=image&fallback=1`;
                           }}
                         />
                       ) : (
@@ -920,7 +907,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       alt={`Demo website preview for ${lead.businessName}`}
                       className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = '/demo-templates/design-1-premium/screen.png';
+                        (e.target as HTMLImageElement).src = `/api/demos/${lead.id}/screenshot?format=image&fallback=1`;
                       }}
                     />
                   </div>
@@ -1237,7 +1224,7 @@ function OutreachQueueTab({
           res = await fetch(lead.websiteDemos[0].screenshotUrl);
         }
         if (!res.ok) {
-          res = await fetch('/demo-templates/design-1-premium/screen.png');
+          res = await fetch(`/api/demos/${lead.id}/screenshot?format=image&refresh=true`);
         }
         if (res.ok) {
           const blob = await res.blob();

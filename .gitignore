@@ -32,3 +32,6 @@ Thumbs.db
 *.rar
 *.zip
 project-dump.txt
+
+public/generated-screenshots/*
+!public/generated-screenshots/.gitkeep
