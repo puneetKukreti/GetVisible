@@ -99,6 +99,61 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
         const altDemos = await WebsiteDemoRepository.listDemos(altOrgId, initialLead.id);
         if (altDemos.length > 0) initialDemos = altDemos;
       }
+
+      // If lead exists but demo hasn't been generated yet, generate one on-the-fly
+      if (initialDemos.length === 0) {
+        try {
+          const newDemo: WebsiteDemoData = {
+            id: `demo-${initialLead.id}-v1`,
+            leadId: initialLead.id,
+            organizationId: targetOrg,
+            templateId: 'design-1-premium',
+            version: 1,
+            generationStatus: 'COMPLETED',
+            approvalStatus: 'APPROVED',
+            publicToken: `token-${initialLead.id}`,
+            viewCount: 0,
+            theme: {
+              id: 'executive-navy',
+              name: 'Executive Navy',
+              primaryColor: '#1e3a8a',
+              secondaryColor: '#1e293b',
+              accentColor: '#2563eb',
+              fontFamily: 'sans',
+              style: 'corporate',
+              borderRadius: 'md',
+            },
+            content: {
+              brand: { businessName: initialLead.businessName },
+              location: { city: initialLead.city, address: initialLead.address },
+              contact: { publicPhone: initialLead.publicPhone, publicEmail: initialLead.publicEmail },
+              meta: { profession: initialLead.profession },
+            } as any,
+            design: {
+              layout: 'design-1-premium',
+              template: 'design-1-premium' as any,
+              sectionOrder: ['HERO', 'SERVICES', 'ABOUT', 'WHY_CHOOSE_US', 'INDUSTRIES', 'FAQ', 'CONTACT', 'LOCATION'],
+              theme: {
+                id: 'executive-navy',
+                name: 'Executive Navy',
+                primaryColor: '#1e3a8a',
+                secondaryColor: '#1e293b',
+                accentColor: '#2563eb',
+                fontFamily: 'sans',
+                style: 'corporate',
+                borderRadius: 'md',
+              },
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          const saved = await WebsiteDemoRepository.saveDemo(targetOrg, newDemo, 'system');
+          if (saved) {
+            initialDemos = [saved];
+            initialPublicDemo = saved;
+          }
+        } catch {}
+      }
     }
   } catch {}
 

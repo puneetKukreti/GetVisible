@@ -75,8 +75,11 @@ export async function captureLocalHeroScreenshot(
       '--disable-gpu',
       '--no-sandbox',
       '--disable-dev-shm-usage',
+      '--allow-file-access-from-files',
+      '--enable-local-file-accesses',
+      '--run-all-compositor-stages-before-draw',
       '--hide-scrollbars',
-      '--virtual-time-budget=1200',
+      '--virtual-time-budget=2000',
       `--window-size=${width},${height}`,
       `--screenshot=${outputPngPath}`,
       `file:///${tmpHtmlPath.replace(/\\/g, '/')}`,
@@ -107,9 +110,24 @@ export function generateHeroMockupSvg(
   city: string,
   profession: string = 'Chartered Accountants'
 ): string {
-  const escapedBrand = (brandName || 'Chartered Accountants').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const escapedCity = (city || 'Gurgaon').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const escapedProf = (profession || 'Chartered Accountants').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escapedBrand = (brandName || 'Chartered Accountants')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+  const escapedCity = (city || 'Gurgaon')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+  const escapedProf = (profession || 'Chartered Accountants')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 640" width="1024" height="640">
   <defs>

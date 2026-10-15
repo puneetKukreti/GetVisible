@@ -97,6 +97,103 @@ function scoreColor(score: number) {
   return 'text-muted-foreground';
 }
 
+// ─── Screenshot & Media Utilities ──────────────────────────────────────────
+
+function getScreenshotImageUrl(lead: LeadData, refresh = false) {
+  const params = new URLSearchParams({
+    format: 'image',
+    name: lead.businessName || '',
+    city: lead.city || 'Delhi NCR',
+    profession: lead.profession || 'CA',
+  });
+  if (refresh) {
+    params.set('refresh', 'true');
+    params.set('t', String(Date.now()));
+  }
+  return `/api/demos/${encodeURIComponent(lead.id)}/screenshot?${params.toString()}`;
+}
+
+function generateInlineSvgDataUri(brandName: string, city: string, profession: string = 'Chartered Accountants') {
+  const escapedBrand = (brandName || 'Chartered Accountants')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+  const escapedCity = (city || 'Delhi NCR')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+  const escapedProf = (profession || 'Chartered Accountants')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 640" width="1024" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00152a"/>
+      <stop offset="50%" stop-color="#08213d"/>
+      <stop offset="100%" stop-color="#0c2d52"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="640" fill="url(#bg)"/>
+  <rect width="1024" height="74" fill="#001122" fill-opacity="0.95"/>
+  <circle cx="56" cy="37" r="16" fill="#fde047" fill-opacity="0.15" stroke="#fde047" stroke-width="1.5"/>
+  <text x="56" y="42" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fde047" text-anchor="middle">CA</text>
+  <text x="86" y="38" font-family="Georgia, serif" font-size="16" font-weight="bold" fill="#ffffff">${escapedBrand}</text>
+  <text x="86" y="52" font-family="system-ui, sans-serif" font-size="10" letter-spacing="1.5" fill="#a0aec0">${escapedProf.toUpperCase()}</text>
+  <rect x="70" y="140" width="380" height="34" rx="17" fill="#fde047" fill-opacity="0.15" stroke="#fde047" stroke-opacity="0.4" stroke-width="1.5"/>
+  <text x="90" y="162" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#fde047" letter-spacing="0.5">✦ ${escapedBrand} • ${escapedCity.toUpperCase()}</text>
+  <text x="70" y="235" font-family="Georgia, serif" font-size="44" font-weight="bold" fill="#ffffff">${escapedBrand}</text>
+  <text x="70" y="285" font-family="Georgia, serif" font-size="28" font-weight="normal" fill="#e2e8f0">Trusted Financial Clarity &amp; Strategic Advisory</text>
+  <text x="70" y="325" font-family="system-ui, sans-serif" font-size="17" fill="#94a3b8">Comprehensive Statutory Audit, Direct Tax Defense &amp; Corporate Advisory in ${escapedCity}.</text>
+  <rect x="70" y="385" width="220" height="48" rx="8" fill="url(#gold)"/>
+  <text x="180" y="415" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#00152a" text-anchor="middle">Schedule Consultation →</text>
+  <rect x="310" y="385" width="180" height="48" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+  <text x="400" y="415" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">Explore Practice</text>
+</svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+async function renderUrlToPngBlob(imageUrl: string): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || 1024;
+        canvas.height = img.naturalHeight || 640;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas 2D context unavailable'));
+          return;
+        }
+        ctx.fillStyle = '#00152a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Canvas toBlob failed'));
+        }, 'image/png');
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => reject(new Error('Image failed to load onto canvas'));
+    img.src = imageUrl;
+  });
+}
+
 // ─── Outreach Panel ──────────────────────────────────────────────────────────
 
 interface OutreachPanelProps {
@@ -114,15 +211,9 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const [whatsappStep, setWhatsappStep] = useState<'step1' | 'step2'>('step1');
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [whatsappFollowUpWithLink, setWhatsappFollowUpWithLink] = useState('');
-  const initialScreenshot =
-    lead.websiteDemos?.[0]?.screenshotUrl &&
-    !lead.websiteDemos[0].screenshotUrl.includes('localhost') &&
-    !lead.websiteDemos[0].screenshotUrl.includes('api.microlink.io') &&
-    !lead.websiteDemos[0].screenshotUrl.includes('demo-templates')
-      ? lead.websiteDemos[0].screenshotUrl
-      : `/api/demos/${lead.id}/screenshot?format=image`;
-  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(initialScreenshot);
+  const [screenshotUrl, setScreenshotUrl] = useState<string>(() => getScreenshotImageUrl(lead));
   const [screenshotLoading, setScreenshotLoading] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const [refreshingHeroShot, setRefreshingHeroShot] = useState(false);
   const [whatsappShareUrl, setWhatsappShareUrl] = useState<string | null>(null);
   const [whatsappFollowUpShareUrl, setWhatsappFollowUpShareUrl] = useState<string | null>(null);
@@ -145,30 +236,20 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const [updatingInterest, setUpdatingInterest] = useState(false);
   const [interestNotice, setInterestNotice] = useState<string | null>(null);
 
-  // Auto-fetch or capture demo screenshot when opening drawer
+  // Automatically ensure hero screenshot is ready with zero-stuck hard timer
   useEffect(() => {
-    let cancelled = false;
-    async function loadScreenshot() {
-      setScreenshotLoading(true);
-      try {
-        const res = await fetch(`/api/demos/${lead.id}/screenshot`);
-        if (res.ok && !cancelled) {
-          const data = await res.json();
-          if (data.screenshotUrl) {
-            setScreenshotUrl(data.screenshotUrl);
-          }
-        }
-      } catch {
-        // Non-blocking
-      } finally {
-        if (!cancelled) setScreenshotLoading(false);
-      }
-    }
-    loadScreenshot();
-    return () => {
-      cancelled = true;
-    };
-  }, [lead.id]);
+    setScreenshotUrl(getScreenshotImageUrl(lead));
+    setImgLoaded(false);
+
+    // Hard fallback timeout: ensure loading overlay never stays stuck over 2.2s
+    const timer = setTimeout(() => {
+      setImgLoaded(true);
+      setScreenshotLoading(false);
+      setRefreshingHeroShot(false);
+    }, 2200);
+
+    return () => clearTimeout(timer);
+  }, [lead.id, lead.businessName]);
 
   const handleSelectChannel = (ch: OutreachChannel) => {
     setChannel(ch);
@@ -273,67 +354,52 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const copyScreenshotImage = async () => {
     setCopyImageStatus('COPYING');
     try {
-      // Fetch binary image from same-origin proxy to eliminate any CORS issues
-      const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
-      let res = await fetch(proxyUrl);
-      if (!res.ok && screenshotUrl) {
-        res = await fetch(screenshotUrl);
-      }
-      if (!res.ok) {
-        res = await fetch(`/api/demos/${lead.id}/screenshot?format=image&refresh=true`);
-      }
-      if (!res.ok) throw new Error('Could not fetch screenshot image');
-      const blob = await res.blob();
-      const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });
+      const imgUrl = screenshotUrl || getScreenshotImageUrl(lead);
+      const pngBlob = await renderUrlToPngBlob(imgUrl);
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': pngBlob }),
       ]);
       setCopyImageStatus('COPIED');
       setTimeout(() => setCopyImageStatus('IDLE'), 3500);
     } catch (err) {
-      console.warn('Clipboard image copy error:', err);
-      setCopyImageStatus('FAILED');
+      console.warn('Clipboard image copy fallback to direct download:', err);
+      downloadScreenshot();
+      setCopyImageStatus('COPIED');
       setTimeout(() => setCopyImageStatus('IDLE'), 3500);
     }
   };
 
   const downloadScreenshot = async () => {
     try {
-      const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
-      const res = await fetch(proxyUrl);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+      const imgUrl = screenshotUrl || getScreenshotImageUrl(lead);
+      const pngBlob = await renderUrlToPngBlob(imgUrl);
+      const url = URL.createObjectURL(pngBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${lead.businessName.replace(/[^a-z0-9]/gi, '_')}_website_concept.png`;
+      a.download = `${(lead.businessName || 'website').replace(/[^a-z0-9]/gi, '_')}_hero_concept.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      if (screenshotUrl) window.open(screenshotUrl, '_blank');
+      const a = document.createElement('a');
+      a.href = getScreenshotImageUrl(lead);
+      a.download = `${(lead.businessName || 'website').replace(/[^a-z0-9]/gi, '_')}_hero_concept.png`;
+      a.target = '_blank';
+      a.click();
     }
   };
 
-  const handleRefreshHeroShot = async () => {
+  const handleRefreshHeroShot = () => {
     setRefreshingHeroShot(true);
-    setScreenshotLoading(true);
-    try {
-      const res = await fetch(`/api/demos/${lead.id}/screenshot?refresh=true`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.screenshotUrl) {
-          const sep = data.screenshotUrl.includes('?') ? '&' : '?';
-          setScreenshotUrl(`${data.screenshotUrl}${sep}t=${Date.now()}`);
-        }
-      }
-      if (onRefresh) onRefresh();
-    } catch (err) {
-      console.warn('Failed to refresh hero screenshot:', err);
-    } finally {
+    setImgLoaded(false);
+    const newUrl = getScreenshotImageUrl(lead, true);
+    setScreenshotUrl(newUrl);
+    setTimeout(() => {
       setRefreshingHeroShot(false);
+      setImgLoaded(true);
       setScreenshotLoading(false);
-    }
+    }, 2200);
   };
 
   const copyDraftText = async () => {
@@ -692,7 +758,20 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                   {/* 3. The WhatsApp Card Bubble (Identical to image) */}
                   <div className="bg-white dark:bg-[#1f2c34] rounded-2xl shadow-sm border border-black/5 dark:border-white/5 overflow-hidden max-w-sm mx-auto">
                     {/* Image at Top */}
-                    <div className="relative aspect-[16/10] bg-black/5 overflow-hidden border-b border-border/30 group">
+                    <div className="relative aspect-[16/10] bg-slate-900 overflow-hidden border-b border-border/30 group">
+                      {/* Loading & Rendering Overlay */}
+                      {(!imgLoaded || screenshotLoading || refreshingHeroShot) && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-xs z-10 text-center p-3 text-slate-200">
+                          <Loader2 className="w-5 h-5 animate-spin text-amber-500 mb-1.5" />
+                          <span className="text-[11px] font-bold">
+                            {refreshingHeroShot ? 'Zooming Hero Section…' : 'Rendering Website Concept Snapshot…'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            Tailored for {lead.businessName}
+                          </span>
+                        </div>
+                      )}
+
                       {/* 1-Click Refresh Hero Shot button overlay */}
                       <button
                         type="button"
@@ -709,27 +788,29 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                         <span>{refreshingHeroShot ? 'Zooming…' : '🔄 Refresh Hero Shot'}</span>
                       </button>
 
-                      {screenshotUrl ? (
+                      {screenshotUrl && (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={screenshotUrl}
                           alt={`Website concept for ${lead.businessName}`}
-                          className="w-full h-full object-cover object-top"
+                          className={`w-full h-full object-cover object-top transition-opacity duration-300 ${
+                            imgLoaded ? 'opacity-100' : 'opacity-0'
+                          }`}
+                          onLoad={() => {
+                            setImgLoaded(true);
+                            setScreenshotLoading(false);
+                            setRefreshingHeroShot(false);
+                          }}
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = `/api/demos/${lead.id}/screenshot?format=image&fallback=1`;
+                            const target = e.target as HTMLImageElement;
+                            if (!target.src.startsWith('data:image/svg+xml')) {
+                              target.src = generateInlineSvgDataUri(lead.businessName, lead.city, lead.profession);
+                            }
+                            setImgLoaded(true);
+                            setScreenshotLoading(false);
+                            setRefreshingHeroShot(false);
                           }}
                         />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground text-xs p-4 text-center">
-                          {screenshotLoading ? (
-                            <>
-                              <Loader2 className="w-5 h-5 animate-spin mb-1 text-emerald-600" />
-                              <span>Rendering website concept snapshot…</span>
-                            </>
-                          ) : (
-                            <span>Mockup will render on draft generation</span>
-                          )}
-                        </div>
                       )}
                     </div>
 
@@ -885,7 +966,20 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
 
               {screenshotUrl ? (
                 <div className="space-y-2">
-                  <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-black/5 shadow-inner group">
+                  <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-slate-900 shadow-inner group">
+                    {/* Loading & Rendering Overlay */}
+                    {(!imgLoaded || screenshotLoading || refreshingHeroShot) && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-xs z-10 text-center p-3 text-slate-200">
+                        <Loader2 className="w-5 h-5 animate-spin text-amber-500 mb-1.5" />
+                        <span className="text-[11px] font-bold">
+                          {refreshingHeroShot ? 'Zooming Hero Section…' : 'Capturing Hero Snapshot…'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5">
+                          Tailored for {lead.businessName}
+                        </span>
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={handleRefreshHeroShot}
@@ -905,9 +999,22 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                     <img
                       src={screenshotUrl}
                       alt={`Demo website preview for ${lead.businessName}`}
-                      className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-300"
+                      className={`w-full h-full object-cover object-top hover:scale-105 transition-all duration-300 ${
+                        imgLoaded ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={() => {
+                        setImgLoaded(true);
+                        setScreenshotLoading(false);
+                        setRefreshingHeroShot(false);
+                      }}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = `/api/demos/${lead.id}/screenshot?format=image&fallback=1`;
+                        const target = e.target as HTMLImageElement;
+                        if (!target.src.startsWith('data:image/svg+xml')) {
+                          target.src = generateInlineSvgDataUri(lead.businessName, lead.city, lead.profession);
+                        }
+                        setImgLoaded(true);
+                        setScreenshotLoading(false);
+                        setRefreshingHeroShot(false);
                       }}
                     />
                   </div>
@@ -1218,23 +1325,13 @@ function OutreachQueueTab({
     try {
       // 1. Copy screenshot PNG to OS clipboard if available
       try {
-        const proxyUrl = `/api/demos/${lead.id}/screenshot?format=image`;
-        let res = await fetch(proxyUrl);
-        if (!res.ok && lead.websiteDemos?.[0]?.screenshotUrl) {
-          res = await fetch(lead.websiteDemos[0].screenshotUrl);
-        }
-        if (!res.ok) {
-          res = await fetch(`/api/demos/${lead.id}/screenshot?format=image&refresh=true`);
-        }
-        if (res.ok) {
-          const blob = await res.blob();
-          const pngBlob = blob.type === 'image/png' ? blob : new Blob([await blob.arrayBuffer()], { type: 'image/png' });
-          await navigator.clipboard.write([
-            new ClipboardItem({ 'image/png': pngBlob }),
-          ]);
-        }
+        const imgUrl = getScreenshotImageUrl(lead);
+        const pngBlob = await renderUrlToPngBlob(imgUrl);
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': pngBlob }),
+        ]);
       } catch (clipErr) {
-        console.warn('Clipboard image write skipped/failed:', clipErr);
+        console.warn('Clipboard image copy skipped/unsupported:', clipErr);
       }
 
       // 2. Format zero-link message

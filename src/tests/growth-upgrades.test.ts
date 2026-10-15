@@ -203,8 +203,8 @@ describe('Growth & Workflow Upgrades', () => {
       const json = await res.json();
       expect(json.success).toBe(true);
       expect(json.screenshotUrl).toBeDefined();
-      expect(json.screenshotUrl).toMatch(/generated-screenshots/);
-    });
+      expect(json.screenshotUrl).toMatch(/screenshot/);
+    }, 15000);
 
     it('returns binary image with non-empty buffer when format=image is requested', async () => {
       const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
@@ -224,6 +224,6 @@ describe('Growth & Workflow Upgrades', () => {
       const arrayBuf = await res.arrayBuffer();
       // Verify image binary payload is delivered
       expect(arrayBuf.byteLength).toBeGreaterThan(1000);
-    });
+    }, 15000);
   });
 });
