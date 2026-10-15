@@ -555,6 +555,9 @@ export function selectWebsiteDesign(
       chosenLayoutKey = 'CLINIC_HEALTHCARE';
     } else if (/interior|architect|design|decor|modular/i.test(text)) {
       chosenLayoutKey = 'INTERIOR_ARCHITECTURE';
+    } else if (lead.profession && !/chartered|ca firm|audit|tax|gst|accounting|accountant|advisory/i.test(lead.profession)) {
+      const generalSmbLayouts: WebsiteLayout[] = ['MODERN_FINTECH', 'MODERN_INDIAN', 'EDITORIAL_FINANCE'];
+      chosenLayoutKey = generalSmbLayouts[hash % generalSmbLayouts.length];
     }
   }
 

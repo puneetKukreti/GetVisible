@@ -83,8 +83,16 @@ export function DemoRenderer({
 
   const rawLayout = activeDesign?.layout || safeContent.meta?.templateId || 'design-1-premium';
 
-  // If this layout corresponds to a Google Stitch design (or CA archetype), render the high-fidelity Stitch template view
-  if (isStitchLayout(rawLayout)) {
+  // Check if this business is specifically a Chartered Accountant / Tax Practice requesting a static Stitch template
+  const isCaOrAccounting = /chartered accountant|ca firm|tax advisory|auditor|accounting practice/i.test(
+    `${safeContent.meta?.profession || ''} ${safeContent.brand?.businessName || ''}`
+  );
+  const isAiSynthesized =
+    safeContent.hero?.provenance === 'AI_SYNTHESIZED' ||
+    safeContent.brand?.provenance === 'AI_SYNTHESIZED';
+
+  // Only render static CA Stitch HTML iframe if the lead is specifically an un-synthesized CA practice
+  if (isStitchLayout(rawLayout) && isCaOrAccounting && !isAiSynthesized) {
     return (
       <StitchDemoView
         demoId={demoId}

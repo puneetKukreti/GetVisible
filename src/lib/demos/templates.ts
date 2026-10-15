@@ -5,6 +5,7 @@ import {
   inferCAArchetype,
   type CAArchetypeMeta,
 } from './ca-archetypes';
+import { getDeterministicProfessionProfile } from './ai-content-generator';
 
 export interface LeadFacts {
   businessName: string;
@@ -51,17 +52,18 @@ export const BASE_TEMPLATE: ProfessionTemplate = {
     const activeTheme = theme || (design ? design.theme : THEMES.executiveNavy);
     const currentYear = new Date().getFullYear();
     const professionLabel = facts.profession || 'Professional Services';
+    const profile = getDeterministicProfessionProfile(facts);
 
     return {
       meta: {
-        title: `${brandName} | Professional Advisory in ${city}`,
-        description: `Dedicated professional practice in ${city} providing advisory, compliance, and strategic consulting services.`,
+        title: `${brandName} | ${profile.heroBadge || professionLabel} in ${city}`,
+        description: profile.heroSubheadline || `Dedicated ${professionLabel.toLowerCase()} services in ${city}.`,
         profession: professionLabel,
         templateId: 'BASE_TEMPLATE',
       },
       brand: {
         businessName: brandName,
-        tagline: `Professional Advisory & Client Services in ${city}`,
+        tagline: profile.heroHeadline || `${professionLabel} in ${city}`,
         provenance: facts.businessName ? 'VERIFIED_LEAD' : 'NEUTRAL_PLACEHOLDER',
       },
       theme: activeTheme,
@@ -70,17 +72,18 @@ export const BASE_TEMPLATE: ProfessionTemplate = {
         items: [
           { label: 'Services', href: '#services' },
           { label: 'About', href: '#about' },
+          { label: 'Why Us', href: '#why-choose-us' },
           { label: 'Contact', href: '#contact' },
         ],
-        ctaText: 'Schedule Consultation',
+        ctaText: profile.primaryCtaLabel || 'Schedule Consultation',
         ctaHref: '#contact',
       },
       hero: {
-        badge: `${professionLabel} & Advisory`,
-        headline: `Strategic Clarity & Client-Focused Professional Guidance`,
-        subheadline: `Delivering dependable advisory and consulting solutions for clients in ${city} and across the region.`,
+        badge: profile.heroBadge || `${professionLabel} • ${city}`,
+        headline: profile.heroHeadline || `Dedicated ${professionLabel} in ${city}`,
+        subheadline: profile.heroSubheadline || `Delivering dependable, professional solutions for clients in ${city}.`,
         primaryCta: {
-          label: 'Schedule Consultation',
+          label: profile.primaryCtaLabel || 'Schedule Consultation',
           href: '#contact',
         },
         secondaryCta: {
@@ -90,215 +93,132 @@ export const BASE_TEMPLATE: ProfessionTemplate = {
         provenance: 'NEUTRAL_PLACEHOLDER',
       },
       about: {
-        title: 'About Our Practice',
-        leadParagraph: `${brandName} is a professional practice based in ${city}, providing comprehensive advisory and consulting services.`,
-        body: `We partner with enterprises, organizations, and private clients to maintain regulatory compliance, manage strategic priorities, and deliver measurable results. Our work emphasizes methodical adherence to industry standards, proactive risk management, and direct partner engagement.`,
-        highlights: [
-          {
-            title: 'Professional Integrity',
-            description: 'Uncompromising adherence to statutory frameworks and codes of professional conduct.',
-          },
-          {
-            title: 'Client-Centered Focus',
-            description: 'Tailored advisory solutions engineered around specific client operational requirements.',
-          },
-          {
-            title: 'Confidential Governance',
-            description: 'Institutional data protocols safeguarding sensitive client documentation and records.',
-          },
-          {
-            title: 'Proactive Advisory',
-            description: 'Structured timelines, clear communication, and ongoing regulatory oversight.',
-          },
-        ],
+        title: `About ${brandName}`,
+        leadParagraph: profile.aboutLead || `${brandName} is a dedicated ${professionLabel.toLowerCase()} enterprise in ${city}.`,
+        body: profile.aboutBody || `We deliver reliable, standards-driven solutions tailored to our clients' unique requirements.`,
+        highlights:
+          profile.highlights && profile.highlights.length > 0
+            ? profile.highlights
+            : [
+                {
+                  title: 'Quality Standards',
+                  description: 'Methodical adherence to industry benchmarks and quality execution.',
+                },
+                {
+                  title: 'Client Dedication',
+                  description: 'Tailored solutions engineered around specific client operational requirements.',
+                },
+                {
+                  title: 'Local Focus',
+                  description: `Proudly serving residential and enterprise clients across ${city}.`,
+                },
+                {
+                  title: 'Clear Guidance',
+                  description: 'Structured timelines, transparent communication, and dedicated support.',
+                },
+              ],
         provenance: 'NEUTRAL_PLACEHOLDER',
       },
       services: {
-        sectionTitle: 'Core Practice Areas & Services',
-        sectionSubtitle: `Comprehensive advisory and consulting solutions tailored for clients in ${city}.`,
-        items: [
-          {
-            id: 'srv-1',
-            title: 'Strategic Consultation & Advisory',
-            description: 'Methodical advisory and consultation tailored to corporate governance and operational needs.',
-            isConfirmed: false,
-            provenance: 'NEUTRAL_PLACEHOLDER',
-          },
-          {
-            id: 'srv-2',
-            title: 'Compliance & Regulatory Management',
-            description: 'Statutory compliance tracking, documentation review, and formal regulatory filings.',
-            isConfirmed: false,
-            provenance: 'NEUTRAL_PLACEHOLDER',
-          },
-          {
-            id: 'srv-3',
-            title: 'Client Representation & Assessment',
-            description: 'Formal representation, risk assessment, and technical advisory across complex matters.',
-            isConfirmed: false,
-            provenance: 'NEUTRAL_PLACEHOLDER',
-          },
-          {
-            id: 'srv-4',
-            title: 'Institutional Scrutiny & Diligence',
-            description: 'Independent review, financial scrutiny, and due diligence reporting for business transactions.',
-            isConfirmed: false,
-            provenance: 'NEUTRAL_PLACEHOLDER',
-          },
-        ],
+        sectionTitle: profile.servicesSectionTitle || 'Our Core Services',
+        sectionSubtitle: profile.servicesSectionSubtitle || `Comprehensive solutions tailored for clients in ${city}.`,
+        items: profile.services.map((s, idx) => ({
+          id: `srv-${idx + 1}`,
+          title: s.title,
+          description: s.description,
+          isConfirmed: false,
+          provenance: 'NEUTRAL_PLACEHOLDER' as const,
+        })),
       },
       whyChooseUs: {
-        sectionTitle: 'Why Choose Our Practice',
+        sectionTitle: 'Why Choose Us',
         sectionSubtitle: 'Core commitments that define our client engagements and professional standards.',
-        points: [
-          {
-            title: 'Direct Partner Attention',
-            description: 'Engagements are directly overseen by senior advisors who understand your operational context.',
-            iconName: 'UserCheck',
-          },
-          {
-            title: 'Regulatory Accuracy',
-            description: 'Meticulous adherence to current statutory circulars and industry quality standards.',
-            iconName: 'CheckCircle2',
-          },
-          {
-            title: 'Confidentiality & Data Security',
-            description: 'Strict security protocols protecting your corporate records and proprietary data.',
-            iconName: 'Lock',
-          },
-          {
-            title: 'Transparent Communication',
-            description: 'Clear milestone schedules and straightforward explanations without unnecessary jargon.',
-            iconName: 'Clock',
-          },
-        ],
+        points: profile.whyChooseUs.map((w, idx) => ({
+          title: w.title,
+          description: w.description,
+          iconName: idx === 0 ? 'UserCheck' : idx === 1 ? 'CheckCircle2' : idx === 2 ? 'ShieldCheck' : 'Clock',
+        })),
       },
       process: {
-        sectionTitle: 'Our Engagement Methodology',
+        sectionTitle: 'Our Working Process',
         sectionSubtitle: 'A structured, transparent roadmap engineered for accuracy and predictability.',
-        steps: [
-          {
-            number: '01',
-            title: 'Scope & Assessment',
-            description: `We analyze your organizational structure and specific operational objectives in ${city}.`,
-          },
-          {
-            number: '02',
-            title: 'Review & Formulation',
-            description: 'Detailed analysis of supporting documentation, requirements, and compliance timelines.',
-          },
-          {
-            number: '03',
-            title: 'Execution & Delivery',
-            description: 'Methodical preparation and delivery of reports, documentation, and advisory deliverables.',
-          },
-          {
-            number: '04',
-            title: 'Ongoing Support',
-            description: 'Continuous advisory tracking, regulatory alerts, and responsive support.',
-          },
-        ],
+        steps: profile.processSteps.map((p, idx) => ({
+          number: p.number || `0${idx + 1}`,
+          title: p.title,
+          description: p.description,
+        })),
       },
       trust: {
-        sectionTitle: 'Standards of Professional Governance',
+        sectionTitle: 'Standards of Excellence & Trust',
         badges: [
           {
-            title: 'Professional Ethics Compliant',
-            description: 'Strict adherence to code of professional ethics, peer review standards, and independence norms.',
+            title: 'Verified Workmanship',
+            description: 'Adherence to industry best practices, safety norms, and professional standards.',
             iconName: 'ShieldCheck',
           },
           {
-            title: 'Senior Partner Oversight',
-            description: 'Qualified senior professionals directly supervise documentation and engagement quality.',
+            title: 'Dedicated Supervision',
+            description: 'Direct project oversight to ensure top-notch quality and durability.',
             iconName: 'UserCheck',
           },
           {
-            title: 'Confidential Governance',
-            description: 'Institutional security protocols protecting sensitive corporate and personal files.',
+            title: 'Client Privacy & Trust',
+            description: 'Respectful, confidential handling of all client documentation and requirements.',
             iconName: 'Lock',
           },
           {
-            title: 'Regulatory Precision',
-            description: 'Continuous tracking of statutory updates, notifications, and compliance mandates.',
+            title: 'Timely Delivery',
+            description: 'Structured project milestones and on-time delivery commitment.',
             iconName: 'CheckCircle2',
           },
         ],
       },
       expertise: {
-        sectionTitle: 'Key Focus Areas',
-        sectionSubtitle: 'Specialized proficiency across core advisory and operational domains.',
-        items: [
-          {
-            title: 'Statutory Advisory & Governance',
-            description: 'Comprehensive guidance on regulatory compliance, filings, and statutory adherence.',
-            tags: ['Compliance', 'Governance', 'Advisory'],
-          },
-          {
-            title: 'Corporate Planning & Structure',
-            description: 'Strategic planning, entity structuring, and operational efficiency consulting.',
-            tags: ['Corporate Planning', 'Structuring', 'Due Diligence'],
-          },
-          {
-            title: 'Financial Scrutiny & Diligence',
-            description: 'Methodical review, financial analysis, and due diligence reporting for operations.',
-            tags: ['Financial Review', 'Scrutiny', 'Due Diligence'],
-          },
-          {
-            title: 'Operational Risk & Controls',
-            description: 'Proactive evaluation of operational workflows, control procedures, and compliance tracking.',
-            tags: ['Risk Management', 'Internal Controls', 'Operations'],
-          },
-        ],
+        sectionTitle: 'Specialized Capabilities',
+        sectionSubtitle: 'Deep technical proficiency across key service areas.',
+        items: profile.services.map((s) => ({
+          title: s.title,
+          description: s.description,
+          tags: [professionLabel, 'Professional', 'Local Service'],
+        })),
       },
       ctaBanner: {
-        title: `Connect with Our ${city} Practice`,
-        subtitle: 'Schedule an introductory consultation to discuss your specific advisory or compliance requirements.',
+        title: `Connect with ${brandName} in ${city}`,
+        subtitle: `Get in touch today to schedule an introductory consultation or request a custom estimate.`,
         primaryCta: {
-          label: 'Schedule Consultation',
+          label: profile.primaryCtaLabel || 'Get Free Estimate',
           href: '#contact',
         },
         secondaryCta: {
-          label: 'Explore Services',
+          label: 'View Services',
           href: '#services',
         },
       },
       industries: {
         enabled: true,
-        sectionTitle: 'Industries We Serve',
+        sectionTitle: 'Client Segments We Serve',
         items: [
-          'Technology & Software Services',
-          'Manufacturing & Supply Chain',
-          'Real Estate & Infrastructure',
-          'Retail & E-commerce',
-          'Healthcare & Life Sciences',
-          'Professional Consulting',
+          'Residential & Homeowners',
+          'Commercial Properties & Offices',
+          'Retail & Local Businesses',
+          'Enterprises & Corporate Clients',
         ],
       },
       testimonials: {
         enabled: false,
-        sectionTitle: 'Client Testimonials',
+        sectionTitle: 'Client Feedback',
         items: [],
       },
       faq: {
         sectionTitle: 'Frequently Asked Questions',
-        items: [
-          {
-            question: 'How do we initiate a professional engagement?',
-            answer: 'You can reach out through our contact form or direct phone line. We schedule an introductory consultation to evaluate your operational context and scope of requirements.',
-          },
-          {
-            question: `Do you assist clients outside of ${city}?`,
-            answer: `Yes, while our primary practice is anchored in ${city}, we advise clients across regional and national jurisdictions.`,
-          },
-          {
-            question: 'What is your standard engagement turnaround?',
-            answer: 'Turnaround schedules are determined during initial scoping, with milestones agreed upon before engagement commencement.',
-          },
-        ],
+        items: profile.faqs.map((f) => ({
+          question: f.question,
+          answer: f.answer,
+        })),
       },
       contact: {
         sectionTitle: 'Connect With Our Team',
-        sectionSubtitle: 'Reach out to schedule an introductory consultation regarding your advisory or compliance requirements.',
+        sectionSubtitle: `Reach out to ${brandName} to schedule an appointment or request an estimate.`,
         formTitle: 'Send a Message',
         simulatedDisclaimer: 'Demo concept only — inquiries submitted through this form are simulated and are not delivered to the business.',
         publicEmail: facts.publicEmail || null,
@@ -308,7 +228,7 @@ export const BASE_TEMPLATE: ProfessionTemplate = {
       location: {
         address: facts.address || `${city}, India`,
         city: facts.city || 'Gurgaon',
-        officeHours: 'Monday – Friday: 9:30 AM – 6:30 PM IST',
+        officeHours: 'Monday – Saturday: 9:00 AM – 7:30 PM IST',
         mapPlaceholder: true,
       },
       footer: {
@@ -933,8 +853,9 @@ export function getTemplate(
     }
   }
 
-  // If facts are provided and match any registered archetype
-  if (facts) {
+  // Only match CA archetypes if profession indicates CA or accounting
+  const isCaOrAccounting = /chartered|ca firm|audit|tax|gst|accounting|accountant/i.test(text);
+  if (isCaOrAccounting && facts) {
     const inferredId = inferCAArchetype(facts);
     if (TEMPLATE_REGISTRY[inferredId]) {
       return TEMPLATE_REGISTRY[inferredId];

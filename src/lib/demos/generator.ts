@@ -4,7 +4,7 @@ import { getTemplate, THEMES, LeadFacts } from './templates';
 import { GeminiAIProvider, MockAIProvider } from '@/lib/providers/ai.provider';
 import { selectWebsiteDesign } from './personalization';
 import { getTemplateScreenshotPath } from './stitch-templates';
-import { generateAiBusinessContent } from './ai-content-generator';
+import { generateAiBusinessContent, getDeterministicProfessionProfile, getGeminiApiKey } from './ai-content-generator';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -93,12 +93,10 @@ export class WebsiteDemoGeneratorService {
     // Synthesize factual baseline content tailored to design and facts
     let content: WebsiteContent = template.buildContent(leadFacts, selectedTheme, design);
 
-    // Structured AI Enrichment via Gemini 2.5 Flash if API key is present or requested
-    const hasGeminiKey = Boolean(
-      (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0) ||
-      (process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_GENERATIVE_AI_API_KEY.trim().length > 0)
-    );
-    const shouldEnrichWithAi = options.useAiEnrichment !== undefined ? options.useAiEnrichment : hasGeminiKey;
+    // Structured AI Enrichment via Gemini Flash or profession-tailored engine
+    const liveApiKey = getGeminiApiKey();
+    const hasGeminiKey = Boolean(liveApiKey);
+    const shouldEnrichWithAi = options.useAiEnrichment !== false;
 
     if (shouldEnrichWithAi) {
       let aiProfile = null;
@@ -111,8 +109,18 @@ export class WebsiteDemoGeneratorService {
             address: lead.address,
           });
         } catch (aiErr) {
-          console.warn('Gemini 2.5 Flash content generation skipped/failed:', aiErr);
+          console.warn('Gemini Flash content generation skipped/failed:', aiErr);
         }
+      }
+
+      // If Gemini did not return content (no key or call failed), fall back to rich profession engine
+      if (!aiProfile) {
+        aiProfile = getDeterministicProfessionProfile({
+          businessName: lead.businessName,
+          profession: lead.profession,
+          city: lead.city,
+          address: lead.address,
+        });
       }
 
       if (aiProfile) {
