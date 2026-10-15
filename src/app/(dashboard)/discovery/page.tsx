@@ -422,19 +422,32 @@ export default function DiscoveryPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <Briefcase className="w-3.5 h-3.5 text-muted-foreground" />
-                    <span>Profession / Industry</span>
+                    <span>Profession / Industry *</span>
                   </label>
-                  <select
+                  <Input
+                    list="profession-options"
+                    placeholder="e.g. Dental Clinic, Modular Kitchen, Gym, CA Firm, Pest Control..."
                     value={profession}
                     onChange={(e) => setProfession(e.target.value)}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="Chartered Accountant">Chartered Accountant (CA Firm)</option>
-                    <option value="Healthcare / Dental Clinic">Healthcare / Dental Clinic</option>
-                    <option value="Interior Designer & Architect">Interior Designer &amp; Architect</option>
-                    <option value="Tax Consultant">Tax Consultant</option>
-                    <option value="Lawyer / Legal Firm">Lawyer / Legal Practice</option>
-                  </select>
+                    required
+                    className="text-xs h-9"
+                  />
+                  <datalist id="profession-options">
+                    <option value="Chartered Accountant" />
+                    <option value="Dental Clinic" />
+                    <option value="Modular Kitchen Studio" />
+                    <option value="Gym & Fitness Center" />
+                    <option value="Pest Control Services" />
+                    <option value="Interior Designer & Architect" />
+                    <option value="Lawyer / Legal Practice" />
+                    <option value="Real Estate Consultant" />
+                    <option value="Boutique Salon & Spa" />
+                    <option value="Solar Energy Installer" />
+                    <option value="Sweet Shop & Bakery" />
+                    <option value="Diagnostics & Pathology Lab" />
+                    <option value="Physiotherapy Clinic" />
+                    <option value="Tax Consultant" />
+                  </datalist>
                 </div>
 
                 <div className="space-y-1.5">

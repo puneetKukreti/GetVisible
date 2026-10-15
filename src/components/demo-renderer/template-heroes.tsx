@@ -36,7 +36,7 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             <div className={`lg:col-span-7 space-y-6 sm:space-y-8 ${typo.containerClass}`}>
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300">
-                <span>✦ {firmName} • {hero.badge || 'Chartered Accountancy Practice'}</span>
+                <span>✦ {firmName} • {hero.badge || 'Professional Practice'}</span>
                 {split.hasSuffix && (
                   <span className="inline-block px-2 py-0.5 text-[10px] rounded bg-amber-500/20 font-mono text-amber-800 dark:text-amber-200">
                     {split.suffix}
@@ -112,7 +112,7 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
                   }}
                 >
                   <Shield className="h-3.5 w-3.5 shrink-0" />
-                  <span>✦ {firmName} • {hero.badge || 'Chartered Accountants'}</span>
+                  <span>✦ {firmName} • {hero.badge || 'Professional Practice'}</span>
                 </div>
                 {split.hasSuffix && (
                   <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
@@ -291,7 +291,7 @@ export function TemplateHero({ hero, brand, theme, template = 'MODERN_FINTECH' }
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex items-center gap-2 rounded-md bg-amber-500/15 border border-amber-500/40 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:text-amber-200">
                 <Scale className="h-3.5 w-3.5 shrink-0" />
-                <span>✦ {firmName} • {hero.badge || 'Chartered Accountancy & Corporate Advisory'}</span>
+                <span>✦ {firmName} • {hero.badge || 'Professional Practice'}</span>
               </div>
               {split.hasSuffix && (
                 <span className="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">

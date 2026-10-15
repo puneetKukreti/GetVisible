@@ -222,7 +222,9 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     }
 
     // 4. Zero-fail instant SVG Hero Mockup (Works 100% on Vercel Serverless / Cloud without Chrome)
-    const svgContent = generateHeroMockupSvg(brandName, city, profession);
+    const heroHeadline = content?.hero?.headline;
+    const heroSubheadline = content?.hero?.subheadline;
+    const svgContent = generateHeroMockupSvg(brandName, city, profession, heroHeadline, heroSubheadline);
     try {
       fs.writeFileSync(heroSvgPath, svgContent, 'utf-8');
     } catch {}

@@ -115,7 +115,13 @@ function getScreenshotImageUrl(lead: LeadData, refresh = false) {
   return `/api/demos/${encodeURIComponent(lead.id)}/screenshot?${params.toString()}`;
 }
 
-function generateInlineSvgDataUri(brandName: string, city: string, profession: string = 'Chartered Accountants') {
+function generateInlineSvgDataUri(
+  brandName: string,
+  city: string,
+  profession: string = 'Chartered Accountants',
+  headline?: string,
+  subheadline?: string
+) {
   const escapedBrand = (brandName || 'Chartered Accountants')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -129,6 +135,34 @@ function generateInlineSvgDataUri(brandName: string, city: string, profession: s
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
   const escapedProf = (profession || 'Chartered Accountants')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  // Compute 2-letter initials from business brand name
+  const cleanParts = (brandName || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(Boolean);
+  const initials =
+    cleanParts.length >= 2
+      ? (cleanParts[0][0] + cleanParts[1][0]).toUpperCase()
+      : cleanParts[0]?.slice(0, 2).toUpperCase() || 'GV';
+
+  const escapedHeadline = (headline || `${escapedProf} Excellence &amp; Advisory`)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  const escapedSubheadline = (
+    subheadline ||
+    `Dedicated ${escapedProf.toLowerCase()} services, trusted expertise &amp; comprehensive advisory in ${escapedCity}.`
+  )
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -150,14 +184,14 @@ function generateInlineSvgDataUri(brandName: string, city: string, profession: s
   <rect width="1024" height="640" fill="url(#bg)"/>
   <rect width="1024" height="74" fill="#001122" fill-opacity="0.95"/>
   <circle cx="56" cy="37" r="16" fill="#fde047" fill-opacity="0.15" stroke="#fde047" stroke-width="1.5"/>
-  <text x="56" y="42" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fde047" text-anchor="middle">CA</text>
+  <text x="56" y="42" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fde047" text-anchor="middle">${initials}</text>
   <text x="86" y="38" font-family="Georgia, serif" font-size="16" font-weight="bold" fill="#ffffff">${escapedBrand}</text>
   <text x="86" y="52" font-family="system-ui, sans-serif" font-size="10" letter-spacing="1.5" fill="#a0aec0">${escapedProf.toUpperCase()}</text>
   <rect x="70" y="140" width="380" height="34" rx="17" fill="#fde047" fill-opacity="0.15" stroke="#fde047" stroke-opacity="0.4" stroke-width="1.5"/>
   <text x="90" y="162" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#fde047" letter-spacing="0.5">✦ ${escapedBrand} • ${escapedCity.toUpperCase()}</text>
   <text x="70" y="235" font-family="Georgia, serif" font-size="44" font-weight="bold" fill="#ffffff">${escapedBrand}</text>
-  <text x="70" y="285" font-family="Georgia, serif" font-size="28" font-weight="normal" fill="#e2e8f0">Trusted Financial Clarity &amp; Strategic Advisory</text>
-  <text x="70" y="325" font-family="system-ui, sans-serif" font-size="17" fill="#94a3b8">Comprehensive Statutory Audit, Direct Tax Defense &amp; Corporate Advisory in ${escapedCity}.</text>
+  <text x="70" y="285" font-family="Georgia, serif" font-size="28" font-weight="normal" fill="#e2e8f0">${escapedHeadline}</text>
+  <text x="70" y="325" font-family="system-ui, sans-serif" font-size="17" fill="#94a3b8">${escapedSubheadline}</text>
   <rect x="70" y="385" width="220" height="48" rx="8" fill="url(#gold)"/>
   <text x="180" y="415" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#00152a" text-anchor="middle">Schedule Consultation →</text>
   <rect x="310" y="385" width="180" height="48" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
@@ -873,7 +907,13 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             if (!target.src.startsWith('data:image/svg+xml')) {
-                              target.src = generateInlineSvgDataUri(lead.businessName, lead.city, lead.profession);
+                              target.src = generateInlineSvgDataUri(
+                                lead.businessName,
+                                lead.city,
+                                lead.profession,
+                                lead.websiteDemos?.[0]?.content?.hero?.headline,
+                                lead.websiteDemos?.[0]?.content?.hero?.subheadline
+                              );
                             }
                             setImgLoaded(true);
                             setScreenshotLoading(false);
@@ -1079,7 +1119,13 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         if (!target.src.startsWith('data:image/svg+xml')) {
-                          target.src = generateInlineSvgDataUri(lead.businessName, lead.city, lead.profession);
+                          target.src = generateInlineSvgDataUri(
+                            lead.businessName,
+                            lead.city,
+                            lead.profession,
+                            lead.websiteDemos?.[0]?.content?.hero?.headline,
+                            lead.websiteDemos?.[0]?.content?.hero?.subheadline
+                          );
                         }
                         setImgLoaded(true);
                         setScreenshotLoading(false);

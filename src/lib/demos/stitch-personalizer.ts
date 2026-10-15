@@ -172,9 +172,12 @@ export function personalizeStitchHtml(
   html = html.replaceAll('SHARMA & ASSOCIATES', escapedBrand.toUpperCase());
 
   // 2b. Hero Business Name & Firm Identity Injection (Huge, unmissable branding in Hero section)
+  const aiBadge = contentOrFacts?.hero?.badge;
+  const badgeText = aiBadge ? escapeHtml(aiBadge) : `✦ ${escapedBrand} • ${escapeHtml(city)}`;
+
   const heroBadgePill = `
 <div style="margin-bottom: 14px; display: inline-flex; align-items: center; gap: 8px; background: rgba(212, 175, 55, 0.18); border: 1px solid rgba(212, 175, 55, 0.5); padding: 6px 14px; border-radius: 9999px; font-size: 13px; font-weight: 700; color: #b45309; letter-spacing: 0.06em; text-transform: uppercase;">
-  <span>✦ ${escapedBrand} • ${escapeHtml(city)}</span>
+  <span>${badgeText.startsWith('✦') ? badgeText : `✦ ${badgeText}`}</span>
 </div>`;
 
   // Replace any existing generic eyebrow badge before the h1 with the gold firm badge pill
@@ -182,14 +185,53 @@ export function personalizeStitchHtml(
     html = html.replace(/<div[^>]*class="[^"]*inline-flex items-center gap-2[^"]*mb-6"[^>]*>[\s\S]*?<\/div>/i, heroBadgePill);
   }
 
+  const aiHeadline = contentOrFacts?.hero?.headline;
+  const aiSubheadline = contentOrFacts?.hero?.subheadline;
+  const headlineSubtitle = aiHeadline
+    ? `${escapeHtml(aiHeadline)}${aiSubheadline ? ` — ${escapeHtml(aiSubheadline)}` : ''}`
+    : `Trusted Professional Services &amp; Advisory in ${escapeHtml(city)}`;
+
   const heroHeadlineContent = `
 <span style="display:block; color:inherit; font-size:1.12em; font-weight:800; letter-spacing:-0.02em; margin-bottom:6px; line-height:1.15;">${escapedBrand}</span>
-<span style="display:block; font-size:0.70em; font-weight:500; opacity:0.9; line-height:1.25;">Trusted Financial Clarity &amp; Strategic Tax Advisory in ${escapeHtml(city)}</span>`;
+<span style="display:block; font-size:0.70em; font-weight:500; opacity:0.9; line-height:1.25;">${headlineSubtitle}</span>`;
 
   // Inject the prominent business name & headline right into the primary Hero <h1>
   html = html.replace(/(<h1[^>]*>)([\s\S]*?)(<\/h1>)/i, (_match, openTag, _inner, closeTag) => {
     return `${openTag}\n${heroHeadlineContent}\n${closeTag}`;
   });
+
+  // 2c. Dynamic CTA label replacement if custom CTA provided
+  const ctaLabel = contentOrFacts?.hero?.primaryCta?.label;
+  if (ctaLabel) {
+    const escapedCta = escapeHtml(ctaLabel);
+    html = html.replaceAll('Schedule Consultation', escapedCta);
+    html = html.replaceAll('Book Consultation', escapedCta);
+    html = html.replaceAll('Schedule A Consultation', escapedCta);
+  }
+
+  // 2d. Dynamic Services replacement if custom/AI services provided
+  if (Array.isArray(contentOrFacts?.services?.items) && contentOrFacts.services.items.length > 0) {
+    const defaultServices = [
+      'Statutory Audit &amp; Assurance',
+      'Corporate Tax &amp; Advisory',
+      'GST &amp; Indirect Tax Litigation',
+      'Transfer Pricing &amp; Cross-Border',
+    ];
+    contentOrFacts.services.items.slice(0, 4).forEach((srv: any, idx: number) => {
+      if (srv?.title && defaultServices[idx]) {
+        const escapedTitle = escapeHtml(srv.title);
+        html = html.replaceAll(defaultServices[idx], escapedTitle);
+        html = html.replaceAll(defaultServices[idx].replace(/&amp;/g, '&'), escapedTitle);
+      }
+    });
+
+    if (contentOrFacts?.services?.sectionTitle) {
+      const escapedSecTitle = escapeHtml(contentOrFacts.services.sectionTitle);
+      html = html.replaceAll('Practice Areas &amp; Core Disciplines', escapedSecTitle);
+      html = html.replaceAll('Practice Areas & Core Disciplines', escapedSecTitle);
+      html = html.replaceAll('Areas of Practice', escapedSecTitle);
+    }
+  }
 
   // 3. City & Address substitutions
   html = html.replaceAll('Connaught Place, New Delhi', escapeHtml(rawAddress));

@@ -4,6 +4,7 @@ import { getTemplate, THEMES, LeadFacts } from './templates';
 import { GeminiAIProvider, MockAIProvider } from '@/lib/providers/ai.provider';
 import { selectWebsiteDesign } from './personalization';
 import { getTemplateScreenshotPath } from './stitch-templates';
+import { generateAiBusinessContent } from './ai-content-generator';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -92,9 +93,117 @@ export class WebsiteDemoGeneratorService {
     // Synthesize factual baseline content tailored to design and facts
     let content: WebsiteContent = template.buildContent(leadFacts, selectedTheme, design);
 
-    // Structured AI Enrichment if configured and requested
-    if (options.useAiEnrichment) {
-      content = await this.enrichWithAi(content, leadFacts, design.layout);
+    // Structured AI Enrichment via Gemini 2.5 Flash if API key is present or requested
+    const hasGeminiKey = Boolean(
+      (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0) ||
+      (process.env.GOOGLE_GENERATIVE_AI_API_KEY && process.env.GOOGLE_GENERATIVE_AI_API_KEY.trim().length > 0)
+    );
+    const shouldEnrichWithAi = options.useAiEnrichment !== undefined ? options.useAiEnrichment : hasGeminiKey;
+
+    if (shouldEnrichWithAi) {
+      let aiProfile = null;
+      if (hasGeminiKey) {
+        try {
+          aiProfile = await generateAiBusinessContent({
+            businessName: lead.businessName,
+            profession: lead.profession,
+            city: lead.city,
+            address: lead.address,
+          });
+        } catch (aiErr) {
+          console.warn('Gemini 2.5 Flash content generation skipped/failed:', aiErr);
+        }
+      }
+
+      if (aiProfile) {
+        content = {
+          ...content,
+          meta: {
+            ...content.meta,
+            title: `${lead.businessName} | ${aiProfile.heroBadge || lead.profession} in ${lead.city}`,
+            description: aiProfile.heroSubheadline || content.meta.description,
+            profession: lead.profession,
+          },
+          brand: {
+            ...content.brand,
+            businessName: lead.businessName,
+            tagline: aiProfile.heroHeadline || content.brand.tagline,
+            provenance: 'AI_SYNTHESIZED',
+          },
+          hero: {
+            ...content.hero,
+            badge: aiProfile.heroBadge || content.hero.badge,
+            headline: aiProfile.heroHeadline || content.hero.headline,
+            subheadline: aiProfile.heroSubheadline || content.hero.subheadline,
+            primaryCta: {
+              ...content.hero.primaryCta,
+              label: aiProfile.primaryCtaLabel || content.hero.primaryCta.label,
+            },
+            provenance: 'AI_SYNTHESIZED',
+          },
+          about: {
+            ...content.about,
+            title: `About ${lead.businessName}`,
+            leadParagraph: aiProfile.aboutLead || content.about.leadParagraph,
+            body: aiProfile.aboutBody || content.about.body,
+            highlights:
+              aiProfile.highlights && aiProfile.highlights.length > 0
+                ? aiProfile.highlights
+                : content.about.highlights,
+            provenance: 'AI_SYNTHESIZED',
+          },
+          services: {
+            ...content.services,
+            sectionTitle: aiProfile.servicesSectionTitle || content.services.sectionTitle,
+            sectionSubtitle: aiProfile.servicesSectionSubtitle || content.services.sectionSubtitle,
+            items:
+              aiProfile.services && aiProfile.services.length > 0
+                ? aiProfile.services.map((s, idx) => ({
+                    id: `srv-${idx + 1}`,
+                    title: s.title,
+                    description: s.description,
+                    isConfirmed: false,
+                    provenance: 'AI_SYNTHESIZED' as const,
+                  }))
+                : content.services.items,
+          },
+          whyChooseUs: {
+            ...content.whyChooseUs,
+            points:
+              aiProfile.whyChooseUs && aiProfile.whyChooseUs.length > 0
+                ? aiProfile.whyChooseUs.map((w, idx) => ({
+                    title: w.title,
+                    description: w.description,
+                    iconName: content.whyChooseUs.points[idx]?.iconName || 'ShieldCheck',
+                  }))
+                : content.whyChooseUs.points,
+          },
+          process:
+            aiProfile.processSteps && aiProfile.processSteps.length > 0
+              ? {
+                  sectionTitle: 'Our Working Process',
+                  sectionSubtitle: 'How we collaborate with clients from consultation to delivery.',
+                  steps: aiProfile.processSteps.map((p, idx) => ({
+                    number: p.number || `0${idx + 1}`,
+                    title: p.title,
+                    description: p.description,
+                  })),
+                }
+              : content.process,
+          faq:
+            aiProfile.faqs && aiProfile.faqs.length > 0
+              ? {
+                  sectionTitle: 'Frequently Asked Questions',
+                  items: aiProfile.faqs.map((f) => ({
+                    question: f.question,
+                    answer: f.answer,
+                  })),
+                }
+              : content.faq,
+        };
+      } else {
+        content = await this.enrichWithAi(content, leadFacts, design.layout);
+      }
     }
 
     // Strict Claim Safety Enforcement
