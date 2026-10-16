@@ -8,6 +8,7 @@ import {
   UserPlus,
   FileCode,
   FileSpreadsheet,
+  BarChart3,
   Users,
   Settings,
   LogOut,
@@ -42,6 +43,11 @@ const CORE_NAV_ITEMS: NavItem[] = [
     title: 'Proposals & PDF',
     href: '/proposals',
     icon: FileSpreadsheet,
+  },
+  {
+    title: 'Pipeline Analytics',
+    href: '/analytics',
+    icon: BarChart3,
   },
 ];
 

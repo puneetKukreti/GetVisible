@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
-import { isRealHumanVisit } from '@/lib/demos/public';
+import { isRealHumanVisit, generatePublicDemoToken } from '@/lib/demos/public';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { getProfessionPreset } from '@/lib/demos/profession-config';
 import { selectWebsiteDesign } from '@/lib/demos/personalization';
@@ -112,7 +112,7 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
             version: 1,
           });
           generated.id = `demo-${initialLead.id}-v1`;
-          generated.publicToken = `token-${initialLead.id}`;
+          generated.publicToken = generatePublicDemoToken();
           generated.approvalStatus = 'APPROVED';
           const saved = await WebsiteDemoRepository.saveDemo(targetOrg, generated, 'system');
           if (saved) {
@@ -140,7 +140,7 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
               version: 1,
               generationStatus: 'COMPLETED',
               approvalStatus: 'APPROVED',
-              publicToken: `token-${initialLead.id}`,
+              publicToken: generatePublicDemoToken(),
               viewCount: 0,
               theme: preset.defaultTheme,
               content: {

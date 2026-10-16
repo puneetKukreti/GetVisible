@@ -148,7 +148,11 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Error rendering demo HTML';
-    return new NextResponse(`<html><body><h1>Error Rendering Demo</h1><p>${message}</p></body></html>`, {
+    const safeMessage = message
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    return new NextResponse(`<html><body><h1>Error Rendering Demo</h1><p>${safeMessage}</p></body></html>`, {
       status: 500,
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
     });

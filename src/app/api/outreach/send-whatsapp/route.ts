@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { LeadRepository } from '@/lib/db/repository';
 import { createAuditLogEntry } from '@/lib/audit';
+import { checkOutreachEligibility } from '@/lib/compliance';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Lead not found in this organization' },
         { status: 404 }
+      );
+    }
+
+    // Compliance gate: block suppressed / opted-out / DO_NOT_CONTACT leads
+    // before any outreach staging or dispatch.
+    const eligibility = checkOutreachEligibility(
+      lead,
+      'WHATSAPP',
+      true,
+      lead.suppressionRecords || [],
+      lead.consentRecords || []
+    );
+
+    if (!eligibility.allowed) {
+      return NextResponse.json(
+        { success: false, error: eligibility.reason || 'Outreach blocked by compliance rules' },
+        { status: 403 }
       );
     }
 

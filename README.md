@@ -66,7 +66,8 @@ To run in explicit Sandbox Demo Mode (no local PostgreSQL server required):
 DEMO_MODE=true
 NEXT_PUBLIC_DEMO_MODE=true
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/leadforge_ai?schema=public"
-NEXTAUTH_SECRET="leadforge-production-demo-secret-key-development"
+NEXTAUTH_SECRET="generate-a-strong-secret-here"
+ADMIN_PASSWORD="choose-a-strong-owner-password"
 NEXTAUTH_URL="http://localhost:3000"
 GEMINI_API_KEY=""
 ```
@@ -91,9 +92,10 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-**Sandbox Credentials:**
-- Email: `admin@getvisible.example` (or legacy `admin@leadforge.example`)
-- Password: `demo123`
+**Owner access:**
+- The workbench at `/login` is unlocked with `ADMIN_PASSWORD`. There is no
+  default password; login fails closed (HTTP 503) when it is not configured.
+- Optional NextAuth demo login uses `DEMO_ADMIN_PASSWORD` (only when `DEMO_MODE=true`).
 - Organization: `Gurgaon CA Agency HQ` (`org-demo-gurgaon`)
 
 ---

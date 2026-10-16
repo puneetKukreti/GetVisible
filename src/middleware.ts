@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { OWNER_AUTH_COOKIE, verifyOwnerSessionToken } from '@/lib/session';
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
 
@@ -18,20 +19,25 @@ export function middleware(request: NextRequest) {
   if (pathname === '/login' || pathname.startsWith('/api/auth')) {
     // If already authenticated and trying to access /login, redirect to /campaigns
     if (pathname === '/login') {
-      const authCookie = request.cookies.get('gv_owner_auth')?.value;
-      if (authCookie === 'authenticated') {
+      const authCookie = request.cookies.get(OWNER_AUTH_COOKIE)?.value;
+      if (await verifyOwnerSessionToken(authCookie)) {
         return NextResponse.redirect(new URL('/campaigns', request.url));
       }
     }
     return NextResponse.next();
   }
 
-  // 3. Prospect-facing public demos (must remain accessible without authentication)
+  // 3. Public marketing pages (no owner session required)
+  if (pathname === '/pricing') {
+    return NextResponse.next();
+  }
+
+  // 4. Prospect-facing public demos (must remain accessible without authentication)
   if (pathname.startsWith('/demo/')) {
     return NextResponse.next();
   }
 
-  // 4. Public demo APIs for prospect view, automated screenshots, and change requests
+  // 5. Public demo APIs for prospect view, automated screenshots, and change requests
   //    Matches: /api/demos/:id/html, /api/demos/:id/screenshot, /api/demos/:id, /api/demos/:id/request-changes
   if (pathname.startsWith('/api/demos/') && pathname !== '/api/demos') {
     // Allow all GET requests to demo details/html/screenshots
@@ -44,9 +50,9 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 5. Verify Owner Authentication Cookie for all other routes
-  const authCookie = request.cookies.get('gv_owner_auth')?.value;
-  const isAuthenticated = authCookie === 'authenticated';
+  // 6. Verify the signed owner session token for all other routes
+  const authCookie = request.cookies.get(OWNER_AUTH_COOKIE)?.value;
+  const isAuthenticated = await verifyOwnerSessionToken(authCookie);
 
   if (!isAuthenticated) {
     // Return 401 for protected API requests

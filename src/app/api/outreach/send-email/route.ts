@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { LeadRepository } from '@/lib/db/repository';
 import { ProductionEmailProvider, MockEmailProvider, GmailSmtpProvider } from '@/lib/providers/email.provider';
+import { checkOutreachEligibility } from '@/lib/compliance';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { success: false, error: 'Lead does not have an email address listed' },
         { status: 400 }
+      );
+    }
+
+    // Compliance gate: block suppressed / opted-out / DO_NOT_CONTACT leads
+    // before any transmission attempt.
+    const eligibility = checkOutreachEligibility(
+      lead,
+      'EMAIL',
+      true,
+      lead.suppressionRecords || [],
+      lead.consentRecords || []
+    );
+
+    if (!eligibility.allowed) {
+      return NextResponse.json(
+        { success: false, error: eligibility.reason || 'Outreach blocked by compliance rules' },
+        { status: 403 }
       );
     }
 

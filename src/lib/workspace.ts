@@ -92,7 +92,7 @@ export async function getServerWorkspaceMode(): Promise<WorkspaceMode> {
     if (headerMode === 'pilot' || headerMode === 'real') return 'pilot';
     if (headerMode === 'demo') return 'demo';
 
-    const headerOrgId = h.get('x-organization-id');
+    const headerOrgId = process.env.TRUST_ORG_HEADER === 'true' ? h.get('x-organization-id') : null;
     if (headerOrgId === PILOT_ORGANIZATION_ID) return 'pilot';
     if (headerOrgId === DEMO_ORGANIZATION_ID) return 'demo';
 

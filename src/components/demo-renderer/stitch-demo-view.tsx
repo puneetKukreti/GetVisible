@@ -149,7 +149,7 @@ export function StitchDemoView({
           setLoading(false);
           setLoadError(true);
         }}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        sandbox="allow-scripts allow-forms allow-popups"
       />
     </div>
   );

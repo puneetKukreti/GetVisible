@@ -153,7 +153,7 @@ export default function TemplatePreviewPage({ params }: TemplatePreviewPageProps
             src={currentTemplate.htmlUrl}
             title={currentTemplate.name}
             className="w-full h-full border-0 bg-white"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+            sandbox="allow-scripts allow-forms allow-popups"
           />
         </div>
       </main>

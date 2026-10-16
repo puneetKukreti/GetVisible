@@ -106,8 +106,10 @@ export class GmailSmtpProvider implements IEmailProvider {
   name = 'GmailSmtpProvider';
 
   private getCredentials() {
-    const rawUser = process.env.GMAIL_USER || 'govisibleonweb@gmail.com';
-    const rawPass = process.env.GMAIL_APP_PASSWORD || 'wibanibxxhrbewwk';
+    // Credentials must come from the environment. Never commit real
+    // credentials or ship a working fallback that would silently send mail.
+    const rawUser = process.env.GMAIL_USER || '';
+    const rawPass = process.env.GMAIL_APP_PASSWORD || '';
 
     const user = rawUser.trim().replace(/^["']|["']$/g, '');
     const pass = rawPass.trim().replace(/^["']|["']$/g, '').replace(/[^a-zA-Z0-9]/g, '');

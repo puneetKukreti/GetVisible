@@ -16,7 +16,7 @@ export function generatePublicDemoToken(businessName?: string): string {
       return slug;
     }
   }
-  return crypto.randomBytes(6).toString('base64url');
+  return crypto.randomBytes(16).toString('base64url');
 }
 
 /**

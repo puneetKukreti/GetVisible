@@ -17,11 +17,18 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        // Explicit demo login or credential validation (supports both GetVisible and legacy LeadForge)
+        const demoMode =
+          process.env.DEMO_MODE === 'true' || process.env.NEXT_PUBLIC_DEMO_MODE === 'true';
+        const demoPassword = (process.env.DEMO_ADMIN_PASSWORD || '').trim();
+
+        // Explicit demo login. Only available in explicit demo mode AND when a
+        // demo password is configured. Never a hardcoded default.
         if (
+          demoMode &&
+          demoPassword.length >= 8 &&
           (credentials?.email === 'admin@getvisible.example' ||
             credentials?.email === 'admin@leadforge.example') &&
-          credentials?.password === 'demo123'
+          credentials?.password === demoPassword
         ) {
           return {
             id: 'demo-user-admin',
@@ -33,21 +40,8 @@ export const authOptions: NextAuthOptions = {
           };
         }
 
-        // Support for standard login when configured
+        // Production DB credential lookup
         if (credentials?.email && credentials?.password) {
-          // If in explicit demo mode, permit test login
-          if (process.env.DEMO_MODE === 'true') {
-            return {
-              id: 'demo-user-member',
-              name: credentials.email.split('@')[0],
-              email: credentials.email,
-              role: 'MEMBER',
-              organizationId: DEMO_ORGANIZATION_ID,
-              organizationName: 'Gurgaon CA Agency HQ',
-            };
-          }
-
-          // Production DB credential lookup
           try {
             const { prisma } = await import('./db/prisma');
             const user = await prisma.user.findUnique({
@@ -94,7 +88,9 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || 'leadforge-production-fallback-secret-development-only',
+  secret:
+    process.env.NEXTAUTH_SECRET ||
+    (process.env.NODE_ENV !== 'production' ? 'getvisible-dev-only-insecure-nextauth-secret' : undefined),
 };
 
 import {
@@ -206,8 +202,11 @@ export async function getResolvedOrganizationId(
     }
   }
 
-  // Explicit organization ID header takes priority if specified
-  if (headerOrgId && headerOrgId.trim().length > 0) {
+  // Explicit organization ID header is only trusted when an operator has opted
+  // in via TRUST_ORG_HEADER=true. By default it is ignored so a client cannot
+  // select an arbitrary tenant (tenancy bypass).
+  const trustOrgHeader = process.env.TRUST_ORG_HEADER === 'true';
+  if (trustOrgHeader && headerOrgId && headerOrgId.trim().length > 0) {
     return headerOrgId.trim();
   }
 

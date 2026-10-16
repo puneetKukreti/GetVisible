@@ -478,7 +478,10 @@ export function personalizeStitchHtml(
   // 7. Inject client script: Hydrator + screenshot zoom + simulated form submission
   const injectedScript = `
 <script>
-  window.__GV_DEMO_CONTENT__ = ${JSON.stringify(hydrationData)};
+  window.__GV_DEMO_CONTENT__ = ${JSON.stringify(hydrationData)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')};
   (function() {
     // Zoom in on Hero section when capturing automated screenshot
     if (typeof window !== 'undefined' && window.location.search.includes('screenshot=true')) {

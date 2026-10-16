@@ -433,6 +433,16 @@ export { isExplicitDemoMode };
  * Ensures production mode does NOT silently fake data.
  */
 async function ensureDatabaseMode(): Promise<void> {
+  if (isExplicitDemoMode() && process.env.NODE_ENV === 'production') {
+    const g = globalThis as unknown as { __gvDemoModeWarned?: boolean };
+    if (!g.__gvDemoModeWarned) {
+      g.__gvDemoModeWarned = true;
+      console.warn(
+        '[GetVisible] WARNING: DEMO_MODE=true in a production build. Data is held in an in-memory store mirrored to .data/ and is NOT durable or concurrency-safe. Set DEMO_MODE=false and provide DATABASE_URL for a production deployment.'
+      );
+    }
+  }
+
   if (!isExplicitDemoMode()) {
     // If not in demo mode, verify PostgreSQL connectivity.
     // When live Prisma client is used, connection failure throws an explicit DatabaseConnectionError.
