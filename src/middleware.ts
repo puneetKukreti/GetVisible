@@ -27,6 +27,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // 2b. Retention cron endpoint (self-authenticated via CRON_SECRET in the route)
+  if (pathname.startsWith('/api/cron')) {
+    return NextResponse.next();
+  }
+
   // 3. Public marketing pages (no owner session required)
   if (pathname === '/pricing') {
     return NextResponse.next();

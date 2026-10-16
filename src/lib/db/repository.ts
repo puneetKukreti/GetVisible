@@ -25,7 +25,12 @@ import {
 } from './demo-data';
 import { createAuditLogEntry } from '../audit';
 import { validateStatusTransition } from '../sales/lifecycle';
-import { generatePublicDemoToken } from '../demos/public';
+import {
+  generatePublicDemoToken,
+  isDemoExpired,
+  DEMO_PUBLIC_TTL_MS,
+} from '../demos/public';
+import { PILOT_ORGANIZATION_ID } from '../workspace';
 import { getTemplateScreenshotPath } from '../demos/stitch-templates';
 
 export class DatabaseConnectionError extends Error {
@@ -430,6 +435,33 @@ export { isExplicitDemoMode };
 
 
 /**
+ * Idempotently ensures an Organization row exists in PostgreSQL.
+ *
+ * Every record has a foreign key to `organizations`, but nothing in the runtime
+ * ever created that row (only the offline seed script did). Without this, the very
+ * first production write — uploading a lead, saving a demo — fails with a
+ * foreign-key violation and nothing persists. Cached per serverless instance.
+ */
+const ensuredOrganizationIds = new Set<string>();
+async function ensureOrganizationRow(organizationId: string): Promise<void> {
+  if (!organizationId || ensuredOrganizationIds.has(organizationId)) return;
+  const { prisma } = await import('./prisma');
+  await prisma.organization.upsert({
+    where: { id: organizationId },
+    update: {},
+    create: {
+      id: organizationId,
+      name:
+        organizationId === DEMO_ORGANIZATION_ID
+          ? 'Gurgaon CA Demo Agency'
+          : 'Gurgaon CA Pilot Workspace',
+      slug: organizationId,
+    },
+  });
+  ensuredOrganizationIds.add(organizationId);
+}
+
+/**
  * Ensures production mode does NOT silently fake data.
  */
 async function ensureDatabaseMode(): Promise<void> {
@@ -449,6 +481,9 @@ async function ensureDatabaseMode(): Promise<void> {
     try {
       const { prisma } = await import('./prisma');
       await prisma.$queryRaw`SELECT 1`;
+      // Guarantee the active organization rows exist before any write occurs.
+      await ensureOrganizationRow(DEMO_ORGANIZATION_ID);
+      await ensureOrganizationRow(PILOT_ORGANIZATION_ID);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       throw new DatabaseConnectionError(
@@ -1404,6 +1439,39 @@ export class WebsiteDemoRepository {
   }
 
   /**
+   * Physically removes every demo whose public-link TTL (3 days) has elapsed.
+   *
+   * Called opportunistically whenever a public demo link is opened, and by the
+   * daily `/api/cron/prune-demos` job, so demos never outlive their window unless
+   * retained on purpose. Returns the number of demos removed.
+   */
+  static async pruneExpiredDemos(): Promise<number> {
+    await ensureDatabaseMode();
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      let removed = 0;
+      for (const [org, demos] of Array.from(demoStore.getDemosMap().entries())) {
+        const filtered = demos.filter((d) => !isDemoExpired(d));
+        if (filtered.length !== demos.length) {
+          removed += demos.length - filtered.length;
+          demoStore.setOrgDemos(org, filtered);
+        }
+      }
+      if (removed > 0) {
+        demoStore.saveToDisk();
+      }
+      return removed;
+    }
+
+    const { prisma } = await import('./prisma');
+    const res = await prisma.websiteDemo.deleteMany({
+      where: { createdAt: { lt: new Date(Date.now() - DEMO_PUBLIC_TTL_MS) } },
+    });
+    return res.count;
+  }
+
+  /**
    * List website demos strictly scoped by organizationId, optionally filtered by leadId.
    */
   static async listDemos(organizationId: string, leadId?: string): Promise<WebsiteDemoData[]> {
@@ -1414,17 +1482,20 @@ export class WebsiteDemoRepository {
     }
 
     if (isExplicitDemoMode()) {
+      const activeOnly = (demos: WebsiteDemoData[]) => demos.filter((d) => !isDemoExpired(d));
       if (leadId) {
-        return demoStore.getDemosForLead(organizationId, leadId).map(normalizeWebsiteDemo);
+        return activeOnly(demoStore.getDemosForLead(organizationId, leadId)).map(normalizeWebsiteDemo);
       }
-      return demoStore
-        .getOrgDemos(organizationId)
+      return activeOnly(demoStore.getOrgDemos(organizationId))
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .map(normalizeWebsiteDemo);
     }
 
     const { prisma } = await import('./prisma');
-    const where: Record<string, unknown> = { organizationId };
+    const where: Record<string, unknown> = {
+      organizationId,
+      createdAt: { gte: new Date(Date.now() - DEMO_PUBLIC_TTL_MS) },
+    };
     if (leadId) {
       where.leadId = leadId;
     }
@@ -1740,6 +1811,11 @@ export class WebsiteDemoRepository {
       if (!demo || demo.approvalStatus !== 'APPROVED') {
         return null;
       }
+      if (isDemoExpired(demo)) {
+        // Public-link TTL elapsed: remove it so the shared link stops working.
+        await this.deleteDemo(demo.organizationId, demo.id);
+        return null;
+      }
       return normalizeWebsiteDemo(demo);
     }
 
@@ -1767,6 +1843,12 @@ export class WebsiteDemoRepository {
           }
           return false;
         }) || null;
+    }
+
+    if (demo && isDemoExpired(demo)) {
+      // Public-link TTL elapsed: remove it so the shared link stops working.
+      await this.deleteDemo(demo.organizationId, demo.id);
+      return null;
     }
 
     return demo ? normalizeWebsiteDemo(demo) : null;

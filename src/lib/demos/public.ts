@@ -20,6 +20,32 @@ export function generatePublicDemoToken(businessName?: string): string {
 }
 
 /**
+ * Lifetime of a shareable prospect demo link, in days.
+ *
+ * A demo link does NOT expire from being refreshed or re-visited. It is removed
+ * only when the owner deletes it manually, or automatically once this TTL has
+ * elapsed since the demo was created.
+ */
+export const DEMO_PUBLIC_TTL_DAYS = 3;
+export const DEMO_PUBLIC_TTL_MS = DEMO_PUBLIC_TTL_DAYS * 24 * 60 * 60 * 1000;
+
+/** Returns true when a demo has outlived the public-link TTL. */
+export function isDemoExpired(
+  demo: { createdAt?: string | Date | null } | null | undefined,
+  now: number = Date.now()
+): boolean {
+  const raw = demo?.createdAt;
+  const created = raw instanceof Date ? raw.getTime() : raw ? new Date(raw).getTime() : NaN;
+  if (!Number.isFinite(created)) return false;
+  return now - created > DEMO_PUBLIC_TTL_MS;
+}
+
+/** ISO timestamp at which a demo created at `createdAt` should be removed. */
+export function getDemoExpiresAt(createdAt: string): string {
+  return new Date(new Date(createdAt).getTime() + DEMO_PUBLIC_TTL_MS).toISOString();
+}
+
+/**
  * Detects if a domain/origin is a Vercel preview deployment URL containing
  * temporary deployment hashes (e.g. 'get-visible-b64ejegts-puneetkukretis-projects.vercel.app')
  * which are protected by Vercel Authentication by default.
