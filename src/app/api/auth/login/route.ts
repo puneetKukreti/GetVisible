@@ -72,7 +72,11 @@ export async function POST(request: NextRequest) {
     const expectedPassword = (process.env.ADMIN_PASSWORD || '').trim();
     if (!expectedPassword || expectedPassword.length < 8) {
       return NextResponse.json(
-        { success: false, error: 'Owner access is not configured on this server.' },
+        {
+          success: false,
+          error:
+            'Owner access is not configured on this server. Set ADMIN_PASSWORD (minimum 8 characters) in the environment and restart the app.',
+        },
         { status: 503 }
       );
     }
