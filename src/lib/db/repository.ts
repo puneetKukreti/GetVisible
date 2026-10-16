@@ -483,7 +483,13 @@ function normalizeWebsiteDemo(demo: unknown): WebsiteDemoData {
   const isBrokenMicrolink =
     existingUrl.includes('api.microlink.io') &&
     (existingUrl.includes('localhost') || existingUrl.includes('127.0.0.1'));
-  if (!existingUrl || isBrokenMicrolink) {
+  // Upgrade dead or legacy preview references (old screen.png/screen.svg art or
+  // the never-written /generated-screenshots path) to the current Stitch art.
+  const isLegacyPreviewArt = /\/demo-templates\/[^/]+\/(?:screen|hero)\.(?:png|svg)$/i.test(
+    existingUrl
+  );
+  const isMissingGeneratedShot = existingUrl.startsWith('/generated-screenshots/');
+  if (!existingUrl || isBrokenMicrolink || isLegacyPreviewArt || isMissingGeneratedShot) {
     const layout =
       (copy.design as any)?.layout ||
       (contentObj?.design as any)?.layout ||
