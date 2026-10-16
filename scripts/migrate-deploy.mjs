@@ -22,16 +22,6 @@ if (!directUrl) {
 const prismaCli = path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js');
 const env = { ...process.env, DATABASE_URL: directUrl };
 
-// Recovery step: a previous deploy recorded the initial migration `0000_init` as
-// failed (P3018) because the file had been written with a corrupted encoding,
-// which blocks every later migration. Mark that failed attempt as rolled back so
-// the corrected migration can be applied. This is a harmless no-op once the
-// migration has been applied successfully (or was never recorded).
-spawnSync(process.execPath, [prismaCli, 'migrate', 'resolve', '--rolled-back', '0000_init'], {
-  stdio: 'inherit',
-  env,
-});
-
 const result = spawnSync(process.execPath, [prismaCli, 'migrate', 'deploy'], {
   stdio: 'inherit',
   env,
