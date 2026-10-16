@@ -1,3 +1,5 @@
+import { getProfessionStitchDesign } from './profession-stitch';
+
 export interface StitchTemplateMeta {
   id: string;
   name: string;
@@ -103,6 +105,11 @@ export function getStitchTemplate(id: string): StitchTemplateMeta | undefined {
  * Guarantees a valid, high-resolution preview image is always available.
  */
 export function getTemplateScreenshotPath(layoutOrTemplate?: string | null): string {
+  // Profession-specific Stitch template sets ship their own preview art.
+  const professionDesign = getProfessionStitchDesign(layoutOrTemplate || '');
+  if (professionDesign) {
+    return professionDesign.thumbnail;
+  }
   const l = (layoutOrTemplate || '').toLowerCase();
   if (
     l.includes('minimal') ||

@@ -1,12 +1,21 @@
 import fs from 'fs';
 import path from 'path';
 import { STITCH_DESIGN_MAP } from './stitch-personalizer';
+import { getProfessionStitchDesign } from './profession-stitch';
+import { buildProfessionStitchShell } from './profession-stitch-renderer';
 
 /**
  * Server-only utility to read raw HTML templates from disk.
  * Prioritizes src/Demo_website_template, with fallback to public/demo-templates.
+ * Profession-specific Stitch template sets are generated deterministically.
  */
 export function getStitchRawHtml(layoutKey: string = 'design-1-premium'): string {
+  // Profession-specific template sets are generated (no on-disk file).
+  const professionDesign = getProfessionStitchDesign(layoutKey);
+  if (professionDesign) {
+    return buildProfessionStitchShell(professionDesign);
+  }
+
   const meta = STITCH_DESIGN_MAP[layoutKey] || STITCH_DESIGN_MAP['design-1-premium'];
   const folder = meta.templateFolder;
 

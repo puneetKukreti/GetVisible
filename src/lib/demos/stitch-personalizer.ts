@@ -1,12 +1,26 @@
 import { WebsiteContent } from '@/types';
 import { LeadFacts } from './templates';
 import { getIndustryImages } from './industry-images';
+import { PROFESSION_STITCH_DESIGNS, getProfessionStitchDesign, applyStitchOverrides } from './profession-stitch';
+import {
+  renderProfessionStitchPage,
+  detectProfessionStitchDesignId,
+} from './profession-stitch-renderer';
+import type { ProfessionCategory } from './profession-config';
 
 export interface StitchDesignMeta {
   id: string;
   templateFolder: string;
   name: string;
   conceptName: string;
+  /** True for the three CA-only Google Stitch templates. */
+  isCaOnly?: boolean;
+  /** Profession category the template is intended for (non-CA sets only). */
+  category?: ProfessionCategory;
+  /** Every profession category this reusable archetype can serve. */
+  categories?: ProfessionCategory[];
+  /** True when this is a generated profession-specific template set. */
+  isProfessionTemplate?: boolean;
 }
 
 export const STITCH_DESIGN_MAP: Record<string, StitchDesignMeta> = {
@@ -103,6 +117,28 @@ export const STITCH_DESIGN_MAP: Record<string, StitchDesignMeta> = {
   },
 };
 
+// Every entry declared above is one of the CA-only Google Stitch templates
+// (including the legacy/archetype aliases that point at them).
+for (const entry of Object.values(STITCH_DESIGN_MAP)) {
+  entry.isCaOnly = true;
+}
+
+// Register the profession-specific Stitch template sets (non-CA). These are
+// generated shells rather than on-disk files, so they carry a synthetic
+// `templateFolder` and are served via `buildProfessionStitchShell`.
+for (const design of Object.values(PROFESSION_STITCH_DESIGNS)) {
+  STITCH_DESIGN_MAP[design.id] = {
+    id: design.id,
+    templateFolder: `profession:${design.id}`,
+    name: design.name,
+    conceptName: design.conceptName,
+    isCaOnly: false,
+    category: design.category,
+    categories: design.categories,
+    isProfessionTemplate: true,
+  };
+}
+
 /**
  * Returns true if the layout corresponds to a Google Stitch design template.
  */
@@ -123,6 +159,19 @@ export function personalizeStitchHtml(
   contentOrFacts: WebsiteContent | Partial<LeadFacts> | any
 ): string {
   if (!rawHtml) return '';
+
+  // Profession-specific Stitch template sets are rendered deterministically
+  // (server-side) from the validated content model - no CA string surgery.
+  const professionDesignId = detectProfessionStitchDesignId(rawHtml);
+  if (professionDesignId) {
+    const professionDesign = getProfessionStitchDesign(professionDesignId);
+    if (professionDesign) {
+      // Apply the persisted per-lead directive (e.g. an AI-suggested accent)
+      // on top of the base archetype before rendering.
+      const design = applyStitchOverrides(professionDesign, contentOrFacts?.design?.stitch);
+      return renderProfessionStitchPage(design, contentOrFacts);
+    }
+  }
 
   // Extract fields gracefully whether passed WebsiteContent or LeadFacts
   const brandName =

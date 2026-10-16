@@ -6,6 +6,8 @@ import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { personalizeStitchHtml, isStitchLayout } from '@/lib/demos/stitch-personalizer';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { isCaPracticeProfession, contentHasCaLeakageForProfession } from '@/lib/demos/profession-sections';
+import { getProfessionPreset } from '@/lib/demos/profession-config';
+import { getProfessionStitchLayout, isProfessionStitchLayout } from '@/lib/demos/profession-stitch';
 import { WebsiteContent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -74,7 +76,23 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
         !demo ||
         contentHasCaLeakageForProfession(demo.content, lead.profession, lead.businessName);
 
-      if (hasStaleCaContent) {
+      // A demo created before profession Stitch templates existed still points at
+      // its legacy archetype layout. Regenerate it so the iframe renders the
+      // profession-specific Stitch template instead of the older React theme.
+      // A non-CA lead with a known profession should render one of the
+      // profession Stitch archetypes. Legacy demos that still point at a React
+      // layout (or a CA template) are regenerated. We only require "a profession
+      // Stitch layout", not one specific id, so an AI-chosen archetype is valid
+      // and does not trigger a pointless regeneration loop.
+      const expectedStitchLayout = lead.profession
+        ? getProfessionStitchLayout(getProfessionPreset(lead.profession, lead.businessName).category)
+        : undefined;
+      const hasStaleLayout =
+        Boolean(expectedStitchLayout) &&
+        Boolean(demo) &&
+        !isProfessionStitchLayout(demo!.design?.layout);
+
+      if (hasStaleCaContent || hasStaleLayout) {
         try {
           const freshDemo = await WebsiteDemoGeneratorService.generateDemo(lead, {
             useAiEnrichment: true,

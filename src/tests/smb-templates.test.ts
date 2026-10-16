@@ -57,18 +57,21 @@ describe('Task 5 & 6: Solo-Operator Lifecycle & SMB Templates', () => {
         profession: 'Dentist',
         city: 'Gurgaon',
       });
-      expect(design.layout).toBe('CLINIC_HEALTHCARE');
+      expect(design.layout).toBe('design-clinic-clean');
       expect(design.template).toBe('CLINIC_HEALTHCARE');
     });
 
-    it('selectWebsiteDesign auto-selects INTERIOR_ARCHITECTURE for interior and architecture leads', () => {
+    it('selectWebsiteDesign routes interior and architecture leads to a profession Stitch archetype', () => {
       const design = selectWebsiteDesign({
         id: 'lead-interior-102',
         businessName: 'Apex Interior & Architecture Studio',
         profession: 'Architect',
         city: 'Noida',
       });
-      expect(design.layout).toBe('INTERIOR_ARCHITECTURE');
+      // Interior/architecture is visual and image-led, so it reuses the
+      // editorial archetype while keeping the INTERIOR_ARCHITECTURE React
+      // template as its structural fallback.
+      expect(design.layout).toBe('design-photo-editorial');
       expect(design.template).toBe('INTERIOR_ARCHITECTURE');
     });
   });

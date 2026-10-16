@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="Iron and Ember fitness website template preview">
+  <rect width="1200" height="800" fill="#0d0d10"/>
+  <rect x="0" y="0" width="1200" height="74" fill="#17171d"/>
+  <rect x="0" y="73" width="1200" height="1" fill="#2a2a33"/>
+  <rect x="44" y="26" width="170" height="20" rx="4" fill="#f7f7f8"/>
+  <rect x="700" y="32" width="78" height="10" rx="5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="800" y="32" width="66" height="10" rx="5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="888" y="32" width="58" height="10" rx="5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="1010" y="24" width="146" height="26" rx="6" fill="#f97316"/>
+  <rect x="0" y="74" width="1200" height="320" fill="#121218"/>
+  <rect x="0" y="74" width="1200" height="320" fill="#0d0d10" opacity="0.55"/>
+  <rect x="80" y="128" width="150" height="22" rx="4" fill="#f97316" opacity="0.22"/>
+  <rect x="80" y="172" width="700" height="34" rx="4" fill="#f7f7f8"/>
+  <rect x="80" y="220" width="520" height="34" rx="4" fill="#f7f7f8"/>
+  <rect x="80" y="276" width="420" height="11" rx="5.5" fill="#a1a1ab" opacity="0.7"/>
+  <rect x="80" y="312" width="180" height="38" rx="6" fill="#f97316"/>
+  <rect x="278" y="312" width="140" height="38" rx="6" fill="#17171d" stroke="#2a2a33" stroke-width="2"/>
+  <rect x="80" y="438" width="330" height="180" rx="6" fill="#17171d" stroke="#2a2a33"/>
+  <rect x="112" y="472" width="46" height="46" rx="6" fill="#121218"/>
+  <rect x="112" y="536" width="200" height="13" rx="4" fill="#f7f7f8"/>
+  <rect x="112" y="560" width="250" height="9" rx="4.5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="112" y="578" width="220" height="9" rx="4.5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="435" y="438" width="330" height="180" rx="6" fill="#17171d" stroke="#2a2a33"/>
+  <rect x="467" y="472" width="46" height="46" rx="6" fill="#121218"/>
+  <rect x="467" y="536" width="200" height="13" rx="4" fill="#f7f7f8"/>
+  <rect x="467" y="560" width="250" height="9" rx="4.5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="467" y="578" width="220" height="9" rx="4.5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="790" y="438" width="330" height="180" rx="6" fill="#17171d" stroke="#2a2a33"/>
+  <rect x="822" y="472" width="46" height="46" rx="6" fill="#121218"/>
+  <rect x="822" y="536" width="200" height="13" rx="4" fill="#f7f7f8"/>
+  <rect x="822" y="560" width="250" height="9" rx="4.5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="822" y="578" width="220" height="9" rx="4.5" fill="#a1a1ab" opacity="0.6"/>
+  <rect x="80" y="660" width="250" height="20" rx="4" fill="#f7f7f8"/>
+  <rect x="80" y="704" width="1040" height="1" fill="#2a2a33"/>
+  <rect x="80" y="726" width="760" height="12" rx="6" fill="#a1a1ab" opacity="0.7"/>
+</svg>

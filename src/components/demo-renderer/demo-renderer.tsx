@@ -20,7 +20,7 @@ import { ExpertiseSection } from './expertise-section';
 import { WhatsAppFloatingButton } from './component-registry';
 import { WebsiteBlueprint } from '@/lib/blueprint/blueprint-schema';
 
-import { isStitchLayout } from '@/lib/demos/stitch-personalizer';
+import { isStitchLayout, STITCH_DESIGN_MAP } from '@/lib/demos/stitch-personalizer';
 import { StitchDemoView } from './stitch-demo-view';
 import { GallerySection } from './gallery-section';
 import { MenuPricingSection } from './menu-pricing-section';
@@ -87,8 +87,18 @@ export function DemoRenderer({
   const preset = getProfessionPreset(safeContent.meta?.profession, safeContent.brand?.businessName);
   const rawLayout = activeDesign?.layout || safeContent.meta?.templateId || preset.defaultLayout;
 
-  // Render high-end Stitch template ONLY for verified CA practices explicitly requesting static Stitch designs
-  if (preset.isCaPractice && (rawLayout === 'design-1-premium' || rawLayout === 'design-2-minimalist' || rawLayout === 'design-3-contemporary')) {
+  // Render a high-end Stitch template when the layout is a Stitch design that
+  // matches the profession: the three CA-only templates for verified CA
+  // practices, and ANY profession archetype for non-CA professions (the
+  // archetype is chosen per-lead, so the gate is no longer category-locked).
+  const stitchMeta = isStitchLayout(rawLayout) ? STITCH_DESIGN_MAP[rawLayout] : undefined;
+  const stitchAllowedForProfession = stitchMeta
+    ? stitchMeta.isCaOnly
+      ? preset.isCaPractice
+      : !preset.isCaPractice
+    : false;
+
+  if (stitchAllowedForProfession) {
     return (
       <StitchDemoView
         demoId={demoId}

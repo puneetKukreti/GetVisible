@@ -11,6 +11,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { PROFESSION_ARCHETYPE_IDS } from './profession-stitch';
 
 export interface AiDesignRecommendation {
   layout?: string;
@@ -19,6 +20,10 @@ export interface AiDesignRecommendation {
   heroLayout?: string;
   servicesLayout?: string;
   contentDensity?: 'compact' | 'comfortable' | 'spacious';
+  /** Profession Stitch archetype the model judged the best visual fit. */
+  archetype?: string;
+  /** Optional brand accent (6-digit hex) layered onto the chosen archetype. */
+  accentColor?: string;
 }
 
 export interface AiGalleryItem {
@@ -130,6 +135,14 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
   const rawProfession = facts.profession?.trim() || 'Professional Practice';
   const city = facts.city?.trim() || 'Delhi NCR';
   const text = `${rawProfession} ${businessName}`.toLowerCase();
+
+  // Hospitality businesses often contain the word "kitchen" (e.g. "Spice Route
+  // Kitchen & Grill") but must not be captured by the modular-kitchen interior
+  // profile below, nor by other interior-led branches.
+  const isHospitalityBusiness =
+    /restaurant|diner|dine|bistro|grill|cafe|coffee|food|catering|pizzeria|cloud kitchen|multi-?cuisine|eatery|thali|dhaba|bakery|bar\b|brasserie|lounge/i.test(
+      text
+    );
 
   // 0. Chartered Accountant / Tax & Audit Practice
   if (/chartered accountant|chartered accountancy|ca firm|\bca\b|tax consultant|tax practitioner|audit firm|auditing firm|accounting firm|statutory audit|bookkeep|\bitr\b|\bgst\b|corporate tax|tax & audit/i.test(text)) {
@@ -348,8 +361,8 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
     };
   }
 
-  // 5. Modular Kitchen & Wardrobe
-  if (/kitchen|wardrobe|cabinet|woodwork|modular/i.test(text)) {
+  // 5. Modular Kitchen & Wardrobe (interior fit-out, NOT a restaurant kitchen)
+  if (!isHospitalityBusiness && /kitchen|wardrobe|cabinet|woodwork|modular/i.test(text)) {
     return {
       heroBadge: `Factory-Crafted Modular Interiors • ${city}`,
       heroHeadline: `Bespoke Modular Kitchens & Wardrobes Built for a Lifetime`,
@@ -779,6 +792,7 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
     const density = ['compact', 'comfortable', 'spacious'].includes(parsed.design.contentDensity)
       ? parsed.design.contentDensity
       : undefined;
+    const accent = String(parsed.design.accentColor || '');
     base.design = {
       layout: parsed.design.layout ? String(parsed.design.layout).slice(0, 60) : undefined,
       template: parsed.design.template ? String(parsed.design.template).slice(0, 60) : undefined,
@@ -786,6 +800,8 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
       heroLayout: parsed.design.heroLayout ? String(parsed.design.heroLayout).slice(0, 60) : undefined,
       servicesLayout: parsed.design.servicesLayout ? String(parsed.design.servicesLayout).slice(0, 60) : undefined,
       contentDensity: density,
+      archetype: parsed.design.archetype ? String(parsed.design.archetype).slice(0, 60) : undefined,
+      accentColor: /^#[0-9a-fA-F]{6}$/.test(accent) ? accent.toLowerCase() : undefined,
     };
   }
 
@@ -990,7 +1006,7 @@ Return ONLY a single valid JSON object matching this exact schema (no markdown f
     { "question": "Fourth client question regarding appointments or turnaround?", "answer": "Helpful 1-2 sentence answer" }
   ],
   "sections": ["HERO", "SERVICES", "GALLERY", "EXPERTISE", "ABOUT", "PROCESS", "WHY_CHOOSE_US", "FAQ", "CONTACT", "LOCATION"],
-  "design": { "heroLayout": "e.g. visual-fullbleed | split-editorial | minimal-serif", "servicesLayout": "e.g. cards | grid | luxury-rows", "contentDensity": "compact | comfortable | spacious" },
+  "design": { "archetype": "ONE of: ${PROFESSION_ARCHETYPE_IDS.join(' | ')}", "accentColor": "#RRGGBB (optional brand accent)", "heroLayout": "e.g. visual-fullbleed | split-editorial | minimal-serif", "servicesLayout": "e.g. cards | grid | luxury-rows", "contentDensity": "compact | comfortable | spacious" },
   "seo": { "title": "SEO page title (business name + profession + city, <= 60 chars)", "description": "SEO meta description (<= 155 chars)" },
   "navItems": [
     { "label": "Nav label 1", "href": "#services" },
@@ -1020,6 +1036,18 @@ OPTIONAL BLOCKS:
 - Provide "menu" ONLY when MENU is in "sections".
 - Provide "expertise" ONLY when EXPERTISE is in "sections".
 - Provide "industries" ONLY when INDUSTRIES is in "sections".
+
+DESIGN SELECTION (choose the visual identity for this profession):
+- "design.archetype" MUST be one of the listed ids. Pick the aesthetic that best fits this exact profession and sector:
+  - design-photo-editorial: image-led, dark & editorial (photography, interior/architecture).
+  - design-restaurant-warm: warm & appetite-driven (restaurants, cafes, catering).
+  - design-clinic-clean: calm & clinical, trust-first (clinics, doctors, healthcare).
+  - design-realestate-premium: premium listings (real estate, property, builders).
+  - design-bold-energetic: bold & high-energy (gyms, fitness, coaching, sports).
+  - design-beauty-elegant: soft & elegant (salons, spas, beauty, bridal).
+  - design-classic-professional: clean & credible general default (legal, consulting, trades, or anything unsure).
+- "design.accentColor" is OPTIONAL and must be a 6-digit hex like "#0d9488". Omit it to use the archetype's own palette.
+- Never invent markup, CSS, or font names — only the id and an optional hex accent.
 
 TRUTHFULNESS RULES (mandatory):
 - NEVER invent testimonials, awards, certifications, years in business, staff counts, client counts, addresses, phone numbers, or exact prices.

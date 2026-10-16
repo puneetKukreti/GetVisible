@@ -19,6 +19,7 @@ import {
   scrubContentCaLeakage,
   ProfessionContentPlan,
 } from './profession-sections';
+import { isProfessionArchetypeId } from './profession-stitch';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -325,6 +326,37 @@ export class WebsiteDemoGeneratorService {
       if (aiProfile.design.contentDensity) design.contentDensity = aiProfile.design.contentDensity;
       if (aiProfile.design.heroLayout) design.heroLayout = aiProfile.design.heroLayout;
       if (aiProfile.design.servicesLayout) design.servicesLayout = aiProfile.design.servicesLayout;
+    }
+
+    // Generalized profession design: the AI may pick any registered archetype
+    // (validated against the allow-list) and suggest an accent colour. This is
+    // what lets "just type a profession" produce a tailored Stitch design with
+    // zero per-profession code. CA practices keep their deterministic layout.
+    if (!isCaPractice) {
+      const chosenArchetype = aiProfile?.design?.archetype;
+      if (chosenArchetype && isProfessionArchetypeId(chosenArchetype)) {
+        design.layout = chosenArchetype as WebsiteLayout;
+      }
+      const accent = aiProfile?.design?.accentColor;
+      design.stitch = {
+        archetype: design.layout,
+        accentColor: accent && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent.toLowerCase() : undefined,
+      };
+
+      // Persist the resolved design (including the Stitch directive) onto the
+      // content so server-side rendering stays fully deterministic.
+      content.design = {
+        ...(content.design || ({} as WebsiteDesign)),
+        layout: design.layout,
+        template: design.template,
+        theme: design.theme,
+        sectionOrder: design.sectionOrder,
+        heroLayout: design.heroLayout,
+        servicesLayout: design.servicesLayout,
+        features: design.features,
+        contentDensity: design.contentDensity,
+        stitch: design.stitch,
+      } as WebsiteDesign;
     }
 
     // Trust badges — always profession-appropriate; never CA copy for non-CA.

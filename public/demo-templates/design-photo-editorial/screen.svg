@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="Aperture Editorial photography website template preview">
+  <rect width="1200" height="800" fill="#0b0b0e"/>
+  <rect x="0" y="0" width="1200" height="74" fill="#141418"/>
+  <rect x="0" y="73" width="1200" height="1" fill="#26262d"/>
+  <rect x="44" y="28" width="168" height="18" rx="4" fill="#f6f5f2"/>
+  <rect x="44" y="50" width="70" height="7" rx="3.5" fill="#c8a15a"/>
+  <rect x="700" y="32" width="80" height="10" rx="5" fill="#a3a3ad" opacity="0.6"/>
+  <rect x="800" y="32" width="70" height="10" rx="5" fill="#a3a3ad" opacity="0.6"/>
+  <rect x="890" y="32" width="60" height="10" rx="5" fill="#a3a3ad" opacity="0.6"/>
+  <rect x="1010" y="24" width="146" height="26" rx="13" fill="#c8a15a"/>
+  <rect x="0" y="74" width="1200" height="330" fill="#17171c"/>
+  <rect x="0" y="74" width="1200" height="330" fill="url(#gvphoto)"/>
+  <defs>
+    <linearGradient id="gvphoto" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b0b0e" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#0b0b0e" stop-opacity="0.95"/>
+    </linearGradient>
+  </defs>
+  <rect x="70" y="210" width="150" height="20" rx="10" fill="#c8a15a" opacity="0.22"/>
+  <rect x="70" y="252" width="640" height="30" rx="6" fill="#f6f5f2"/>
+  <rect x="70" y="292" width="500" height="30" rx="6" fill="#f6f5f2"/>
+  <rect x="70" y="342" width="360" height="12" rx="6" fill="#a3a3ad" opacity="0.8"/>
+  <rect x="70" y="366" width="220" height="34" rx="17" fill="#c8a15a"/>
+  <rect x="306" y="366" width="150" height="34" rx="17" fill="none" stroke="#f6f5f2" stroke-opacity="0.5"/>
+  <rect x="70" y="446" width="330" height="290" rx="6" fill="#141418"/>
+  <rect x="70" y="446" width="330" height="200" rx="6" fill="#232330"/>
+  <rect x="424" y="446" width="330" height="220" rx="6" fill="#141418"/>
+  <rect x="424" y="446" width="330" height="150" rx="6" fill="#2b2b39"/>
+  <rect x="778" y="446" width="352" height="290" rx="6" fill="#141418"/>
+  <rect x="778" y="446" width="352" height="200" rx="6" fill="#20202c"/>
+  <rect x="94" y="666" width="120" height="10" rx="5" fill="#c8a15a"/>
+  <rect x="448" y="676" width="120" height="10" rx="5" fill="#c8a15a"/>
+  <rect x="802" y="666" width="120" height="10" rx="5" fill="#c8a15a"/>
+  <rect x="180" y="770" width="840" height="6" rx="3" fill="#1c1c22"/>
+</svg>

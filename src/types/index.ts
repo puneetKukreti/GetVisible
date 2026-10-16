@@ -174,7 +174,15 @@ export type WebsiteLayout =
   | 'TRADITIONAL_CA'
   | 'design-1-premium'
   | 'design-2-minimalist'
-  | 'design-3-contemporary';
+  | 'design-3-contemporary'
+  // Profession-specific Stitch template sets (non-CA)
+  | 'design-photo-editorial'
+  | 'design-restaurant-warm'
+  | 'design-clinic-clean'
+  | 'design-realestate-premium'
+  | 'design-bold-energetic'
+  | 'design-beauty-elegant'
+  | 'design-classic-professional';
 
 export type WebsiteSectionType =
   | 'HERO'
@@ -209,6 +217,15 @@ export interface WebsiteDesign {
     [key: string]: any;
   };
   contentDensity?: 'compact' | 'comfortable' | 'spacious';
+  /**
+   * Profession Stitch directive: the resolved archetype and an optional
+   * validated accent colour chosen for this lead. Persisted so re-renders are
+   * fully deterministic.
+   */
+  stitch?: {
+    archetype?: string;
+    accentColor?: string;
+  };
 }
 
 export interface WebsiteProcessStep {

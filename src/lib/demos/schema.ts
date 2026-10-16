@@ -38,6 +38,13 @@ export const WebsiteLayoutSchema = z.enum([
   'design-1-premium',
   'design-2-minimalist',
   'design-3-contemporary',
+  'design-photo-editorial',
+  'design-restaurant-warm',
+  'design-clinic-clean',
+  'design-realestate-premium',
+  'design-bold-energetic',
+  'design-beauty-elegant',
+  'design-classic-professional',
 ]);
 
 export const WebsiteSectionTypeSchema = z.enum([
@@ -73,6 +80,12 @@ export const WebsiteDesignSchema = z.object({
   layout: WebsiteLayoutSchema,
   theme: WebsiteThemeSchema,
   sectionOrder: z.array(WebsiteSectionTypeSchema),
+  stitch: z
+    .object({
+      archetype: z.string().max(60).optional(),
+      accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color code').optional(),
+    })
+    .optional(),
 });
 
 export const WebsiteProcessStepSchema = z.object({

@@ -4,6 +4,7 @@ import React from 'react';
 import { WebsiteDemoData, WebsiteTemplate, WebsiteLayout } from '@/types';
 import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
 import { CA_LAYOUTS } from '@/lib/demos/personalization';
+import { isStitchLayout } from '@/lib/demos/stitch-personalizer';
 import { FloatingClaimBar } from '@/components/demos/floating-claim-bar';
 
 interface PublicDemoViewProps {
@@ -32,12 +33,12 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
     demo.templateId ||
     'design-1-premium';
 
-  const activeLayout: WebsiteLayout =
-    (CA_LAYOUTS[rawLayoutKey as WebsiteLayout]
-      ? (rawLayoutKey as WebsiteLayout)
-      : null) ||
-    (rawLayoutKey === 'CA_ACCOUNTING_PROFESSIONAL' ? 'design-1-premium' : null) ||
-    'design-1-premium';
+  const isKnownLayout =
+    Boolean(CA_LAYOUTS[rawLayoutKey as WebsiteLayout]) || isStitchLayout(rawLayoutKey);
+
+  const activeLayout: WebsiteLayout = isKnownLayout
+    ? (rawLayoutKey as WebsiteLayout)
+    : 'design-1-premium';
 
   const rawSectionOrder =
     demo.design?.sectionOrder ||
@@ -63,7 +64,7 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
         design={{
           ...demo.design,
           layout: activeLayout,
-          template: activeLayout as WebsiteTemplate,
+          template: (demo.design?.template || activeLayout) as WebsiteTemplate,
           theme: themeObj,
           sectionOrder,
         }}

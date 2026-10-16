@@ -7,6 +7,7 @@ import {
 } from '@/types';
 import { THEMES } from './themes';
 import { getProfessionPreset } from './profession-config';
+import { getProfessionStitchLayout } from './profession-stitch';
 
 export interface CALayoutDefinition {
   layout: WebsiteLayout;
@@ -27,7 +28,7 @@ export interface CALayoutDefinition {
   contentDensity: 'compact' | 'comfortable' | 'spacious';
 }
 
-export const CA_LAYOUTS: Record<WebsiteLayout, CALayoutDefinition> = {
+export const CA_LAYOUTS: Record<string, CALayoutDefinition> = {
   EDITORIAL_FINANCE: {
     layout: 'EDITORIAL_FINANCE',
     template: 'EDITORIAL_FINANCE',
@@ -552,7 +553,11 @@ export function selectWebsiteDesign(
   } else if (isCaOrGeneric) {
     chosenLayoutKey = LAYOUT_KEYS[hash % LAYOUT_KEYS.length];
   } else {
-    chosenLayoutKey = preset.defaultLayout;
+    // Non-CA professions use their dedicated Stitch template set when one
+    // exists, otherwise they keep their profession archetype layout.
+    chosenLayoutKey =
+      (getProfessionStitchLayout(preset.category) as WebsiteLayout | undefined) ||
+      preset.defaultLayout;
   }
 
   const layoutDef = CA_LAYOUTS[chosenLayoutKey] || CA_LAYOUTS[preset.defaultLayout] || CA_LAYOUTS.MODERN_FINTECH;
