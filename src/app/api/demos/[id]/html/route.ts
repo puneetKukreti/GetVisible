@@ -5,6 +5,7 @@ import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { personalizeStitchHtml, isStitchLayout } from '@/lib/demos/stitch-personalizer';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
+import { isCaPracticeProfession, contentHasCaLeakageForProfession } from '@/lib/demos/profession-sections';
 import { WebsiteContent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -64,17 +65,14 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }
     }
 
-    // Auto-regenerate if non-CA lead has stale CA content or missing demo
+    // Auto-regenerate if a non-CA lead has stale CA content or a missing demo
     const effectiveOrgId = lead?.organizationId || demo?.organizationId || DEMO_ORGANIZATION_ID;
-    const isCaPractice = /chartered accountant|ca firm|tax advisory|auditor|accounting practice/i.test(
-      `${lead?.profession || ''} ${lead?.businessName || ''}`
-    );
+    const isCaPractice = isCaPracticeProfession(lead?.profession, lead?.businessName);
 
     if (lead && !isCaPractice) {
-      const contentStr = typeof demo?.content === 'string' ? demo.content : JSON.stringify(demo?.content || {});
       const hasStaleCaContent =
         !demo ||
-        /statutory audit|transfer pricing|form 15ca/i.test(contentStr);
+        contentHasCaLeakageForProfession(demo.content, lead.profession, lead.businessName);
 
       if (hasStaleCaContent) {
         try {
@@ -102,12 +100,12 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
         meta: { profession: lead.profession },
       };
     } else {
-      // Fallback preview
+      // Neutral fallback preview (used only when neither a demo nor a lead can be resolved)
       content = {
-        brand: { businessName: 'Chartered Accountants & Advisory' },
-        location: { city: 'Gurgaon', address: 'Cyber City, Gurgaon' },
-        contact: { publicPhone: '+91 99999 99999', publicEmail: 'contact@ca-practice.in' },
-        meta: { profession: 'Chartered Accountant' },
+        brand: { businessName: 'Your Business' },
+        location: { city: 'Your City', address: 'Your City, India' },
+        contact: { publicPhone: '+91 00000 00000', publicEmail: 'hello@example.com' },
+        meta: { profession: 'Business' },
       };
     }
 

@@ -58,7 +58,7 @@ export function detectProfessionCategory(profession?: string, businessName?: str
   if (/\b(coaching|institute|academy|tuition|school|classes|training|exam|mentor)\b/i.test(text)) {
     return 'EDUCATION_COACHING';
   }
-  if (/\b(photo|photographer|photography|videograph|wedding|portrait|studio|cinematograph|shoot|camera)\b/i.test(text)) {
+  if (/\b(photo|photographer|photography|videograph|videographer|cinematograph|portrait|wedding shoot|pre-wedding|photoshoot)\b/i.test(text)) {
     return 'PHOTOGRAPHY_CREATIVE';
   }
   return 'GENERAL_SMB';

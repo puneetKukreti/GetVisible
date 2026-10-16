@@ -12,6 +12,28 @@
 import fs from 'fs';
 import path from 'path';
 
+export interface AiDesignRecommendation {
+  layout?: string;
+  template?: string;
+  themeId?: string;
+  heroLayout?: string;
+  servicesLayout?: string;
+  contentDensity?: 'compact' | 'comfortable' | 'spacious';
+}
+
+export interface AiGalleryItem {
+  title: string;
+  category?: string;
+  description?: string;
+  /** Short visual brief used to source a profession-appropriate image. */
+  imageQuery?: string;
+}
+
+export interface AiMenuCategory {
+  name: string;
+  items: { name: string; description?: string; price: string; badge?: string }[];
+}
+
 export interface AiBusinessContent {
   heroBadge: string;
   heroHeadline: string;
@@ -26,6 +48,37 @@ export interface AiBusinessContent {
   whyChooseUs: { title: string; description: string }[];
   processSteps: { number: string; title: string; description: string }[];
   faqs: { question: string; answer: string }[];
+
+  // ---- Profession-aware structured extensions (optional; AI may supply) ----
+  /** Ordered list of website sections the AI judged appropriate for this profession. */
+  sections?: string[];
+  /** Design configuration recommendations for the deterministic renderer. */
+  design?: AiDesignRecommendation;
+  seo?: { title?: string; description?: string };
+  navItems?: { label: string; href?: string }[];
+  expertise?: {
+    sectionTitle?: string;
+    sectionSubtitle?: string;
+    items: { title: string; description: string; tags?: string[] }[];
+  };
+  gallery?: {
+    sectionTitle?: string;
+    sectionSubtitle?: string;
+    items: AiGalleryItem[];
+  };
+  menu?: {
+    sectionTitle?: string;
+    sectionSubtitle?: string;
+    categories: AiMenuCategory[];
+  };
+  industries?: { sectionTitle?: string; items: string[] };
+  ctaBanner?: {
+    title?: string;
+    subtitle?: string;
+    primaryCtaLabel?: string;
+    secondaryCtaLabel?: string;
+  };
+  trustBadges?: { title: string; description: string; iconName?: string }[];
 }
 
 export interface GenerateAiContentFacts {
@@ -78,6 +131,51 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
   const city = facts.city?.trim() || 'Delhi NCR';
   const text = `${rawProfession} ${businessName}`.toLowerCase();
 
+  // 0. Chartered Accountant / Tax & Audit Practice
+  if (/chartered accountant|chartered accountancy|ca firm|\bca\b|tax consultant|tax practitioner|audit firm|auditing firm|accounting firm|statutory audit|bookkeep|\bitr\b|\bgst\b|corporate tax|tax & audit/i.test(text)) {
+    return {
+      heroBadge: `Chartered Accountants & Advisory • ${city}`,
+      heroHeadline: `Trusted Chartered Accountancy & Advisory for Growing Businesses`,
+      heroSubheadline: `Partner-led audit, tax, and compliance guidance delivered with clarity and discretion for clients across ${city}.`,
+      primaryCtaLabel: 'Schedule a Consultation',
+      aboutLead: `${businessName} is a chartered accountancy practice based in ${city}, serving businesses and professionals with dependable financial guidance.`,
+      aboutBody: `Our approach is structured, transparent, and compliance-first. We help clients stay on top of their statutory obligations while making sound, well-explained financial decisions.`,
+      highlights: [
+        { title: 'Partner-Led Attention', description: 'Direct involvement of senior professionals on every engagement.' },
+        { title: 'Compliance Discipline', description: 'Organised, deadline-driven handling of statutory and tax requirements.' },
+        { title: 'Clear Communication', description: 'Plain-language explanations of financial and regulatory matters.' },
+        { title: 'Confidential Handling', description: 'Careful, discreet treatment of all client information.' },
+      ],
+      servicesSectionTitle: 'Our Core Services',
+      servicesSectionSubtitle: 'Comprehensive assurance, tax, and advisory support for businesses and professionals.',
+      services: [
+        { title: 'Statutory & Tax Audit', description: 'Independent audit and assurance engagements conducted with rigour and independence.' },
+        { title: 'Direct Tax & ITR Filing', description: 'Preparation and filing of income tax returns with careful review and documentation.' },
+        { title: 'GST Advisory & Returns', description: 'Registration, periodic returns, and advisory on indirect tax matters.' },
+        { title: 'Accounting & Bookkeeping', description: 'Reliable bookkeeping and periodic financial reporting for smooth compliance.' },
+        { title: 'Company Law & ROC Compliance', description: 'Support with incorporation, annual filings, and corporate secretarial compliance.' },
+        { title: 'Financial Advisory & MIS', description: 'Practical reporting and advisory to support informed decision-making.' },
+      ],
+      whyChooseUs: [
+        { title: 'Ethical Practice', description: 'Guidance aligned with professional standards and a strict confidentiality commitment.' },
+        { title: 'Structured Process', description: 'Documented checklists and timelines that keep engagements predictable.' },
+        { title: 'Responsive Team', description: 'Timely replies and proactive reminders around key compliance dates.' },
+        { title: 'Long-Term Support', description: `Ongoing advisory for businesses growing across ${city} and beyond.` },
+      ],
+      processSteps: [
+        { number: '01', title: 'Initial Consultation', description: 'We understand your entity, obligations, and immediate priorities.' },
+        { number: '02', title: 'Scope & Engagement', description: 'A clear, itemised scope of work and responsibilities is agreed upfront.' },
+        { number: '03', title: 'Execution & Review', description: 'Work is carried out with review checkpoints for accuracy.' },
+        { number: '04', title: 'Filing & Follow-Up', description: 'Filings completed on time, with reminders for upcoming deadlines.' },
+      ],
+      faqs: [
+        { question: 'How do I engage your practice?', answer: `You can contact ${businessName} to arrange an initial consultation; we will outline the scope and information required.` },
+        { question: 'Do you assist with ongoing compliance?', answer: 'Yes, we support recurring compliance such as periodic returns, bookkeeping, and annual filings on a retained basis.' },
+        { question: 'Which clients do you typically serve?', answer: 'We work with proprietors, partnerships, companies, and professionals needing dependable assurance, tax, and advisory support.' },
+      ],
+    };
+  }
+
   // 1. Dentist & Dental Clinic
   if (/dent|dental|orthodont|teeth|oral|smile/i.test(text)) {
     return {
@@ -105,7 +203,7 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
         { title: 'Experienced Specialists', description: 'Led by certified dental surgeons and orthodontists with proven clinical track records.' },
         { title: 'State-of-the-Art Tech', description: 'Low-radiation digital CBCT and high-definition intraoral cameras.' },
         { title: 'Comfort-First Care', description: 'Relaxing clinical atmosphere designed to eliminate dental phobia for adults and children.' },
-        { title: 'Emergency Care', description: 'Prompt relief for severe toothaches, trauma, and dental emergencies in ${city}.' },
+        { title: 'Emergency Care', description: `Prompt relief for severe toothaches, trauma, and dental emergencies in ${city}.` },
       ],
       processSteps: [
         { number: '01', title: 'Consultation & Digital Scan', description: 'In-depth clinical examination, intraoral photos, and digital imaging.' },
@@ -145,7 +243,7 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
         { title: 'Custom Nutrition & Diet Plans', description: 'Evidence-based macronutrient breakdowns and meal plans to fuel your fitness transformation.' },
       ],
       whyChooseUs: [
-        { title: 'Results-Driven Culture', description: 'Hundreds of verified client body transformations across ${city}.' },
+        { title: 'Results-Driven Culture', description: `A motivating, goal-focused environment for members across ${city}.` },
         { title: 'No Crowded Queues', description: 'Spacious multi-floor layout with multiple duplicate stations for peak training hours.' },
         { title: 'Community Support', description: 'Motivating, judgment-free environment welcoming beginners and elite athletes alike.' },
         { title: 'Flexible Memberships', description: 'Transparent monthly, quarterly, and annual packages with zero hidden joining fees.' },
@@ -190,7 +288,7 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
       whyChooseUs: [
         { title: 'Personalized Artistry', description: 'Every haircut, color, and makeup look is tailored to your face shape and personal style.' },
         { title: 'Sanitized Luxury Environment', description: 'Plush seating, calming background music, and supreme hygiene standards.' },
-        { title: 'Client Trust & Satisfaction', description: 'Over 98% repeat client rating across ${city} and NCR.' },
+        { title: 'Client Trust & Satisfaction', description: `A loyal, returning client base built across ${city} and the surrounding region.` },
         { title: 'Prompt Appointments', description: 'Zero waiting times with reserved slot scheduling.' },
       ],
       processSteps: [
@@ -220,7 +318,7 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
         { title: 'Government Certified', description: 'Licensed by the Central Insecticides Board (CIB) with certified technicians.' },
         { title: 'Odorless & Non-Toxic', description: 'No need to vacate your home or unpack kitchen cabinets.' },
         { title: 'Long-Term Warranty', description: 'Free retreatment warranty on all residential and commercial annual packages.' },
-        { title: 'Same-Day Dispatch', description: 'Rapid emergency response across all sectors and neighborhoods in ${city}.' },
+        { title: 'Same-Day Dispatch', description: `Rapid emergency response across all sectors and neighborhoods in ${city}.` },
       ],
       servicesSectionTitle: 'Targeted Pest Solutions',
       servicesSectionSubtitle: 'Scientific eradication methods that terminate infestations and prevent recurrence.',
@@ -245,7 +343,7 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
       faqs: [
         { question: 'Do we have to leave the house during treatment?', answer: 'No! Our cockroach gel and general pest treatments are 100% odorless and safe for you to remain inside.' },
         { question: 'How long does termite treatment last?', answer: 'Our drill-fill-seal termite treatments come with a 3-year or 5-year written service warranty.' },
-        { question: 'How quickly can your team arrive in ${city}?', answer: 'We offer same-day service and can arrive at your doorstep within 2 to 4 hours of confirmation.' },
+        { question: `How quickly can your team arrive in ${city}?`, answer: 'We offer same-day service and can arrive at your doorstep within a few hours of confirmation.' },
       ],
     };
   }
@@ -362,7 +460,7 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
       whyChooseUs: [
         { title: 'Zero Artificial Preservatives', description: 'We refuse shortcuts; only authentic cocoa, real fruits, and pure dairy.' },
         { title: 'Hygienic FSSAI Kitchen', description: 'Immaculate preparation standards following international food safety protocols.' },
-        { title: 'Reliable Same-Day Delivery', description: 'Safe chilled delivery across ${city} guaranteeing intact decoration.' },
+        { title: 'Reliable Same-Day Delivery', description: `Safe chilled delivery across ${city} guaranteeing intact decoration.` },
         { title: 'Custom Tastes & Diets', description: 'Gluten-free, sugar-free, and vegan options available upon request.' },
       ],
       processSteps: [
@@ -374,12 +472,189 @@ export function getDeterministicProfessionProfile(facts: GenerateAiContentFacts)
       faqs: [
         { question: 'How much notice is needed for a customized designer cake?', answer: 'We recommend placing custom design orders 24 hours in advance, although standard fresh celebration cakes can be prepared within 2 to 3 hours.' },
         { question: 'Are eggless cakes available?', answer: 'Yes! Over 90% of our bakery menu and all traditional sweets are 100% vegetarian / eggless.' },
-        { question: 'Do you deliver across ${city}?', answer: `Yes, ${businessName} provides temperature-safe doorstep delivery across all sectors of ${city}.` },
+        { question: `Do you deliver across ${city}?`, answer: `Yes, ${businessName} provides temperature-safe doorstep delivery across all sectors of ${city}.` },
       ],
     };
   }
 
-  // 8. General SMB / Custom Trades (Fallback for any arbitrary profession)
+  // 8. Photographer / Videographer / Creative Studio
+  if (/photograph|photographer|photography|videograph|cinematograph|portrait|wedding shoot|pre-wedding|\bphotoshoot\b|photo studio/i.test(text)) {
+    return {
+      heroBadge: `Wedding & Portrait Photography • ${city}`,
+      heroHeadline: `Timeless Wedding, Portrait & Event Photography in ${city}`,
+      heroSubheadline: `From candid wedding stories to editorial portraits and commercial shoots, ${businessName} captures each moment with a calm, unobtrusive eye.`,
+      primaryCtaLabel: 'Check Dates & Book a Shoot',
+      aboutLead: `${businessName} is a ${city}-based photography studio specialising in weddings, portraits, and brand storytelling.`,
+      aboutBody: `We blend natural light, thoughtful composition, and honest storytelling to deliver images you will treasure for years. Every session is planned around you, your comfort, and the story you want told.`,
+      highlights: [
+        { title: 'Story-First Approach', description: 'We document real emotion and candid moments rather than stiff, posed frames.' },
+        { title: 'Professional Equipment', description: 'Pro-grade cameras, lenses, and lighting for reliable results in any setting.' },
+        { title: 'Quick Turnarounds', description: 'Carefully edited, colour-graded galleries delivered within an agreed timeline.' },
+        { title: 'Flexible Packages', description: 'Coverage options tailored to weddings, portraits, events, and commercial needs.' },
+      ],
+      servicesSectionTitle: 'Photography Services',
+      servicesSectionSubtitle: 'Coverage for every occasion, planned around your story and delivered with care.',
+      services: [
+        { title: 'Wedding Photography', description: 'Full-day candid and traditional coverage of ceremonies, rituals, and celebrations.' },
+        { title: 'Pre-Wedding & Couple Shoots', description: 'Relaxed, location-scouted couple sessions that feel natural and personal.' },
+        { title: 'Portrait & Family Sessions', description: 'Studio or outdoor portraits for individuals, families, and professional profiles.' },
+        { title: 'Event & Celebration Coverage', description: 'Birthdays, engagements, and corporate events documented start to finish.' },
+        { title: 'Commercial & Product Shoots', description: 'Brand, product, and lifestyle imagery crafted for websites and social media.' },
+        { title: 'Maternity & Newborn', description: 'Gentle, patient sessions to capture the earliest days of your growing family.' },
+      ],
+      whyChooseUs: [
+        { title: 'Calm On The Day', description: 'A discreet, friendly presence that keeps your event relaxed and on schedule.' },
+        { title: 'Consistent Style', description: 'Warm, true-to-life editing that keeps your gallery looking timeless, not trendy.' },
+        { title: 'Clear Communication', description: 'Upfront planning, transparent timelines, and quick replies before and after the shoot.' },
+        { title: 'Local Knowledge', description: `Familiarity with the best locations, light, and logistics across ${city}.` },
+      ],
+      processSteps: [
+        { number: '01', title: 'Enquiry & Date Check', description: 'Share your date, location, and vision so we can confirm availability.' },
+        { number: '02', title: 'Pre-Shoot Consultation', description: 'We plan the timeline, must-have shots, locations, and outfit guidance.' },
+        { number: '03', title: 'The Shoot Day', description: 'Relaxed, well-guided coverage so you can simply enjoy the moment.' },
+        { number: '04', title: 'Editing & Delivery', description: 'Careful selection, colour grading, and secure delivery of your final gallery.' },
+      ],
+      faqs: [
+        { question: 'How far in advance should we book?', answer: 'Wedding dates are best booked early, especially in peak season. Portrait and event sessions can often be arranged at shorter notice depending on availability.' },
+        { question: 'How many photos do we receive?', answer: 'The number depends on the duration and type of coverage. We will confirm an expected range in your quote and deliver a fully edited selection.' },
+        { question: 'Do you travel outside the city?', answer: `Yes. ${businessName} covers destination and outstation shoots — travel and stay are discussed and agreed upfront.` },
+      ],
+    };
+  }
+
+  // 9. Restaurant, Cafe & Cloud Kitchen
+  if (/restaurant|diner|dine|bistro|cloud kitchen|multi-?cuisine|food court|eatery|thali|dhaba/i.test(text)) {
+    return {
+      heroBadge: `Dine-In • Takeaway • Delivery`,
+      heroHeadline: `Freshly Prepared Favourites at ${businessName}`,
+      heroSubheadline: `From signature mains to comforting classics, ${businessName} serves food made fresh to order in the heart of ${city}.`,
+      primaryCtaLabel: 'Reserve a Table / Order',
+      aboutLead: `${businessName} is a ${city} dining destination serving freshly prepared food for dine-in, takeaway, and delivery.`,
+      aboutBody: `We focus on quality ingredients, consistent taste, and warm hospitality. Whether it is a quick lunch, a family dinner, or a celebration, our kitchen and team are ready to serve you.`,
+      highlights: [
+        { title: 'Freshly Cooked', description: 'Dishes prepared to order using quality, responsibly sourced ingredients.' },
+        { title: 'Warm Hospitality', description: 'Friendly, attentive service in a comfortable, welcoming setting.' },
+        { title: 'Varied Menu', description: 'Something for every taste, from signature specials to comfort classics.' },
+        { title: 'Dine or Order In', description: 'Enjoy in-house or get it delivered and packed carefully for the journey.' },
+      ],
+      servicesSectionTitle: 'Dining & Service Options',
+      servicesSectionSubtitle: 'Ways to enjoy our food — in the restaurant, at home, or at your celebration.',
+      services: [
+        { title: 'Dine-In Experience', description: 'Relaxed in-house seating with attentive service and a welcoming atmosphere.' },
+        { title: 'Takeaway', description: 'Freshly packed favourites, ready for you to collect at your convenience.' },
+        { title: 'Home Delivery', description: 'Careful, timely delivery of our most-loved dishes to your doorstep where offered.' },
+        { title: 'Private & Group Dining', description: 'Space and menus suited to family gatherings, friends, and small celebrations.' },
+        { title: 'Catering Enquiries', description: 'Bulk and event catering arrangements discussed and tailored to your needs.' },
+      ],
+      whyChooseUs: [
+        { title: 'Consistent Taste', description: 'Recipes and standards that keep every visit reliably enjoyable.' },
+        { title: 'Hygienic Kitchen', description: 'Strict cleanliness and safe food-handling practices at every step.' },
+        { title: 'Friendly Team', description: 'Staff who make you feel looked after from the moment you arrive.' },
+        { title: 'Easy Booking', description: 'Simple reservations and orders over a call or message.' },
+      ],
+      processSteps: [
+        { number: '01', title: 'Choose Your Experience', description: 'Dine in, take away, order for delivery, or enquire about catering.' },
+        { number: '02', title: 'Confirm Your Booking', description: 'Reserve a table or place your order over a call or message.' },
+        { number: '03', title: 'Prepared Fresh', description: 'Your food is cooked to order by our kitchen team.' },
+        { number: '04', title: 'Served Or Delivered', description: 'Enjoy in-house or receive it carefully packed and on time.' },
+      ],
+      faqs: [
+        { question: 'Do you take reservations?', answer: 'Yes, we recommend reserving a table for evenings and weekends. Give us a call or message us to confirm availability.' },
+        { question: 'Do you offer delivery?', answer: 'Where available, we offer delivery in and around the city. Please contact us to confirm coverage for your location.' },
+        { question: 'Can you cater for groups or events?', answer: `Yes. ${businessName} takes bulk and celebration enquiries — share your date and headcount and we will suggest suitable options.` },
+      ],
+    };
+  }
+
+  // 10. Real Estate & Property Advisory
+  if (/real estate|realty|property|properties|realtor|property broker|builder|housing|apartments|flats?\b|plots?\b|commercial space|leasing/i.test(text)) {
+    return {
+      heroBadge: `Residential & Commercial Property • ${city}`,
+      heroHeadline: `Find the Right Property with Trusted Local Guidance`,
+      heroSubheadline: `From first homes to prime commercial spaces, ${businessName} helps buyers, sellers, and investors move with confidence across ${city}.`,
+      primaryCtaLabel: 'Schedule a Site Visit',
+      aboutLead: `${businessName} is a ${city} property advisory helping clients buy, sell, rent, and invest with clarity.`,
+      aboutBody: `We combine local market knowledge with a transparent, paperwork-friendly process so you can make informed decisions without pressure. From shortlisting to registration support, we stay with you at every step.`,
+      highlights: [
+        { title: 'Local Market Insight', description: `Practical, area-level knowledge of pricing, demand, and upcoming corridors in ${city}.` },
+        { title: 'Verified Options', description: 'Shortlists focused on genuine, well-matched properties rather than endless listings.' },
+        { title: 'Transparent Guidance', description: 'Clear communication on pricing, costs, and next steps with no hidden surprises.' },
+        { title: 'End-to-End Support', description: 'Assistance with site visits, negotiation, documentation, and handover.' },
+      ],
+      servicesSectionTitle: 'Property Services',
+      servicesSectionSubtitle: 'Guidance across buying, selling, renting, and investing — matched to your goals.',
+      services: [
+        { title: 'Residential Sales & Purchase', description: 'Help finding or selling apartments, villas, floors, and independent homes.' },
+        { title: 'Rentals & Leasing', description: 'Tenant and landlord support for residential and commercial rentals.' },
+        { title: 'Commercial & Office Spaces', description: 'Shops, offices, and commercial units suited to your business requirements.' },
+        { title: 'Plots & Land', description: 'Guidance on plots and land parcels, including basic due-diligence pointers.' },
+        { title: 'Investment Advisory', description: 'Area and segment guidance for buyers evaluating long-term property value.' },
+        { title: 'Documentation Support', description: 'Assistance coordinating the paperwork involved in a property transaction.' },
+      ],
+      whyChooseUs: [
+        { title: 'Client-First Advice', description: 'Recommendations based on your budget and needs, not a quick sale.' },
+        { title: 'Responsive Communication', description: 'Timely updates and straight answers throughout your search.' },
+        { title: 'Wide Local Network', description: `Access to a broad set of options across ${city} and nearby areas.` },
+        { title: 'Smooth Coordination', description: 'We help keep visits, negotiation, and paperwork moving on schedule.' },
+      ],
+      processSteps: [
+        { number: '01', title: 'Requirement Discussion', description: 'We understand your budget, location preferences, and timeline.' },
+        { number: '02', title: 'Curated Shortlist', description: 'You receive a focused set of properties that genuinely match your brief.' },
+        { number: '03', title: 'Site Visits', description: 'We schedule and accompany visits so you can compare options easily.' },
+        { number: '04', title: 'Deal & Handover', description: 'Support through negotiation, documentation, and final handover.' },
+      ],
+      faqs: [
+        { question: 'Do you charge for site visits?', answer: 'Initial consultations and shortlisting are typically free. Any charges are discussed and agreed with you upfront before proceeding.' },
+        { question: 'Can you help with rentals as well as sales?', answer: 'Yes, we assist with both buying/selling and rentals or leasing, for residential and commercial requirements.' },
+        { question: 'Do you help with paperwork?', answer: `We coordinate and guide you through the documentation process; ${businessName} can recommend professionals where formal legal or financial advice is required.` },
+      ],
+    };
+  }
+
+  // 11. Doctor / Clinic / Healthcare (non-dental)
+  if (/doctor|clinic|medical|physio|hospital|pediatric|paediatric|ayurved|homeopath|orthopedic|derma|skin|diagnostic|patholog|dentist|dental/i.test(text)) {
+    return {
+      heroBadge: `Patient-First Medical Care • ${city}`,
+      heroHeadline: `Compassionate, Expert Medical Care in ${city}`,
+      heroSubheadline: `Clear guidance, attentive consultation, and patient-first care from the team at ${businessName}.`,
+      primaryCtaLabel: 'Book Appointment',
+      aboutLead: `${businessName} is a ${city} practice focused on accurate diagnosis and respectful, patient-first care.`,
+      aboutBody: `We take the time to understand your concerns, explain your options clearly, and involve you in every decision. Our focus is on safe, evidence-based care in a comfortable environment.`,
+      highlights: [
+        { title: 'Clear Consultations', description: 'Plain-language explanations so you understand your condition and options.' },
+        { title: 'Patient Comfort', description: 'A calm, hygienic environment designed to put you at ease.' },
+        { title: 'Attentive Follow-Up', description: 'Guidance on next steps, recovery, and when to return for review.' },
+        { title: 'Respectful Care', description: 'Confidential handling of your details and a judgement-free approach.' },
+      ],
+      servicesSectionTitle: 'Treatments & Services',
+      servicesSectionSubtitle: 'Consultation-led care tailored to your individual needs.',
+      services: [
+        { title: 'General Consultation', description: 'An unhurried assessment of your symptoms, history, and concerns.' },
+        { title: 'Preventive Care', description: 'Routine check-ups and guidance to help you stay well.' },
+        { title: 'Specialist Consultation', description: 'Focused assessment where a specific area of care is required.' },
+        { title: 'Diagnostics & Testing', description: 'Coordination of relevant tests to support an accurate diagnosis.' },
+      ],
+      whyChooseUs: [
+        { title: 'Patient-First Approach', description: 'Your comfort and understanding guide every consultation.' },
+        { title: 'Clear Guidance', description: 'Honest explanations of what is known, what is uncertain, and what to do next.' },
+        { title: 'Hygiene Standards', description: 'Careful sterilisation and cleanliness protocols throughout the clinic.' },
+        { title: 'Easy Appointments', description: 'Simple booking and timely communication for your visit.' },
+      ],
+      processSteps: [
+        { number: '01', title: 'Book Appointment', description: 'Reach out by phone or message to reserve a suitable slot.' },
+        { number: '02', title: 'Consultation', description: 'We listen carefully and assess your symptoms and history.' },
+        { number: '03', title: 'Plan Of Care', description: 'You receive clear, agreed next steps and any tests required.' },
+        { number: '04', title: 'Follow-Up', description: 'Review and ongoing guidance to support your recovery.' },
+      ],
+      faqs: [
+        { question: 'How do I book an appointment?', answer: `You can contact ${businessName} directly by phone or message to arrange a consultation at a convenient time.` },
+        { question: 'What should I bring to my visit?', answer: 'Please bring any relevant reports, prescriptions, and a note of your current concerns to help us assess you accurately.' },
+        { question: 'Do you offer follow-up consultations?', answer: 'Yes, follow-up consultations are arranged where needed to review progress and adjust your plan of care.' },
+      ],
+    };
+  }
+
+  // 12. General SMB / Custom Trades (Fallback for any arbitrary profession)
   return {
     heroBadge: `Trusted ${rawProfession} • ${city}`,
     heroHeadline: `Dedicated, Professional & Reliable ${rawProfession} in ${city}`,
@@ -429,7 +704,12 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
   const city = facts.city?.trim() || 'Delhi NCR';
   const businessName = facts.businessName?.trim() || 'Local Enterprise';
 
-  return {
+  const KNOW_SECTIONS = new Set([
+    'HERO', 'TRUST', 'SERVICES', 'ABOUT', 'EXPERTISE', 'PROCESS', 'WHY_CHOOSE_US',
+    'INDUSTRIES', 'TESTIMONIALS', 'FAQ', 'CONTACT', 'CTA', 'LOCATION', 'GALLERY', 'MENU',
+  ]);
+
+  const base: AiBusinessContent = {
     heroBadge: String(parsed.heroBadge || `${profession} • ${city}`).slice(0, 60),
     heroHeadline: String(parsed.heroHeadline || `${profession} Services in ${city}`).slice(0, 140),
     heroSubheadline: String(
@@ -458,16 +738,15 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
     ).slice(0, 190),
     services: (parsed.services || []).slice(0, 6).map((s: any, i: number) => ({
       title: String(s?.title || `Specialized Service ${i + 1}`).slice(0, 95),
-      description: String(
-        s?.description || `Professional execution and dedicated advisory in ${city}.`
-      ).slice(0, 380),
+      description: String(s?.description || `Professional execution and dedicated advisory in ${city}.`).slice(0, 380),
     })),
     whyChooseUs: Array.isArray(parsed.whyChooseUs)
       ? parsed.whyChooseUs.slice(0, 4).map((w: any, i: number) => ({
           title: String(w?.title || `Trusted Partner ${i + 1}`).slice(0, 75),
-          description: String(
-            w?.description || `Transparent communication, verified standards, and focused attention.`
-          ).slice(0, 320),
+          description: String(w?.description || `Transparent communication, verified standards, and focused attention.`).slice(
+            0,
+            320
+          ),
         }))
       : [],
     processSteps: Array.isArray(parsed.processSteps)
@@ -486,6 +765,147 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
         }))
       : [],
   };
+
+  // ---- Optional profession-aware structured extensions ----
+
+  if (Array.isArray(parsed.sections)) {
+    const sections = parsed.sections
+      .map((s: any) => String(s || '').toUpperCase().trim())
+      .filter((s: string) => KNOW_SECTIONS.has(s));
+    if (sections.length > 0) base.sections = Array.from(new Set(sections));
+  }
+
+  if (parsed.design && typeof parsed.design === 'object') {
+    const density = ['compact', 'comfortable', 'spacious'].includes(parsed.design.contentDensity)
+      ? parsed.design.contentDensity
+      : undefined;
+    base.design = {
+      layout: parsed.design.layout ? String(parsed.design.layout).slice(0, 60) : undefined,
+      template: parsed.design.template ? String(parsed.design.template).slice(0, 60) : undefined,
+      themeId: parsed.design.themeId ? String(parsed.design.themeId).slice(0, 60) : undefined,
+      heroLayout: parsed.design.heroLayout ? String(parsed.design.heroLayout).slice(0, 60) : undefined,
+      servicesLayout: parsed.design.servicesLayout ? String(parsed.design.servicesLayout).slice(0, 60) : undefined,
+      contentDensity: density,
+    };
+  }
+
+  if (parsed.seo && typeof parsed.seo === 'object') {
+    base.seo = {
+      title: parsed.seo.title ? String(parsed.seo.title).slice(0, 150) : undefined,
+      description: parsed.seo.description ? String(parsed.seo.description).slice(0, 300) : undefined,
+    };
+  }
+
+  if (Array.isArray(parsed.navItems)) {
+    const nav = parsed.navItems
+      .slice(0, 6)
+      .map((n: any) => ({
+        label: String(n?.label || '').slice(0, 40),
+        href: n?.href ? String(n.href).slice(0, 120) : undefined,
+      }))
+      .filter((n: any) => n.label.length > 1);
+    if (nav.length > 0) base.navItems = nav;
+  }
+
+  if (parsed.expertise && Array.isArray(parsed.expertise.items)) {
+    base.expertise = {
+      sectionTitle: parsed.expertise.sectionTitle ? String(parsed.expertise.sectionTitle).slice(0, 80) : undefined,
+      sectionSubtitle: parsed.expertise.sectionSubtitle
+        ? String(parsed.expertise.sectionSubtitle).slice(0, 200)
+        : undefined,
+      items: parsed.expertise.items.slice(0, 8).map((it: any, i: number) => ({
+        title: String(it?.title || `Specialisation ${i + 1}`).slice(0, 80),
+        description: String(it?.description || `Focused expertise in this area.`).slice(0, 300),
+        tags: Array.isArray(it?.tags) ? it.tags.slice(0, 5).map((t: any) => String(t).slice(0, 40)) : undefined,
+      })),
+    };
+  }
+
+  if (parsed.gallery && Array.isArray(parsed.gallery.items)) {
+    const items = parsed.gallery.items
+      .slice(0, 12)
+      .map((g: any, i: number) => ({
+        title: String(g?.title || `Showcase ${i + 1}`).slice(0, 100),
+        category: g?.category ? String(g.category).slice(0, 60) : undefined,
+        description: g?.description ? String(g.description).slice(0, 200) : undefined,
+        imageQuery: g?.imageQuery ? String(g.imageQuery).slice(0, 120) : undefined,
+      }))
+      .filter((g: any) => g.title.length > 1);
+    if (items.length > 0) {
+      base.gallery = {
+        sectionTitle: parsed.gallery.sectionTitle ? String(parsed.gallery.sectionTitle).slice(0, 80) : undefined,
+        sectionSubtitle: parsed.gallery.sectionSubtitle
+          ? String(parsed.gallery.sectionSubtitle).slice(0, 200)
+          : undefined,
+        items,
+      };
+    }
+  }
+
+  if (parsed.menu && Array.isArray(parsed.menu.categories)) {
+    const categories = parsed.menu.categories
+      .slice(0, 6)
+      .map((c: any) => ({
+        name: String(c?.name || 'Menu').slice(0, 60),
+        items: Array.isArray(c?.items)
+          ? c.items.slice(0, 12).map((it: any) => ({
+              name: String(it?.name || 'Item').slice(0, 80),
+              description: it?.description ? String(it.description).slice(0, 200) : undefined,
+              price: String(it?.price || 'Ask').slice(0, 40),
+              badge: it?.badge ? String(it.badge).slice(0, 30) : undefined,
+            }))
+          : [],
+      }))
+      .filter((c: any) => c.items.length > 0);
+    if (categories.length > 0) {
+      base.menu = {
+        sectionTitle: parsed.menu.sectionTitle ? String(parsed.menu.sectionTitle).slice(0, 80) : undefined,
+        sectionSubtitle: parsed.menu.sectionSubtitle
+          ? String(parsed.menu.sectionSubtitle).slice(0, 200)
+          : undefined,
+        categories,
+      };
+    }
+  }
+
+  if (parsed.industries && Array.isArray(parsed.industries.items)) {
+    const items = parsed.industries.items.slice(0, 8).map((i: any) => String(i).slice(0, 60)).filter(Boolean);
+    if (items.length > 0) {
+      base.industries = {
+        sectionTitle: parsed.industries.sectionTitle
+          ? String(parsed.industries.sectionTitle).slice(0, 80)
+          : undefined,
+        items,
+      };
+    }
+  }
+
+  if (parsed.ctaBanner && typeof parsed.ctaBanner === 'object') {
+    base.ctaBanner = {
+      title: parsed.ctaBanner.title ? String(parsed.ctaBanner.title).slice(0, 120) : undefined,
+      subtitle: parsed.ctaBanner.subtitle ? String(parsed.ctaBanner.subtitle).slice(0, 250) : undefined,
+      primaryCtaLabel: parsed.ctaBanner.primaryCtaLabel
+        ? String(parsed.ctaBanner.primaryCtaLabel).slice(0, 40)
+        : undefined,
+      secondaryCtaLabel: parsed.ctaBanner.secondaryCtaLabel
+        ? String(parsed.ctaBanner.secondaryCtaLabel).slice(0, 40)
+        : undefined,
+    };
+  }
+
+  if (Array.isArray(parsed.trustBadges)) {
+    const badges = parsed.trustBadges
+      .slice(0, 6)
+      .map((b: any, i: number) => ({
+        title: String(b?.title || `Standard ${i + 1}`).slice(0, 80),
+        description: String(b?.description || 'Recognised professional standards.').slice(0, 250),
+        iconName: b?.iconName ? String(b.iconName).slice(0, 40) : undefined,
+      }))
+      .filter((b: any) => b.title.length > 1);
+    if (badges.length > 0) base.trustBadges = badges;
+  }
+
+  return base;
 }
 
 /**
@@ -527,12 +947,12 @@ ${
     : 'CONVERSION MANDATE: Create compelling, customer-centric, professional copy that inspires local trust, highlights craftsmanship or expertise, and drives direct inquiries via call or appointment.'
 }
 
-Return ONLY a valid JSON object matching this exact schema:
+Return ONLY a single valid JSON object matching this exact schema (no markdown fences, no commentary):
 {
-  "heroBadge": "Short 3-5 word category badge (e.g. 'Premier Dental & Implant Center', 'Boutique Modular Kitchen Studio', 'Trusted Chartered Accountants')",
+  "heroBadge": "Short 3-5 word category badge (e.g. 'Premier Dental & Implant Center', 'Boutique Modular Kitchen Studio', 'Wedding & Portrait Photography')",
   "heroHeadline": "Compelling 6-10 word headline tailored to their exact profession and local standing",
   "heroSubheadline": "1-sentence value proposition mentioning their core offerings, client commitment, and ${city}",
-  "primaryCtaLabel": "Action-oriented CTA button text (e.g. 'Schedule Consultation', 'Book Appointment', 'Get Free Quote', 'Request Estimate')",
+  "primaryCtaLabel": "Action-oriented CTA button text (e.g. 'Schedule Consultation', 'Book Appointment', 'Check Dates & Book a Shoot')",
   "aboutLead": "1-sentence overview of ${businessName} in ${city}",
   "aboutBody": "2-sentence description of their quality standards, customer focus, and local reputation",
   "highlights": [
@@ -541,7 +961,7 @@ Return ONLY a valid JSON object matching this exact schema:
     { "title": "Highlight 3 (2-4 words)", "description": "1 short sentence" },
     { "title": "Highlight 4 (2-4 words)", "description": "1 short sentence" }
   ],
-  "servicesSectionTitle": "Category section title (e.g. 'Our Core Services', 'Specialized Treatments & Care', 'Design & Execution Services')",
+  "servicesSectionTitle": "Category section title (e.g. 'Our Core Services', 'Photography Services', 'Menu & Specialities')",
   "servicesSectionSubtitle": "1-sentence subtitle describing their service offerings",
   "services": [
     { "title": "Specific Service 1 for this profession", "description": "Clear 1-2 sentence explanation of this service" },
@@ -568,8 +988,45 @@ Return ONLY a valid JSON object matching this exact schema:
     { "question": "Second common client question?", "answer": "Helpful 1-2 sentence answer" },
     { "question": "Third common client question regarding location or process?", "answer": "Helpful 1-2 sentence answer" },
     { "question": "Fourth client question regarding appointments or turnaround?", "answer": "Helpful 1-2 sentence answer" }
-  ]
+  ],
+  "sections": ["HERO", "SERVICES", "GALLERY", "EXPERTISE", "ABOUT", "PROCESS", "WHY_CHOOSE_US", "FAQ", "CONTACT", "LOCATION"],
+  "design": { "heroLayout": "e.g. visual-fullbleed | split-editorial | minimal-serif", "servicesLayout": "e.g. cards | grid | luxury-rows", "contentDensity": "compact | comfortable | spacious" },
+  "seo": { "title": "SEO page title (business name + profession + city, <= 60 chars)", "description": "SEO meta description (<= 155 chars)" },
+  "navItems": [
+    { "label": "Nav label 1", "href": "#services" },
+    { "label": "Nav label 2", "href": "#about" },
+    { "label": "Nav label 3", "href": "#faq" },
+    { "label": "Nav label 4", "href": "#contact" }
+  ],
+  "expertise": { "sectionTitle": "Specialities or signature approach", "sectionSubtitle": "1 sentence", "items": [ { "title": "Speciality 1", "description": "1 sentence", "tags": ["tag1", "tag2"] } ] },
+  "gallery": { "sectionTitle": "Portfolio / gallery title", "sectionSubtitle": "1 sentence", "items": [ { "title": "Work title", "category": "Category", "description": "1 sentence", "imageQuery": "short visual brief of the ideal photo" } ] },
+  "menu": { "sectionTitle": "Menu / Packages / Listings title", "sectionSubtitle": "1 sentence", "categories": [ { "name": "Category name", "items": [ { "name": "Item name", "description": "1 sentence", "price": "On enquiry", "badge": "Popular" } ] } ] },
+  "industries": { "sectionTitle": "Who we serve", "items": ["Segment 1", "Segment 2", "Segment 3", "Segment 4"] },
+  "ctaBanner": { "title": "Closing call-to-action headline", "subtitle": "1 sentence", "primaryCtaLabel": "Primary CTA", "secondaryCtaLabel": "Secondary CTA" },
+  "trustBadges": [ { "title": "Trust point", "description": "1 sentence", "iconName": "ShieldCheck" } ]
 }
+
+SECTION SELECTION RULES (very important):
+- "sections" is the ordered list of sections the website should render, chosen specifically for THIS profession. Do NOT include sections that do not apply.
+- Allowed values: HERO, SERVICES, ABOUT, EXPERTISE, GALLERY, MENU, PROCESS, TRUST, WHY_CHOOSE_US, INDUSTRIES, FAQ, CTA, CONTACT, LOCATION.
+- Always begin with HERO and end with CONTACT then LOCATION.
+- Include GALLERY for visually-led businesses (photography, interiors, food & dining, fitness, real estate, beauty).
+- Include MENU for food & dining businesses, and reuse MENU as "packages", "membership plans", or "featured listings" for businesses that sell packages (e.g. photography packages, gym memberships, property listings).
+- Include EXPERTISE when the business has distinct specialities or a signature style/approach.
+- Omit INDUSTRIES and TESTIMONIALS unless clearly relevant.
+
+OPTIONAL BLOCKS:
+- Provide "gallery" ONLY when GALLERY is in "sections". Give each item a concrete "imageQuery" describing the ideal photograph.
+- Provide "menu" ONLY when MENU is in "sections".
+- Provide "expertise" ONLY when EXPERTISE is in "sections".
+- Provide "industries" ONLY when INDUSTRIES is in "sections".
+
+TRUTHFULNESS RULES (mandatory):
+- NEVER invent testimonials, awards, certifications, years in business, staff counts, client counts, addresses, phone numbers, or exact prices.
+- If a value is unknown, omit it. For prices, use "On enquiry" rather than inventing numbers.
+- General industry statements are fine; business-specific facts must NOT be fabricated.
+
+LOCALISATION: Write in professional Indian English and reference "${city}" naturally.
 `;
 
   const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];

@@ -104,7 +104,18 @@ export function getIndustryImages(profession?: string, businessName?: string): I
     };
   }
 
-  // 9. Car Detailing / Automobile / Workshop / Solar / Pest Control / Contractor
+  // 9. Photography / Videography / Creative Studio
+  if (/photo|photograph|videograph|cinematograph|portrait|wedding shoot|pre-wedding|studio|camera|shoot|videographer/i.test(text)) {
+    return {
+      heroImage: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1200&q=85',
+      secondaryImage: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=900&q=80',
+      aboutImage: 'https://images.unsplash.com/photo-1554048612-b6a482bc67e5?auto=format&fit=crop&w=900&q=80',
+      accentColor: '#d97706',
+      categoryTag: 'Wedding & Portrait Photography Studio',
+    };
+  }
+
+  // 10. Automobile / Workshop / Solar / Pest Control / Contractor
   if (/car|auto|garage|mechanic|detailing|motor|solar|pest|electric|plumb|contractor|clean|rooftop/i.test(text)) {
     return {
       heroImage: 'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1200&q=85',
@@ -115,12 +126,23 @@ export function getIndustryImages(profession?: string, businessName?: string): I
     };
   }
 
-  // 10. CA / Tax / Legal / Default Corporate
+  // 11. Chartered Accountant / Tax / Audit / Legal (explicit — never the fallback)
+  if (/chartered|ca firm|\bca\b|audit|tax|gst|account|bookkeep|itr|advocate|lawyer|legal/i.test(text)) {
+    return {
+      heroImage: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85',
+      secondaryImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=900&q=80',
+      aboutImage: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80',
+      accentColor: '#1e3a8a',
+      categoryTag: 'Chartered Advisory & Corporate Practice',
+    };
+  }
+
+  // 12. Neutral professional fallback (never assume CA for unknown professions)
   return {
-    heroImage: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=85',
-    secondaryImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=900&q=80',
-    aboutImage: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=900&q=80',
-    accentColor: '#1e3a8a',
-    categoryTag: 'Chartered Advisory & Corporate Practice',
+    heroImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=85',
+    secondaryImage: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=80',
+    aboutImage: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=900&q=80',
+    accentColor: '#2563eb',
+    categoryTag: 'Professional Services',
   };
 }

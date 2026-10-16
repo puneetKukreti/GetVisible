@@ -5,6 +5,9 @@ import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { isRealHumanVisit } from '@/lib/demos/public';
+import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
+import { getProfessionPreset } from '@/lib/demos/profession-config';
+import { selectWebsiteDesign } from '@/lib/demos/personalization';
 import { DemoViewWrapper } from './demo-view-wrapper';
 import { WebsiteDemoData, LeadData } from '@/types';
 
@@ -30,14 +33,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     try {
       const publicDemo = await WebsiteDemoRepository.getApprovedDemoByPublicToken(tokenOrId);
       if (publicDemo) {
-        const brandName = publicDemo.content?.brand?.businessName || 'Chartered Accountants';
+        const brandName = publicDemo.content?.brand?.businessName || 'Local Business';
+        const profession = publicDemo.content?.meta?.profession || 'Business';
         const title =
           publicDemo.content?.meta?.title ||
-          `${brandName} | Chartered Accountants & Tax Advisory`;
+          `${brandName} | ${profession}`;
         const description =
           publicDemo.content?.meta?.description ||
           publicDemo.content?.brand?.tagline ||
-          'Dedicated chartered accountancy practice providing audit, tax, and corporate advisory.';
+          `Personalised website concept for ${brandName}.`;
 
         return {
           title,
@@ -103,56 +107,59 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
       // If lead exists but demo hasn't been generated yet, generate one on-the-fly
       if (initialDemos.length === 0) {
         try {
-          const newDemo: WebsiteDemoData = {
-            id: `demo-${initialLead.id}-v1`,
-            leadId: initialLead.id,
+          const generated = await WebsiteDemoGeneratorService.generateDemo(initialLead, {
             organizationId: targetOrg,
-            templateId: 'design-1-premium',
             version: 1,
-            generationStatus: 'COMPLETED',
-            approvalStatus: 'APPROVED',
-            publicToken: `token-${initialLead.id}`,
-            viewCount: 0,
-            theme: {
-              id: 'executive-navy',
-              name: 'Executive Navy',
-              primaryColor: '#1e3a8a',
-              secondaryColor: '#1e293b',
-              accentColor: '#2563eb',
-              fontFamily: 'sans',
-              style: 'corporate',
-              borderRadius: 'md',
-            },
-            content: {
-              brand: { businessName: initialLead.businessName },
-              location: { city: initialLead.city, address: initialLead.address },
-              contact: { publicPhone: initialLead.publicPhone, publicEmail: initialLead.publicEmail },
-              meta: { profession: initialLead.profession },
-            } as any,
-            design: {
-              layout: 'design-1-premium',
-              template: 'design-1-premium' as any,
-              sectionOrder: ['HERO', 'SERVICES', 'ABOUT', 'WHY_CHOOSE_US', 'INDUSTRIES', 'FAQ', 'CONTACT', 'LOCATION'],
-              theme: {
-                id: 'executive-navy',
-                name: 'Executive Navy',
-                primaryColor: '#1e3a8a',
-                secondaryColor: '#1e293b',
-                accentColor: '#2563eb',
-                fontFamily: 'sans',
-                style: 'corporate',
-                borderRadius: 'md',
-              },
-            },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          const saved = await WebsiteDemoRepository.saveDemo(targetOrg, newDemo, 'system');
+          });
+          generated.id = `demo-${initialLead.id}-v1`;
+          generated.publicToken = `token-${initialLead.id}`;
+          generated.approvalStatus = 'APPROVED';
+          const saved = await WebsiteDemoRepository.saveDemo(targetOrg, generated, 'system');
           if (saved) {
             initialDemos = [saved];
             initialPublicDemo = saved;
           }
-        } catch {}
+        } catch {
+          // Profession-aware minimal fallback (never CA-biased)
+          try {
+            const preset = getProfessionPreset(initialLead.profession, initialLead.businessName);
+            const design = selectWebsiteDesign(
+              {
+                id: initialLead.id,
+                businessName: initialLead.businessName,
+                city: initialLead.city,
+                profession: initialLead.profession,
+              },
+              1
+            );
+            const newDemo: WebsiteDemoData = {
+              id: `demo-${initialLead.id}-v1`,
+              leadId: initialLead.id,
+              organizationId: targetOrg,
+              templateId: design.layout,
+              version: 1,
+              generationStatus: 'COMPLETED',
+              approvalStatus: 'APPROVED',
+              publicToken: `token-${initialLead.id}`,
+              viewCount: 0,
+              theme: preset.defaultTheme,
+              content: {
+                brand: { businessName: initialLead.businessName },
+                location: { city: initialLead.city, address: initialLead.address },
+                contact: { publicPhone: initialLead.publicPhone, publicEmail: initialLead.publicEmail },
+                meta: { profession: initialLead.profession },
+              } as any,
+              design,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            const saved = await WebsiteDemoRepository.saveDemo(targetOrg, newDemo, 'system');
+            if (saved) {
+              initialDemos = [saved];
+              initialPublicDemo = saved;
+            }
+          } catch {}
+        }
       }
     }
   } catch {}

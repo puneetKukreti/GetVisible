@@ -1,14 +1,24 @@
-import { LeadData, WebsiteDemoData, WebsiteTheme, WebsiteContent, WebsiteLayout, WebsiteDesign } from '@/types';
+import { LeadData, WebsiteDemoData, WebsiteTheme, WebsiteContent, WebsiteLayout, WebsiteDesign, WebsiteSectionType, WebsiteGalleryItem, WebsiteMenuCategory } from '@/types';
 import { WebsiteContentSchema, ValidatedWebsiteContent } from './schema';
 import { getTemplate, THEMES, LeadFacts } from './templates';
 import { GeminiAIProvider, MockAIProvider } from '@/lib/providers/ai.provider';
 import { selectWebsiteDesign } from './personalization';
 import { getTemplateScreenshotPath } from './stitch-templates';
-import { generateAiBusinessContent, getDeterministicProfessionProfile, getGeminiApiKey } from './ai-content-generator';
-import { classifyProfession } from './profession-engine';
-import { buildWebsiteImagesObject } from './image-engine';
+import {
+  generateAiBusinessContent,
+  getDeterministicProfessionProfile,
+  getGeminiApiKey,
+  AiBusinessContent,
+} from './ai-content-generator';
+import { buildWebsiteImagesObject, getContextualImageUrl } from './image-engine';
 import { getIndustryImages } from './industry-images';
-import { getProfessionPreset } from './profession-config';
+import { getProfessionPreset, ProfessionCategory, ProfessionDesignPreset } from './profession-config';
+import {
+  getProfessionContentPlan,
+  normalizeSectionOrder,
+  scrubContentCaLeakage,
+  ProfessionContentPlan,
+} from './profession-sections';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -97,13 +107,17 @@ export class WebsiteDemoGeneratorService {
     // Synthesize factual baseline content tailored to design and facts
     let content: WebsiteContent = template.buildContent(leadFacts, selectedTheme, design);
 
+    // Profession-aware content & section plan (never defaults to CA)
+    const plan = getProfessionContentPlan(lead.profession, lead.businessName);
+    const isCaPractice = plan.isCaPractice;
+
     // Structured AI Enrichment via Gemini Flash or profession-tailored engine
     const liveApiKey = getGeminiApiKey();
     const hasGeminiKey = Boolean(liveApiKey);
     const shouldEnrichWithAi = options.useAiEnrichment !== false;
 
+    let aiProfile: AiBusinessContent | null = null;
     if (shouldEnrichWithAi) {
-      let aiProfile = null;
       if (hasGeminiKey) {
         try {
           aiProfile = await generateAiBusinessContent({
@@ -132,8 +146,8 @@ export class WebsiteDemoGeneratorService {
           ...content,
           meta: {
             ...content.meta,
-            title: `${lead.businessName} | ${aiProfile.heroBadge || lead.profession} in ${lead.city}`,
-            description: aiProfile.heroSubheadline || content.meta.description,
+            title: (aiProfile.seo?.title || `${lead.businessName} | ${aiProfile.heroBadge || lead.profession} in ${lead.city}`).slice(0, 150),
+            description: (aiProfile.seo?.description || aiProfile.heroSubheadline || content.meta.description).slice(0, 300),
             profession: lead.profession,
           },
           brand: {
@@ -212,18 +226,68 @@ export class WebsiteDemoGeneratorService {
                   })),
                 }
               : content.faq,
+          expertise:
+            aiProfile.expertise && aiProfile.expertise.items.length > 0
+              ? {
+                  sectionTitle: aiProfile.expertise.sectionTitle || plan.content.expertiseTitle,
+                  sectionSubtitle: aiProfile.expertise.sectionSubtitle || plan.content.expertiseSubtitle,
+                  items: aiProfile.expertise.items.map((it) => ({
+                    title: it.title,
+                    description: it.description,
+                    tags: it.tags && it.tags.length > 0 ? it.tags : [lead.profession],
+                  })),
+                }
+              : content.expertise,
+          navigation:
+            aiProfile.navItems && aiProfile.navItems.length > 0
+              ? {
+                  items: aiProfile.navItems.map((n) => ({ label: n.label, href: n.href || '#contact' })),
+                  ctaText: aiProfile.primaryCtaLabel || content.navigation.ctaText,
+                  ctaHref: '#contact',
+                }
+              : content.navigation,
+          ctaBanner: {
+            title: aiProfile.ctaBanner?.title || plan.content.ctaBannerTitle,
+            subtitle: aiProfile.ctaBanner?.subtitle || plan.content.ctaBannerSubtitle,
+            primaryCta: {
+              label: aiProfile.ctaBanner?.primaryCtaLabel || aiProfile.primaryCtaLabel || content.hero.primaryCta.label,
+              href: '#contact',
+            },
+            secondaryCta: {
+              label: aiProfile.ctaBanner?.secondaryCtaLabel || 'View Services',
+              href: '#services',
+            },
+          },
+          industries: {
+            enabled: false,
+            sectionTitle: aiProfile.industries?.sectionTitle || plan.content.industriesTitle,
+            items: aiProfile.industries?.items?.length ? aiProfile.industries.items : plan.content.industries,
+          },
+          trust:
+            aiProfile.trustBadges && aiProfile.trustBadges.length > 0
+              ? {
+                  sectionTitle: content.trust?.sectionTitle || 'Standards & Trust',
+                  badges: aiProfile.trustBadges.map((b) => ({
+                    title: b.title,
+                    description: b.description,
+                    iconName: b.iconName || 'ShieldCheck',
+                  })),
+                }
+              : content.trust,
         };
-      } else {
-        content = await this.enrichWithAi(content, leadFacts, design.layout);
       }
     }
 
-    // Contextual imagery injection from Industry & Image Engines and Profession Presets
+    // ---------------------------------------------------------------------
+    // Profession-aware section planning, imagery, and enrichment blocks
+    // ---------------------------------------------------------------------
     const industryImgs = getIndustryImages(lead.profession, lead.businessName);
     const preset = getProfessionPreset(lead.profession, lead.businessName);
     const imageSet = buildWebsiteImagesObject(lead.profession, lead.businessName);
-    const heroImgUrl = industryImgs.heroImage || preset.heroImage || imageSet.heroImage?.url;
-    const aboutImgUrl = industryImgs.aboutImage || preset.aboutImage || imageSet.aboutImage?.url;
+
+    // Prefer the profession-categorised preset imagery, then the industry engine.
+    const heroImgUrl = preset.heroImage || industryImgs.heroImage || imageSet.heroImage?.url;
+    const aboutImgUrl = preset.aboutImage || industryImgs.aboutImage || imageSet.aboutImage?.url;
 
     if (heroImgUrl) {
       content.hero.imageUrl = heroImgUrl;
@@ -245,112 +309,104 @@ export class WebsiteDemoGeneratorService {
     }
     content.images = imageSet;
 
-    // Profession classification for trust badges and specialized sections
-    const professionProfile = classifyProfession(lead.profession);
+    // Section composition: honor Gemini's chosen sections when valid, otherwise
+    // use the deterministic profession plan. This is what makes the same
+    // reusable components produce a photography site vs. a restaurant site.
+    // CA practices keep their existing (Stitch-driven) layout order untouched.
+    let sectionOrder: WebsiteSectionType[] =
+      design.sectionOrder && design.sectionOrder.length > 0 ? design.sectionOrder : plan.sectionOrder;
+    if (!isCaPractice) {
+      sectionOrder = normalizeSectionOrder(aiProfile?.sections, plan.sectionOrder);
+      design.sectionOrder = sectionOrder;
+    }
 
-    if (professionProfile.trustBadges && professionProfile.trustBadges.length > 0) {
+    // Apply safe subset of AI design recommendations.
+    if (aiProfile?.design) {
+      if (aiProfile.design.contentDensity) design.contentDensity = aiProfile.design.contentDensity;
+      if (aiProfile.design.heroLayout) design.heroLayout = aiProfile.design.heroLayout;
+      if (aiProfile.design.servicesLayout) design.servicesLayout = aiProfile.design.servicesLayout;
+    }
+
+    // Trust badges — always profession-appropriate; never CA copy for non-CA.
+    const trustBadgeSource: any[] =
+      plan.trustBadges && plan.trustBadges.length > 0
+        ? plan.trustBadges
+        : content.trust?.badges
+        ? content.trust.badges.map((b) => b.title)
+        : [];
+    if (trustBadgeSource.length > 0) {
       content.trust = {
-        sectionTitle: 'Accreditations & Trust Standards',
-        badges: professionProfile.trustBadges.map((b: any) => ({
+        sectionTitle: isCaPractice ? 'Accreditation & Professional Standards' : 'Standards & Commitments',
+        badges: trustBadgeSource.slice(0, 6).map((b: any) => ({
           title: typeof b === 'string' ? b : b.title,
-          description: typeof b === 'string' ? 'Verified industry standards and client satisfaction.' : b.description,
+          description:
+            typeof b === 'string' ? 'Recognised industry standards and client commitment.' : b.description,
           iconName: (typeof b === 'object' && b.iconName) || 'ShieldCheck',
         })),
       };
     }
 
-    // Attach Gallery for visual/creative professions
-    const isVisualProfession =
-      ['INTERIOR_DESIGNER', 'SALON_SPA', 'GYM_FITNESS', 'PHOTOGRAPHER_EVENT', 'RESTAURANT_CAFE'].includes(
-        professionProfile.id
-      ) ||
-      preset.galleryImages.length > 0 ||
-      /interior|architect|decor|salon|spa|gym|fitness|photo|studio|wedding|bakery|cafe/i.test(
-        `${lead.profession} ${lead.businessName}`
-      );
+    // Expertise (specialities / signature style) — profession-titled.
+    if (sectionOrder.includes('EXPERTISE')) {
+      const aiExpertise = aiProfile?.expertise;
+      if (!content.expertise || content.expertise.items.length === 0) {
+        content.expertise = {
+          sectionTitle: aiExpertise?.sectionTitle || plan.content.expertiseTitle,
+          sectionSubtitle: aiExpertise?.sectionSubtitle || plan.content.expertiseSubtitle,
+          items: content.services.items.slice(0, 6).map((s) => ({
+            title: s.title,
+            description: s.description,
+            tags: [lead.profession],
+          })),
+        };
+      } else {
+        content.expertise = {
+          ...content.expertise,
+          sectionTitle: aiExpertise?.sectionTitle || plan.content.expertiseTitle,
+          sectionSubtitle: aiExpertise?.sectionSubtitle || plan.content.expertiseSubtitle,
+        };
+      }
+    }
 
-    if (isVisualProfession && !content.gallery) {
-      const galleryItems =
-        preset.galleryImages && preset.galleryImages.length > 0
-          ? preset.galleryImages.map((g, idx) => ({
-              id: `gal-${idx + 1}`,
-              title: g.caption || `${lead.businessName} Showcase ${idx + 1}`,
-              category: g.category || lead.profession,
-              imageUrl: g.url,
-              url: g.url,
-              description: g.caption || `Signature delivery and professional execution in ${lead.city}`,
-            }))
-          : imageSet.gallery && imageSet.gallery.length > 0
-          ? imageSet.gallery.map((g, idx) => ({
-              id: `gal-${idx + 1}`,
-              title: `${lead.businessName} Showcase ${idx + 1}`,
-              category: lead.profession,
-              imageUrl: g.url,
-              url: g.url,
-              description: `Signature delivery and professional execution in ${lead.city}`,
-            }))
-          : null;
-
-      if (galleryItems && galleryItems.length > 0) {
+    // Gallery for visually-led professions and AI-requested galleries.
+    if (sectionOrder.includes('GALLERY')) {
+      const galleryItems = buildProfessionGallery(lead, plan, preset, aiProfile);
+      if (galleryItems.length > 0) {
         content.gallery = {
-          sectionTitle: 'Portfolio & Work Gallery',
-          sectionSubtitle: `Explore our signature projects and craftsmanship across ${lead.city}`,
+          sectionTitle: aiProfile?.gallery?.sectionTitle || plan.content.galleryTitle,
+          sectionSubtitle: aiProfile?.gallery?.sectionSubtitle || plan.content.gallerySubtitle,
           items: galleryItems,
         };
-        if (!design.sectionOrder.includes('GALLERY')) {
-          const contactIdx = design.sectionOrder.indexOf('CONTACT');
-          if (contactIdx !== -1) {
-            design.sectionOrder.splice(contactIdx, 0, 'GALLERY');
-          } else {
-            design.sectionOrder.push('GALLERY');
-          }
-        }
       }
     }
 
-    // Attach Menu for dining/food professions
-    const isFoodProfession =
-      professionProfile.id === 'RESTAURANT_CAFE' ||
-      /restaurant|cafe|bakery|sweet|food|dhaba|bistro/i.test(`${lead.profession} ${lead.businessName}`);
-
-    if (isFoodProfession && !content.menu) {
-      content.menu = {
-        sectionTitle: 'Signature Menu & Specialties',
-        sectionSubtitle: 'Handcrafted daily using authentic, fresh ingredients',
-        categories: [
-          {
-            name: 'Chef Recommendations',
-            items: [
-              {
-                name: 'Specialty Platter',
-                description: 'Curated assortment of bestsellers and local favorites',
-                price: '₹450',
-                badge: 'Popular',
-              },
-              {
-                name: 'Signature Brew / Drink',
-                description: 'Artisanal beverage crafted fresh to order',
-                price: '₹180',
-                badge: 'Must Try',
-              },
-              {
-                name: 'Gourmet Main Course',
-                description: 'Cooked with slow-simmered regional spices and farm-fresh ingredients',
-                price: '₹380',
-              },
-            ],
-          },
-        ],
-      };
-      if (!design.sectionOrder.includes('MENU')) {
-        const contactIdx = design.sectionOrder.indexOf('CONTACT');
-        if (contactIdx !== -1) {
-          design.sectionOrder.splice(contactIdx, 0, 'MENU');
-        } else {
-          design.sectionOrder.push('MENU');
-        }
+    // Menu / packages / memberships / listings.
+    if (sectionOrder.includes('MENU')) {
+      if (aiProfile?.menu && aiProfile.menu.categories.length > 0) {
+        content.menu = {
+          sectionTitle: aiProfile.menu.sectionTitle || plan.content.menuTitle,
+          sectionSubtitle: aiProfile.menu.sectionSubtitle || plan.content.menuSubtitle,
+          categories: aiProfile.menu.categories,
+        };
+      } else if (!content.menu || content.menu.categories.length === 0) {
+        content.menu = {
+          sectionTitle: plan.content.menuTitle,
+          sectionSubtitle: plan.content.menuSubtitle,
+          categories: getDefaultMenusForCategory(plan.category),
+        };
       }
     }
+
+    // "Who we serve" is profession-aware and only rendered when planned.
+    content.industries = {
+      enabled: sectionOrder.includes('INDUSTRIES'),
+      sectionTitle: aiProfile?.industries?.sectionTitle || plan.content.industriesTitle,
+      items: aiProfile?.industries?.items?.length ? aiProfile.industries.items : plan.content.industries,
+    };
+
+    // Guarantee zero CA-specific content for non-CA professions, regardless of
+    // whether it originated from AI, the fallback engine, or cached content.
+    content = scrubContentCaLeakage(content, isCaPractice) as WebsiteContent;
 
     // Strict Claim Safety Enforcement
     content = this.enforceClaimSafety(content);
@@ -511,5 +567,172 @@ export class WebsiteDemoGeneratorService {
       // Safe fallback to deterministic baseline
       return content;
     }
+  }
+}
+
+/**
+ * Builds a profession-appropriate gallery. Prefers Gemini-authored gallery
+ * items (each mapped to a matching image), then curated preset collections,
+ * then the profession image engine.
+ */
+function buildProfessionGallery(
+  lead: LeadData,
+  plan: ProfessionContentPlan,
+  preset: ProfessionDesignPreset,
+  aiProfile: AiBusinessContent | null
+): WebsiteGalleryItem[] {
+  const briefs = plan.content.galleryBriefs.length > 0 ? plan.content.galleryBriefs : ['Our work'];
+  const maxItems = 8;
+
+  if (aiProfile?.gallery?.items?.length) {
+    return aiProfile.gallery.items.slice(0, maxItems).map((g, i) => ({
+      id: `gal-${i + 1}`,
+      title: g.title,
+      category: g.category || plan.content.galleryTitle,
+      imageUrl: getContextualImageUrl({
+        profession: lead.profession,
+        businessName: lead.businessName,
+        purpose: 'GALLERY',
+        serviceIndex: i,
+        customKeyword: g.imageQuery,
+      }),
+      description: g.description || briefs[i % briefs.length],
+    }));
+  }
+
+  if (preset.galleryImages && preset.galleryImages.length > 0) {
+    return preset.galleryImages.slice(0, maxItems).map((g, i) => ({
+      id: `gal-${i + 1}`,
+      title: g.caption || briefs[i % briefs.length],
+      category: g.category || plan.content.galleryTitle,
+      imageUrl: g.url,
+      description: plan.content.gallerySubtitle,
+    }));
+  }
+
+  const count = Math.max(3, Math.min(briefs.length, 6));
+  return Array.from({ length: count }).map((_, i) => ({
+    id: `gal-${i + 1}`,
+    title: briefs[i % briefs.length],
+    category: plan.content.galleryTitle,
+    imageUrl: getContextualImageUrl({
+      profession: lead.profession,
+      businessName: lead.businessName,
+      purpose: 'GALLERY',
+      serviceIndex: i,
+    }),
+    description: plan.content.gallerySubtitle,
+  }));
+}
+
+/**
+ * Deterministic menu/packages/listings used when MENU is part of the plan but
+ * neither Gemini nor the base template supplied content. Prices are always
+ * "On enquiry" so no unverified commercial figures are fabricated.
+ */
+function getDefaultMenusForCategory(category: ProfessionCategory): WebsiteMenuCategory[] {
+  const p = 'On enquiry';
+  switch (category) {
+    case 'RESTAURANT_HOSPITALITY':
+      return [
+        {
+          name: 'Starters & Small Plates',
+          items: [
+            { name: 'House Special Starter', description: 'A rotating house favourite, prepared fresh to order.', price: p, badge: 'Popular' },
+            { name: 'Sharing Platter', description: 'A generous selection to begin your meal together.', price: p },
+          ],
+        },
+        {
+          name: 'Mains',
+          items: [
+            { name: 'Signature Main Course', description: 'A chef-curated main from our regular menu.', price: p, badge: 'Chef’s Pick' },
+            { name: 'Everyday Favourite', description: 'A comforting classic loved by regulars.', price: p },
+          ],
+        },
+        {
+          name: 'Desserts & Beverages',
+          items: [
+            { name: 'Dessert of the Day', description: 'Ask our team about today’s fresh preparation.', price: p },
+            { name: 'Beverage Selection', description: 'Hot and cold options to complete your meal.', price: p },
+          ],
+        },
+      ];
+    case 'PHOTOGRAPHY_CREATIVE':
+      return [
+        {
+          name: 'Shoot Packages',
+          items: [
+            { name: 'Essentials Coverage', description: 'Core coverage for smaller sessions and intimate events.', price: p, badge: 'Popular' },
+            { name: 'Full-Day Coverage', description: 'Extended coverage for weddings and large celebrations.', price: p },
+            { name: 'Portrait Session', description: 'Studio or outdoor portrait session tailored to you.', price: p },
+          ],
+        },
+      ];
+    case 'FITNESS_GYM':
+      return [
+        {
+          name: 'Membership Plans',
+          items: [
+            { name: 'Monthly Membership', description: 'Full access to the training floor and group sessions.', price: p, badge: 'Popular' },
+            { name: 'Quarterly Membership', description: 'A longer commitment with continued coach support.', price: p },
+            { name: 'Personal Training', description: 'One-to-one coaching tailored to your goals.', price: p },
+          ],
+        },
+      ];
+    case 'REAL_ESTATE_PROPERTY':
+      return [
+        {
+          name: 'Featured Listings',
+          items: [
+            { name: 'Residential Apartments', description: 'Options matched to your budget and preferred locality.', price: p, badge: 'Popular' },
+            { name: 'Independent Homes & Villas', description: 'Larger homes for families seeking more space.', price: p },
+            { name: 'Commercial Spaces', description: 'Shops and offices suited to your business needs.', price: p },
+          ],
+        },
+      ];
+    case 'INTERIOR_ARCHITECTURE':
+      return [
+        {
+          name: 'Design Packages',
+          items: [
+            { name: 'Design Consultation', description: 'Concept, layout planning, and material guidance.', price: p, badge: 'Popular' },
+            { name: 'Space-Wise Packages', description: 'Modular kitchens, wardrobes, and full-room interiors.', price: p },
+            { name: 'Turnkey Execution', description: 'End-to-end delivery from design to handover.', price: p },
+          ],
+        },
+      ];
+    case 'BEAUTY_SALON':
+      return [
+        {
+          name: 'Popular Services',
+          items: [
+            { name: 'Haircut & Styling', description: 'A consultation-led cut finished to suit you.', price: p, badge: 'Popular' },
+            { name: 'Colour & Highlights', description: 'Ammonia-free colour options with expert advice.', price: p },
+            { name: 'Skin & Facial', description: 'A treatment selected for your skin’s needs.', price: p },
+          ],
+        },
+      ];
+    case 'HEALTHCARE_MEDICAL':
+      return [
+        {
+          name: 'Consultations & Care',
+          items: [
+            { name: 'General Consultation', description: 'An unhurried assessment of your concerns.', price: p, badge: 'Popular' },
+            { name: 'Preventive Check-Up', description: 'Routine review and preventive guidance.', price: p },
+            { name: 'Follow-Up Visit', description: 'A review of progress and next steps.', price: p },
+          ],
+        },
+      ];
+    default:
+      return [
+        {
+          name: 'Service Options',
+          items: [
+            { name: 'Consultation & Assessment', description: 'An initial discussion of your requirements.', price: p, badge: 'Popular' },
+            { name: 'Standard Package', description: 'The most commonly requested scope of work.', price: p },
+            { name: 'Premium Package', description: 'An extended scope with additional support.', price: p },
+          ],
+        },
+      ];
   }
 }

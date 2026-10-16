@@ -164,9 +164,32 @@ const PROFESSION_IMAGE_POOLS: Record<
     ],
   },
 
-  // Digital Marketing & SEO
-  DIGITAL_AGENCY: {
+  // Photographers & Videographers
+  PHOTOGRAPHY: {
     hero: [
+      'https://images.unsplash.com/photo-1519741497674-611481863552', // Candid wedding & bridal moment
+      'https://images.unsplash.com/photo-1516035069371-29a1b244cc32', // Photographer with camera in studio
+    ],
+    about: [
+      'https://images.unsplash.com/photo-1554048612-b6a482bc67e5', // Photographer editing on laptop
+      'https://images.unsplash.com/photo-1452587925148-ce544e77e70d', // Behind-the-scenes camera setup
+    ],
+    services: [
+      'https://images.unsplash.com/photo-1511285560929-80b456fea0bc', // Pre-wedding couple photoshoot
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb', // Editorial studio portrait
+      'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf', // Live event & celebration coverage
+      'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4', // Commercial & brand product shoot
+    ],
+    gallery: [
+      'https://images.unsplash.com/photo-1519741497674-611481863552', // Wedding & bridal
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb', // Portraits
+      'https://images.unsplash.com/photo-1511285560929-80b456fea0bc', // Pre-wedding
+      'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4', // Commercial
+    ],
+  },
+
+  // Digital Marketing & SEO
+  DIGITAL_AGENCY: {    hero: [
       'https://images.unsplash.com/photo-1460925895917-afdab827c52f', // Web analytics digital charts
       'https://images.unsplash.com/photo-1522071820081-009f0129c71c', // Collaborative tech team
     ],
@@ -261,7 +284,7 @@ export function getContextualImageUrl(req: ImageSlotRequest): string {
     return req.userImageUrl.trim();
   }
 
-  const normalized = req.profession.toLowerCase().trim();
+  const normalized = `${req.profession || ''} ${req.businessName || ''}`.toLowerCase().trim();
   let poolKey = 'GENERAL_SMB';
 
   if (/dent|tooth|doctor|clinic|medical|physio|health/i.test(normalized)) {
@@ -280,6 +303,8 @@ export function getContextualImageUrl(req: ImageSlotRequest): string {
     poolKey = 'INTERIOR_DESIGN';
   } else if (/salon|spa|beauty|hair|parlor|makeup/i.test(normalized)) {
     poolKey = 'SALON_SPA';
+  } else if (/photo|photograph|videograph|cinematograph|portrait|wedding shoot|pre-wedding|studio|camera|shoot/i.test(normalized)) {
+    poolKey = 'PHOTOGRAPHY';
   } else if (/chartered|ca firm|audit|tax|gst|account/i.test(normalized)) {
     poolKey = 'CHARTERED_ACCOUNTANT';
   }

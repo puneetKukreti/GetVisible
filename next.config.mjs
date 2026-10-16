@@ -19,6 +19,20 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  webpack: (config, { isServer }) => {
+    // Some shared demo modules (e.g. the profession engine) are imported by
+    // client components but reference Node-only builtins inside try/catch
+    // server utilities. Stub those builtins for the client bundle only, so the
+    // server keeps full Node access while the client build stays valid.
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...(config.resolve.fallback || {}),
+        fs: false,
+        path: false,
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

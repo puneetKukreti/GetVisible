@@ -5,7 +5,7 @@ import {
   WebsiteTheme,
   WebsiteTemplate,
 } from '@/types';
-import { THEMES } from './templates';
+import { THEMES } from './themes';
 import { getProfessionPreset } from './profession-config';
 
 export interface CALayoutDefinition {

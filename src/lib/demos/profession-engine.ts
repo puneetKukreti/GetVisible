@@ -306,6 +306,26 @@ export const PROFESSION_REGISTRY: Record<string, ProfessionConfig> = {
     },
     trustBadges: ['OEM Diagnostic Scanners', '100% Genuine Spare Parts', 'Dust-Free Detailing Bay', 'Transparent Itemized Invoices'],
   },
+
+  // 13. Photographer, Videographer & Creative Studio
+  PHOTOGRAPHER: {
+    id: 'PHOTOGRAPHER',
+    name: 'Photographer, Videographer & Creative Studio',
+    aliases: ['photographer', 'photography', 'photo studio', 'videographer', 'cinematographer', 'portrait studio', 'wedding photographer', 'photojournalist', 'pre-wedding shoot'],
+    category: 'TECH_CREATIVE',
+    defaultLayout: 'LUXURY_PROFESSIONAL',
+    defaultTheme: THEMES.corporateSlate,
+    sectionOrder: ['HERO', 'SERVICES', 'GALLERY', 'EXPERTISE', 'ABOUT', 'PROCESS', 'WHY_CHOOSE_US', 'FAQ', 'CONTACT', 'LOCATION'],
+    primaryCta: 'Check Dates & Book a Shoot',
+    secondaryCta: 'View Portfolio',
+    imageKeywords: {
+      hero: 'wedding photographer candid camera natural light editorial',
+      about: 'photographer editing portraits studio behind the scenes',
+      services: ['wedding photography coverage', 'pre-wedding couple shoot', 'studio portrait session', 'commercial product photography'],
+      gallery: ['candid wedding moment', 'editorial studio portrait', 'pre-wedding couple session', 'commercial brand shoot'],
+    },
+    trustBadges: ['Portfolio-Led Storytelling', 'Professional-Grade Equipment', 'Fast Edited Deliverables', 'Flexible Shoot Packages'],
+  },
 };
 
 /**
@@ -367,6 +387,9 @@ export function classifyProfession(input: string | {
   }
   if (/car|auto|garage|mechanic|detailing|vehicle|motor/i.test(text)) {
     return PROFESSION_REGISTRY.AUTOMOBILE_WORKSHOP;
+  }
+  if (/photo|portrait|wedding film|videograph|cinematograph|camera|visual storytell|photojournal/i.test(text)) {
+    return PROFESSION_REGISTRY.PHOTOGRAPHER;
   }
   if (/audit|tax|gst|itr|cfo|account|ca firm|balance sheet|ledger/i.test(text)) {
     return PROFESSION_REGISTRY.CHARTERED_ACCOUNTANT;
