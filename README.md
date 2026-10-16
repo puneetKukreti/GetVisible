@@ -86,7 +86,45 @@ npm run prisma:migrate
 npm run db:seed
 ```
 
-### 4. Running the Application
+### 4. Production Deployment (Vercel + Postgres)
+
+The deployed app must not rely on the in-memory sandbox store: on serverless hosts that
+memory is per-instance and resets on every cold start, so uploaded leads and generated
+demo links would silently disappear. Production therefore runs with `DEMO_MODE=false`
+against a real database.
+
+1. Create a Postgres database (Vercel Postgres / Neon) and connect it to the project.
+   The integration injects:
+   - `DATABASE_URL` — pooled connection, used by the app at runtime.
+   - `DATABASE_URL_UNPOOLED` — direct connection, used for migrations.
+2. Set these **Production** environment variables:
+   ```env
+   DEMO_MODE=false
+   NEXT_PUBLIC_DEMO_MODE=false
+   ADMIN_PASSWORD="<strong owner password>"
+   NEXTAUTH_SECRET="<32+ character secret>"
+   CRON_SECRET="<random secret>"   # protects the retention cron endpoint
+   ```
+3. Deploy. `npm run vercel-build` runs automatically and executes:
+   ```
+   prisma generate && node scripts/migrate-deploy.mjs && next build
+   ```
+   `scripts/migrate-deploy.mjs` applies the committed Prisma migrations against
+   `DATABASE_URL_UNPOOLED`, because Neon's pooled endpoint cannot run `prisma migrate`.
+
+### Demo link retention
+
+Public demo links are per-prospect and time-limited:
+
+- A link keeps working across refreshes and redeployments. It is removed only when an
+  operator deletes it, or **3 days after the demo was created**
+  (`DEMO_PUBLIC_TTL_DAYS=3`, overridable).
+- Expired demos are pruned opportunistically when a link is opened, and by the daily
+  Vercel Cron job declared in `vercel.json` → `/api/cron/prune-demos`.
+- Pruning deletes only the demo row. The underlying lead record is never deleted, so
+  the pipeline history is preserved.
+
+### 5. Running the Application
 ```bash
 npm run dev
 ```
