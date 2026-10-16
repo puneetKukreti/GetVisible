@@ -33,7 +33,7 @@ export const STITCH_TEMPLATES: StitchTemplateMeta[] = [
       { name: 'Antique Gold', hex: '#755a25', role: 'Accent' },
       { name: 'Crisp Porcelain', hex: '#f7f9ff', role: 'Background' },
     ],
-    thumbnail: '/demo-templates/design-1-premium/screen.png',
+    thumbnail: '/demo-templates/design-1-premium/hero.png',
     htmlUrl: '/demo-templates/design-1-premium/index.html',
     keyFeatures: [
       'OECD & Section 92E Transfer Pricing Advisory focus',
@@ -59,7 +59,7 @@ export const STITCH_TEMPLATES: StitchTemplateMeta[] = [
       { name: 'Architectural Sand', hex: '#F8F7F4', role: 'Background' },
       { name: 'Grid Border', hex: '#E2DCD1', role: 'Outline' },
     ],
-    thumbnail: '/demo-templates/design-2-minimalist/screen.png',
+    thumbnail: '/demo-templates/design-2-minimalist/hero.png',
     htmlUrl: '/demo-templates/design-2-minimalist/index.html',
     keyFeatures: [
       'GST litigation & Section 16(4) defense specialization',
@@ -85,7 +85,7 @@ export const STITCH_TEMPLATES: StitchTemplateMeta[] = [
       { name: 'Executive White', hex: '#FAF8F5', role: 'Background' },
       { name: 'Card Surface', hex: '#FFFFFF', role: 'Surface' },
     ],
-    thumbnail: '/demo-templates/design-3-contemporary/screen.png',
+    thumbnail: '/demo-templates/design-3-contemporary/hero.png',
     htmlUrl: '/demo-templates/design-3-contemporary/index.html',
     keyFeatures: [
       'Virtual CFO & investor-ready MIS reporting sections',
@@ -119,7 +119,7 @@ export function getTemplateScreenshotPath(layoutOrTemplate?: string | null): str
     l.includes('direct_tax') ||
     l === 'design-2-minimalist'
   ) {
-    return '/demo-templates/design-2-minimalist/screen.png';
+    return '/demo-templates/design-2-minimalist/hero.png';
   }
   if (
     l.includes('fintech') ||
@@ -129,8 +129,8 @@ export function getTemplateScreenshotPath(layoutOrTemplate?: string | null): str
     l.includes('modern_indian') ||
     l === 'design-3-contemporary'
   ) {
-    return '/demo-templates/design-3-contemporary/screen.png';
+    return '/demo-templates/design-3-contemporary/hero.png';
   }
   // Default to design-1-premium (Editorial Finance / Corporate Tax / Transfer Pricing / Luxury)
-  return '/demo-templates/design-1-premium/screen.png';
+  return '/demo-templates/design-1-premium/hero.png';
 }

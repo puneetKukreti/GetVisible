@@ -177,12 +177,12 @@ describe('Growth & Workflow Upgrades', () => {
 
   describe('Upgrade 5: Reliable Website Screenshot Image Delivery', () => {
     it('correctly maps various layouts and templates to high-res screenshot paths', () => {
-      expect(getTemplateScreenshotPath('design-1-premium')).toBe('/demo-templates/design-1-premium/screen.png');
-      expect(getTemplateScreenshotPath('design-2-minimalist')).toBe('/demo-templates/design-2-minimalist/screen.png');
-      expect(getTemplateScreenshotPath('design-3-contemporary')).toBe('/demo-templates/design-3-contemporary/screen.png');
-      expect(getTemplateScreenshotPath('SWISS_MINIMAL')).toBe('/demo-templates/design-2-minimalist/screen.png');
-      expect(getTemplateScreenshotPath('MODERN_FINTECH')).toBe('/demo-templates/design-3-contemporary/screen.png');
-      expect(getTemplateScreenshotPath(null)).toBe('/demo-templates/design-1-premium/screen.png');
+      expect(getTemplateScreenshotPath('design-1-premium')).toBe('/demo-templates/design-1-premium/hero.png');
+      expect(getTemplateScreenshotPath('design-2-minimalist')).toBe('/demo-templates/design-2-minimalist/hero.png');
+      expect(getTemplateScreenshotPath('design-3-contemporary')).toBe('/demo-templates/design-3-contemporary/hero.png');
+      expect(getTemplateScreenshotPath('SWISS_MINIMAL')).toBe('/demo-templates/design-2-minimalist/hero.png');
+      expect(getTemplateScreenshotPath('MODERN_FINTECH')).toBe('/demo-templates/design-3-contemporary/hero.png');
+      expect(getTemplateScreenshotPath(null)).toBe('/demo-templates/design-1-premium/hero.png');
     });
 
     it('returns a valid JSON screenshotUrl without failing on localhost', async () => {

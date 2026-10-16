@@ -203,14 +203,14 @@ describe('Profession-specific Stitch template sets', () => {
 
   it('resolves a profession-specific preview thumbnail', () => {
     expect(getTemplateScreenshotPath('design-photo-editorial')).toBe(
-      '/demo-templates/design-photo-editorial/screen.svg'
+      '/demo-templates/design-photo-editorial/hero.png'
     );
     expect(getTemplateScreenshotPath('design-restaurant-warm')).toBe(
-      '/demo-templates/design-restaurant-warm/screen.svg'
+      '/demo-templates/design-restaurant-warm/hero.png'
     );
     // CA behaviour is unchanged.
     expect(getTemplateScreenshotPath('design-1-premium')).toBe(
-      '/demo-templates/design-1-premium/screen.png'
+      '/demo-templates/design-1-premium/hero.png'
     );
   });
 });

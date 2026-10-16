@@ -13,6 +13,7 @@ import {
 import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { personalizeStitchHtml } from '@/lib/demos/stitch-personalizer';
 import { selectWebsiteDesign } from '@/lib/demos/personalization';
+import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
 import { WebsiteContent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -156,14 +157,32 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       } catch {}
     }
 
-    // 3. If local headless browser is available (Local dev / VPS with Chrome), capture high-fidelity PNG
-    const hasLocalBrowser = Boolean(findSystemBrowser());
-    if (hasLocalBrowser) {
-      const layout =
-        demo?.design?.layout ||
-        demo?.templateId ||
-        (lead ? selectWebsiteDesign(lead, 1).layout : 'design-1-premium');
+    // 3. Resolve the demo's Stitch template and its pre-rendered preview art.
+    // These are real 1024x640 screenshots that ship with the app, so they work
+    // on serverless hosts (e.g. Vercel) where no headless Chrome is available.
+    const layout =
+      demo?.design?.layout ||
+      demo?.templateId ||
+      (lead ? selectWebsiteDesign(lead, 1).layout : 'design-1-premium');
+    const templatePreviewPath = getTemplateScreenshotPath(layout);
 
+    const hasLocalBrowser = Boolean(findSystemBrowser());
+
+    if (!hasLocalBrowser && templatePreviewPath.endsWith('.png')) {
+      if (isImageFormat) {
+        return NextResponse.redirect(new URL(templatePreviewPath, request.url));
+      }
+      return NextResponse.json({
+        success: true,
+        screenshotUrl: templatePreviewPath,
+        cached: true,
+        source: 'stitch_template',
+      });
+    }
+
+    // 3b. If a local headless browser is available (local dev / VPS with Chrome),
+    // capture a fresh, pixel-perfect PNG of the personalized Stitch template.
+    if (hasLocalBrowser) {
       let personalizedHtml = '';
       try {
         const rawHtml = getStitchRawHtml(layout);

@@ -121,7 +121,7 @@ export const PROFESSION_STITCH_DESIGNS: Record<string, ProfessionStitchDesign> =
       'Editorial serif headline system',
       'Shoot-date inquiry flow with WhatsApp link',
     ],
-    thumbnail: '/demo-templates/design-photo-editorial/screen.svg',
+    thumbnail: '/demo-templates/design-photo-editorial/hero.png',
   },
   'design-restaurant-warm': {
     id: 'design-restaurant-warm',
@@ -176,7 +176,7 @@ export const PROFESSION_STITCH_DESIGNS: Record<string, ProfessionStitchDesign> =
       'Ambience / food gallery grid',
       'Reservation & order enquiry flow',
     ],
-    thumbnail: '/demo-templates/design-restaurant-warm/screen.svg',
+    thumbnail: '/demo-templates/design-restaurant-warm/hero.png',
   },
   'design-clinic-clean': {
     id: 'design-clinic-clean',
@@ -231,7 +231,7 @@ export const PROFESSION_STITCH_DESIGNS: Record<string, ProfessionStitchDesign> =
       'Step-by-step patient journey',
       'Appointment booking enquiry form',
     ],
-    thumbnail: '/demo-templates/design-clinic-clean/screen.svg',
+    thumbnail: '/demo-templates/design-clinic-clean/hero.png',
   },
   'design-realestate-premium': {
     id: 'design-realestate-premium',
@@ -287,7 +287,7 @@ export const PROFESSION_STITCH_DESIGNS: Record<string, ProfessionStitchDesign> =
       'Investment corridor / portfolio framing',
       'Schedule-a-site-visit enquiry flow',
     ],
-    thumbnail: '/demo-templates/design-realestate-premium/screen.svg',
+    thumbnail: '/demo-templates/design-realestate-premium/hero.png',
   },
   'design-bold-energetic': {
     id: 'design-bold-energetic',
@@ -344,7 +344,7 @@ export const PROFESSION_STITCH_DESIGNS: Record<string, ProfessionStitchDesign> =
       'Training facility & conditioning gallery',
       'Trial-session enquiry flow with WhatsApp',
     ],
-    thumbnail: '/demo-templates/design-bold-energetic/screen.svg',
+    thumbnail: '/demo-templates/design-bold-energetic/hero.png',
   },
   'design-beauty-elegant': {
     id: 'design-beauty-elegant',
@@ -400,7 +400,7 @@ export const PROFESSION_STITCH_DESIGNS: Record<string, ProfessionStitchDesign> =
       'Look-book styling gallery',
       'Appointment booking enquiry flow',
     ],
-    thumbnail: '/demo-templates/design-beauty-elegant/screen.svg',
+    thumbnail: '/demo-templates/design-beauty-elegant/hero.png',
   },
   'design-classic-professional': {
     id: 'design-classic-professional',
@@ -456,7 +456,7 @@ export const PROFESSION_STITCH_DESIGNS: Record<string, ProfessionStitchDesign> =
       'Working-process and trust sections',
       'Clear enquiry flow with WhatsApp',
     ],
-    thumbnail: '/demo-templates/design-classic-professional/screen.svg',
+    thumbnail: '/demo-templates/design-classic-professional/hero.png',
   },
 };
 
