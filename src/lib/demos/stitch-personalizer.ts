@@ -356,19 +356,44 @@ export function personalizeStitchHtml(
   html = html.replaceAll('consultations@sharmaassociates-ca.in', escapeHtml(email));
   html = html.replaceAll('mailto:consultations@sharmaassociates-ca.in', `mailto:${escapeHtml(email)}`);
 
-  // 4b. Hero and profile image substitutions
-  if (heroImgUrl) {
-    html = html.replaceAll(
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuCpghOWlH9V22TfzRWOpl67evU1cFFi8XiyKKu9obITIcnd5mPd1Rs681Bch7QtzYVE52ivMBIxWOUnZAY9armTGSHS_2e_hBoswcVINrlgJxq02H77tNwre6m3CBH8QCQITPG9E3zs8_8eycTCKKhmocAO_vEBAoPp3eyrw3OIFX7Ccb1yuvUieRNfCmcNM7trFJZxAbZ4NWYnmlq1-KyYiv_8PjlVxlpbs14pXszyrrzLCfWrE8eU',
-      heroImgUrl
-    );
-  }
-  if (secondaryImgUrl) {
-    html = html.replaceAll(
-      'https://lh3.googleusercontent.com/aida-public/AB6AXuAe5OCw4z1MaF-l-Maiz1U9Ra4gffPomw-ysqViKtciru8s7VcpfDdgYghTkBvIDaVADi-5aziz92oMz_Qr8ruT_5HhUukCPRoSmXqufunM2Uz9D6Ooqae5QtRKCsrFBN75Cv-5MQ1WZjlQNhEOfWKFnoQZULvR_uM8wPeVM0zZ-9IhmFu88Aq8RWfRJ9LlJR0UxUBgBahWiDjiyYRE-3snpVs0z00VKp9pMipvJIXf4TCRZZ1k4L7O',
-      secondaryImgUrl
-    );
-  }
+  // 4b. Replace every short-lived Google `aida` placeholder image.
+  //
+  // Stitch templates hot-link imagery from `lh3.googleusercontent.com/aida...`.
+  // Those URLs are ephemeral and return 403/400 on any public host, so a demo that
+  // ships them renders a broken image — the header logo, the hero, and profile
+  // photos are all affected. Swap them for real content imagery and never emit a
+  // remote `<img>` in the header.
+  const FALLBACK_HERO =
+    'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=80';
+  const heroFallback = heroImgUrl || aboutImgUrl || secondaryImgUrl || FALLBACK_HERO;
+  const secondaryFallback = secondaryImgUrl || aboutImgUrl || heroImgUrl || FALLBACK_HERO;
+
+  const aidaImageRe = /<img\b([^>]*?)\ssrc="https:\/\/lh3\.googleusercontent\.com\/aida[^"]*"([^>]*)>/gi;
+
+  const headerCloseIdx = html.indexOf('</header>');
+  const headerPart = headerCloseIdx > -1 ? html.slice(0, headerCloseIdx) : '';
+  const bodyPart = headerCloseIdx > -1 ? html.slice(headerCloseIdx) : html;
+
+  // Header: the brand mark is always the monogram badge — never a hot-linked image.
+  const cleanHeader = headerPart.replace(aidaImageRe, (img: string) =>
+    /logo/i.test(img)
+      ? `<div class="w-10 h-10 rounded-sm flex items-center justify-center border shadow-sm shrink-0" style="background:#0b1f33;border-color:rgba(212,175,55,.55);color:#d4af37;"><span style="font-weight:800;letter-spacing:-0.02em;font-size:18px;line-height:1;">${monogram}</span></div>`
+      : ''
+  );
+
+  // Body: hero / about / profile imagery becomes the matching content image.
+  const cleanBody = bodyPart.replace(
+    aidaImageRe,
+    (img: string, pre: string, post: string) => {
+      const alt = /alt="([^"]*)"/i.exec(img)?.[1] || '';
+      const replacement = /profile|partner|avatar|founder|team/i.test(alt)
+        ? secondaryFallback
+        : heroFallback;
+      return `<img${pre} src="${replacement}"${post}>`;
+    }
+  );
+
+  html = cleanHeader + cleanBody;
 
   // 4c. Remove any embedded styles that lock scrolling or hide scrollbars
   html = html.replaceAll('overscroll-behavior:none;', 'overscroll-behavior:auto;');

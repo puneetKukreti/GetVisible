@@ -251,18 +251,25 @@ GetVisible Digital Team`;
       ? input.demoUrl
       : `${baseOrigin}/demo/${businessSlug}`;
 
-  const cityLabel = input.city || 'Delhi NCR';
+  const contactName = (input.contactName || '').trim();
+  const firstName = contactName.split(/\s+/)[0] || '';
+  const salutation = firstName ? `${firstName} ji` : input.businessName;
+  const displayName = contactName || input.businessName;
 
-  const meaningfulMsg = `Namaste *${input.businessName}* 👋
+  const meaningfulMsg = `Namaste *${salutation}* 👋
 
-When prospective clients or businesses in *${cityLabel}* are referred to you, the first thing they do before reaching out is search your name online to view your profile and services.
+I was looking for your practice online and couldn't find an official website, so I created a *custom website demo for ${displayName}* to show how your practice could look online.
 
-To help *${input.businessName}* build that instant digital trust, I designed a clean, professional website concept tailored specifically for you *(preview image attached above 👆)*.
+🖼️ *(preview image attached above 👆)*
 
-🌐 *View Your Custom Website Preview:*
+🌐 *View your demo:*
 ${demoUrl}
 
-If you would like to make this live on your own domain, simply reply *"YES"* to this message!`;
+It's a concept made specifically for your practice, not a generic template.
+
+To help *${displayName}* build that instant digital trust, would you like to see how this could work for your firm? Just reply *"YES"* and I'll explain the next steps.
+
+— Puneet | GetVisible`;
 
   const whatsappMessage = meaningfulMsg;
 

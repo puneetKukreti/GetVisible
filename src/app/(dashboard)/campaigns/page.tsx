@@ -238,18 +238,30 @@ function getMeaningfulWhatsAppMessage(lead: LeadData): {
   const businessSlug = generatePublicDemoToken(lead.businessName);
   const baseOrigin = typeof window !== 'undefined' ? window.location.origin : getAppBaseUrl();
   const demoUrl = `${baseOrigin}/demo/${lead.websiteDemos?.[0]?.publicToken || businessSlug}`;
-  const cityLabel = lead.city || 'Delhi NCR';
 
-  const message = `Namaste *${lead.businessName}* 👋
+  const contactName = (
+    lead.contacts?.find((c) => c.isPrimary)?.name ||
+    lead.contacts?.[0]?.name ||
+    ''
+  ).trim();
+  const firstName = contactName.split(/\s+/)[0] || '';
+  const salutation = firstName ? `${firstName} ji` : lead.businessName;
+  const displayName = contactName || lead.businessName;
 
-When prospective clients or businesses in *${cityLabel}* are referred to you, the first thing they do before reaching out is search your name online to view your profile and services.
+  const message = `Namaste *${salutation}* 👋
 
-To help *${lead.businessName}* build that instant digital trust, I designed a clean, professional website concept tailored specifically for you *(preview image attached above 👆)*.
+I was looking for your practice online and couldn't find an official website, so I created a *custom website demo for ${displayName}* to show how your practice could look online.
 
-🌐 *View Your Custom Website Preview:*
+🖼️ *(preview image attached above 👆)*
+
+🌐 *View your demo:*
 ${demoUrl}
 
-If you would like to make this live on your own domain, simply reply *"YES"* to this message!`;
+It's a concept made specifically for your practice, not a generic template.
+
+To help *${displayName}* build that instant digital trust, would you like to see how this could work for your firm? Just reply *"YES"* and I'll explain the next steps.
+
+— Puneet | GetVisible`;
 
   const followUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${lead.businessName}*:
 
