@@ -336,8 +336,21 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
     setChannel(ch);
     if (ch === 'WHATSAPP') {
       setDraft(whatsappStep === 'step1' ? whatsappMessage : whatsappFollowUpWithLink);
-    } else if (ch === 'EMAIL' && emailDraft) {
-      setDraft(emailDraft);
+    } else if (ch === 'EMAIL') {
+      // Never silently reuse the WhatsApp card copy as an email. If an email
+      // draft does not exist yet, generate one now (needs an approved demo).
+      if (emailDraft) {
+        setDraft(emailDraft);
+      } else if (lead.websiteDemos?.length) {
+        setDraft('');
+        void generateDraft('EMAIL');
+      } else {
+        setDraft('');
+      }
+    } else if (lead.websiteDemos?.length) {
+      // PHONE: auto-draft a call script instead of reusing WhatsApp copy.
+      setDraft('');
+      void generateDraft('PHONE');
     }
   };
 
@@ -350,7 +363,8 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
     }
   };
 
-  const generateDraft = async () => {
+  const generateDraft = async (overrideChannel?: OutreachChannel) => {
+    const activeChannel = overrideChannel || channel;
     setDraftLoading(true);
     setDraftError('');
     try {
@@ -359,7 +373,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           leadId: lead.id,
-          channel: CHANNEL_META[channel].apiChannel,
+          channel: CHANNEL_META[activeChannel].apiChannel,
           intent,
         }),
       });
@@ -376,7 +390,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       if (data.whatsappShareUrl) setWhatsappShareUrl(data.whatsappShareUrl);
       if (data.whatsappFollowUpShareUrl) setWhatsappFollowUpShareUrl(data.whatsappFollowUpShareUrl);
 
-      if (channel === 'WHATSAPP') {
+      if (activeChannel === 'WHATSAPP') {
         setDraft(whatsappStep === 'step1' ? (data.whatsappMessage || data.draft) : (data.whatsappFollowUpWithLink || data.draft));
       } else {
         setDraft(data.draft);
@@ -543,6 +557,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
           leadId: lead.id,
           subject: draftSubject || `Website Concept Prepared for ${lead.businessName}`,
           message: emailDraft || draft,
+          screenshotUrl,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -765,7 +780,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                🛡️ Step 1: Safe Image Pitch (No Link — High Reply)
+                🛡️ Step 1: Image Pitch + Preview Link
               </button>
               <button
                 type="button"
@@ -782,7 +797,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
 
             {/* Generate / Refresh Button */}
             <Button
-              onClick={generateDraft}
+              onClick={() => generateDraft()}
               disabled={draftLoading || !intent.trim()}
               className="w-full gap-2 text-xs h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
             >
@@ -1030,7 +1045,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 py-2 rounded-lg shadow-sm transition-colors"
                     >
                       <MessageSquare className="w-3.5 h-3.5" />
-                      <span>Open in WhatsApp Web ({whatsappStep === 'step1' ? 'Zero-Link Pitch' : 'Follow-Up Link'})</span>
+                      <span>Open in WhatsApp Web ({whatsappStep === 'step1' ? 'Initial Pitch' : 'Follow-Up Link'})</span>
                     </a>
                   )}
                 </div>
@@ -1198,7 +1213,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
 
             {/* Generate Draft Button */}
             <Button
-              onClick={generateDraft}
+              onClick={() => generateDraft()}
               disabled={draftLoading || !intent.trim()}
               className="w-full gap-2 text-xs h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
             >

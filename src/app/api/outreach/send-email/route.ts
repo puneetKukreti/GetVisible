@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { leadId, subject, message } = body;
+    const { leadId, subject, message, screenshotUrl } = body;
 
     if (!leadId) {
       return NextResponse.json(
@@ -58,6 +58,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Guarantee the email body carries a clickable demo link and resolve the
+    // screenshot to an absolute URL the provider can embed.
+    const origin = request.nextUrl.origin;
+    const activeDemo = lead.websiteDemos?.[0];
+    const demoUrl = `${origin}/demo/${activeDemo?.publicToken || lead.id}`;
+
+    let emailBody = typeof message === 'string' ? message : '';
+    if (!/https?:\/\//.test(emailBody)) {
+      emailBody = `${emailBody}\n\nPreview the concept: ${demoUrl}`.trim();
+    }
+
+    const absoluteScreenshot =
+      typeof screenshotUrl === 'string' && screenshotUrl.trim().length > 0
+        ? screenshotUrl.startsWith('http')
+          ? screenshotUrl
+          : new URL(screenshotUrl, origin).toString()
+        : `${origin}/api/demos/${encodeURIComponent(lead.id)}/screenshot?format=image&name=${encodeURIComponent(
+            lead.businessName || ''
+          )}&city=${encodeURIComponent(lead.city || '')}&profession=${encodeURIComponent(lead.profession || '')}`;
+
     // Prioritize Gmail SMTP (sends from authentic govisibleonweb@gmail.com to ANY recipient)
     const gmailProvider = new GmailSmtpProvider();
     const resendProvider = new ProductionEmailProvider();
@@ -70,10 +90,11 @@ export async function POST(request: NextRequest) {
     const sendResult = await emailProvider.sendOutreachEmail({
       to: lead.publicEmail,
       subject: subject || `Website Concept Prepared for ${lead.businessName}`,
-      body: message,
+      body: emailBody,
       leadId: lead.id,
       organizationId: orgId,
       approvedByHuman: true,
+      screenshotUrl: absoluteScreenshot,
     });
 
     if (!sendResult.success) {

@@ -1,5 +1,4 @@
 import nodemailer from 'nodemailer';
-import https from 'https';
 import { ProviderExecutionResult, ProviderStatus } from './provider-result';
 
 export interface EmailSendPayload {
@@ -9,6 +8,8 @@ export interface EmailSendPayload {
   leadId: string;
   organizationId: string;
   approvedByHuman: boolean;
+  /** Absolute URL of the captured website-concept screenshot to embed. */
+  screenshotUrl?: string;
 }
 
 export interface IEmailProvider {
@@ -18,45 +19,102 @@ export interface IEmailProvider {
   sendOutreachEmail(payload: EmailSendPayload): Promise<ProviderExecutionResult<{ messageId: string }>>;
 }
 
+const SCREENSHOT_TIMEOUT_MS = 9000;
+const SCREENSHOT_CID = 'websitepreview';
+
 /**
- * Downloads image buffer safely for embedding as an inline CID attachment.
- * Inline attachments avoid Gmail third-party image blocking and spam filters.
+ * Extracts the first http(s) URL from the outreach body. This is the demo link
+ * the recipient should be able to click.
+ */
+export function extractDemoUrl(body: string): string | null {
+  const match = (body || '').match(/https?:\/\/[^\s]+/);
+  return match ? match[0].replace(/[.,)\]]+$/, '') : null;
+}
+
+/**
+ * Remote fallback thumbnail service (only used when no captured screenshot is
+ * supplied). Requires a publicly reachable https demo URL.
+ */
+function microlinkUrl(demoUrl: string): string {
+  return `https://api.microlink.io?url=${encodeURIComponent(demoUrl)}&screenshot=true&meta=false&embed=screenshot.url`;
+}
+
+/**
+ * Downloads an image over http/https and returns it as a Buffer.
+ * Uses the global fetch so both http (local dev) and https work, with redirects.
  */
 async function fetchImageBuffer(url: string): Promise<Buffer | null> {
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => resolve(null), 8000);
-    https
-      .get(url, (res) => {
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          clearTimeout(timeout);
-          return fetchImageBuffer(res.headers.location).then(resolve);
-        }
-        const chunks: Buffer[] = [];
-        res.on('data', (c) => chunks.push(c));
-        res.on('end', () => {
-          clearTimeout(timeout);
-          resolve(Buffer.concat(chunks));
-        });
-      })
-      .on('error', () => {
-        clearTimeout(timeout);
-        resolve(null);
-      });
-  });
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SCREENSHOT_TIMEOUT_MS);
+    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return buffer.length > 0 ? buffer : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves the inline/remote image source for the email body.
+ * Prefers the captured screenshot; falls back to a live screenshot service.
+ */
+async function resolveScreenshot(
+  payload: EmailSendPayload,
+  demoUrl: string | null
+): Promise<{ imageBuffer: Buffer | null; remoteSrc: string | null }> {
+  let imageBuffer: Buffer | null = null;
+
+  if (payload.screenshotUrl) {
+    imageBuffer = await fetchImageBuffer(payload.screenshotUrl);
+  }
+
+  const publicFallback = demoUrl && /^https:\/\//i.test(demoUrl) ? microlinkUrl(demoUrl) : null;
+
+  if (!imageBuffer && publicFallback) {
+    imageBuffer = await fetchImageBuffer(publicFallback);
+  }
+
+  const remoteSrc = payload.screenshotUrl || publicFallback || null;
+  return { imageBuffer, remoteSrc };
 }
 
 /**
  * Clean, human-looking HTML template that mimics personal agency communication.
  * Avoids aggressive spam triggers (NO heavy colored headers, NO "UNSUBSCRIBE" blast text).
+ * The image block and CTA are only rendered when a demo URL is available, so we
+ * never invent a broken placeholder link.
  */
-function buildInboxFriendlyHtml(payload: EmailSendPayload, hasInlineCid: boolean): string {
-  const urlMatch = payload.body.match(/https?:\/\/[^\s]+/);
-  const targetDemoUrl = urlMatch ? urlMatch[0] : 'https://get-visible-web.vercel.app';
-  const encodedDemoUrl = encodeURIComponent(targetDemoUrl);
-  const remoteImgUrl = `https://api.microlink.io?url=${encodedDemoUrl}&screenshot=true&meta=false&embed=screenshot.url`;
-  const imgSrc = hasInlineCid ? 'cid:websitepreview' : remoteImgUrl;
-
+export function buildInboxFriendlyHtml(
+  payload: EmailSendPayload,
+  imageSrc: string | null,
+  demoUrl: string | null
+): string {
   const cleanBodyText = payload.body.replace(/Preview Snapshot:[\s\S]*?(Best regards|$)/i, '$1');
+
+  const imageBlock =
+    demoUrl && imageSrc
+      ? `
+        <div style="margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #ffffff;">
+          <a href="${demoUrl}" target="_blank" style="text-decoration: none; display: block;">
+            <img src="${imageSrc}" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #e2e8f0;" alt="Interactive Practice Website Concept" />
+          </a>
+          <div style="padding: 10px 14px; background: #f8fafc; font-size: 12px; font-weight: 600; color: #475569;">
+            Live Interactive Concept Preview (Click image or link below to view)
+          </div>
+        </div>`
+      : '';
+
+  const ctaBlock = demoUrl
+    ? `
+        <div style="margin: 20px 0;">
+          <a href="${demoUrl}" target="_blank" style="display: inline-block; background-color: #1a73e8; color: #ffffff !important; padding: 10px 22px; border-radius: 5px; text-decoration: none; font-weight: 600; font-size: 13px;">
+            Open Live Interactive Website Demo &rarr;
+          </a>
+        </div>`
+    : '';
 
   return `
     <!DOCTYPE html>
@@ -69,24 +127,10 @@ function buildInboxFriendlyHtml(payload: EmailSendPayload, hasInlineCid: boolean
         <div style="white-space: pre-line; margin-bottom: 20px; font-size: 14px; color: #222222;">
 ${cleanBodyText}
         </div>
-
-        <div style="margin: 20px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #ffffff;">
-          <a href="${targetDemoUrl}" target="_blank" style="text-decoration: none; display: block;">
-            <img src="${imgSrc}" style="width: 100%; height: auto; display: block; border-bottom: 1px solid #e2e8f0;" alt="Interactive Practice Website Concept" />
-          </a>
-          <div style="padding: 10px 14px; background: #f8fafc; font-size: 12px; font-weight: 600; color: #475569;">
-            Live Interactive Concept Preview (Click image or link below to view)
-          </div>
-        </div>
-
-        <div style="margin: 20px 0;">
-          <a href="${targetDemoUrl}" target="_blank" style="display: inline-block; background-color: #1a73e8; color: #ffffff !important; padding: 10px 22px; border-radius: 5px; text-decoration: none; font-weight: 600; font-size: 13px;">
-            Open Live Interactive Website Demo &rarr;
-          </a>
-        </div>
-
+${imageBlock}
+${ctaBlock}
         <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0 16px;" />
-        
+
         <p style="font-size: 11px; color: #64748b; line-height: 1.4; margin: 0;">
           Prepared by GetVisible Digital Practice Team &bull; Gurgaon, Haryana<br />
           If you prefer not to receive updates from us, simply reply with "opt out".
@@ -159,22 +203,15 @@ export class GmailSmtpProvider implements IEmailProvider {
     try {
       const transporter = nodemailer.createTransport({
         service: 'gmail',
-        auth: {
-          user,
-          pass,
-        },
+        auth: { user, pass },
       });
 
-      // Fetch live screenshot buffer to attach directly as inline CID
-      const urlMatch = payload.body.match(/https?:\/\/[^\s]+/);
-      const targetDemoUrl = urlMatch ? urlMatch[0] : 'https://get-visible-web.vercel.app';
-      const encodedDemoUrl = encodeURIComponent(targetDemoUrl);
-      const screenshotImgUrl = `https://api.microlink.io?url=${encodedDemoUrl}&screenshot=true&meta=false&embed=screenshot.url`;
+      const demoUrl = extractDemoUrl(payload.body);
+      const { imageBuffer, remoteSrc } = await resolveScreenshot(payload, demoUrl);
+      const hasInlineCid = Boolean(imageBuffer);
+      const imageSrc = hasInlineCid ? `cid:${SCREENSHOT_CID}` : remoteSrc;
 
-      const imageBuffer = await fetchImageBuffer(screenshotImgUrl);
-      const hasInlineCid = Boolean(imageBuffer && imageBuffer.length > 0);
-
-      const htmlBody = buildInboxFriendlyHtml(payload, hasInlineCid);
+      const htmlBody = buildInboxFriendlyHtml(payload, imageSrc, demoUrl);
 
       const mailOptions: nodemailer.SendMailOptions = {
         from: `"GetVisible Team" <${user}>`,
@@ -194,7 +231,7 @@ export class GmailSmtpProvider implements IEmailProvider {
           {
             filename: 'website-preview.png',
             content: imageBuffer,
-            cid: 'websitepreview',
+            cid: SCREENSHOT_CID,
           },
         ];
       }
@@ -205,9 +242,7 @@ export class GmailSmtpProvider implements IEmailProvider {
         success: true,
         configured: true,
         isMock: false,
-        data: {
-          messageId: info.messageId,
-        },
+        data: { messageId: info.messageId },
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -264,7 +299,30 @@ export class ProductionEmailProvider implements IEmailProvider {
 
     try {
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-      const htmlBody = buildInboxFriendlyHtml(payload, false);
+      const demoUrl = extractDemoUrl(payload.body);
+      const { imageBuffer, remoteSrc } = await resolveScreenshot(payload, demoUrl);
+      const hasInlineCid = Boolean(imageBuffer) && Boolean(remoteSrc);
+      const imageSrc = hasInlineCid ? `cid:${SCREENSHOT_CID}` : remoteSrc;
+
+      const htmlBody = buildInboxFriendlyHtml(payload, imageSrc, demoUrl);
+
+      const requestBody: Record<string, unknown> = {
+        from: fromEmail,
+        to: payload.to,
+        subject: payload.subject,
+        text: payload.body,
+        html: htmlBody,
+      };
+
+      if (hasInlineCid && imageBuffer) {
+        requestBody.attachments = [
+          {
+            filename: 'website-preview.png',
+            content: imageBuffer.toString('base64'),
+            content_id: SCREENSHOT_CID,
+          },
+        ];
+      }
 
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
@@ -272,13 +330,7 @@ export class ProductionEmailProvider implements IEmailProvider {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         },
-        body: JSON.stringify({
-          from: fromEmail,
-          to: payload.to,
-          subject: payload.subject,
-          text: payload.body,
-          html: htmlBody,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       const data = await response.json().catch(() => ({}));
@@ -296,9 +348,7 @@ export class ProductionEmailProvider implements IEmailProvider {
         success: true,
         configured: true,
         isMock: false,
-        data: {
-          messageId: data.id || `msg-${Date.now()}`,
-        },
+        data: { messageId: data.id || `msg-${Date.now()}` },
       };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
