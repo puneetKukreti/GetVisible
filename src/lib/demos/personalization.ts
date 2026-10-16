@@ -6,6 +6,7 @@ import {
   WebsiteTemplate,
 } from '@/types';
 import { THEMES } from './templates';
+import { getProfessionPreset } from './profession-config';
 
 export interface CALayoutDefinition {
   layout: WebsiteLayout;
@@ -540,34 +541,28 @@ export function selectWebsiteDesign(
 ): WebsiteDesign {
   const seedString = `${lead.id || lead.businessName || 'default-lead'}${version > 1 ? `-v${version}` : ''}`;
   const hash = hashLeadIdentifier(seedString);
+  const preset = getProfessionPreset(lead.profession, lead.businessName);
 
-  // Layout selection: 5 modern templates
-  const defaultLayoutKey = LAYOUT_KEYS[hash % LAYOUT_KEYS.length];
-  let chosenLayoutKey: WebsiteLayout =
-    options?.layout && CA_LAYOUTS[options.layout]
-      ? options.layout
-      : defaultLayoutKey;
+  const isCaOrGeneric = preset.isCaPractice || (!lead.profession && preset.category === 'GENERAL_SMB');
 
-  // Auto-route by profession if no explicit layout option is provided
-  if (!options?.layout) {
-    const text = `${lead.profession || ''} ${lead.businessName || ''}`.toLowerCase();
-    if (/clinic|dental|dentist|doctor|medical|health|skin|physio/i.test(text)) {
-      chosenLayoutKey = 'CLINIC_HEALTHCARE';
-    } else if (/interior|architect|design|decor|modular/i.test(text)) {
-      chosenLayoutKey = 'INTERIOR_ARCHITECTURE';
-    } else if (lead.profession && !/chartered|ca firm|audit|tax|gst|accounting|accountant|advisory/i.test(lead.profession)) {
-      const generalSmbLayouts: WebsiteLayout[] = ['MODERN_FINTECH', 'MODERN_INDIAN', 'EDITORIAL_FINANCE'];
-      chosenLayoutKey = generalSmbLayouts[hash % generalSmbLayouts.length];
-    }
+  let chosenLayoutKey: WebsiteLayout;
+
+  if (options?.layout && CA_LAYOUTS[options.layout]) {
+    chosenLayoutKey = options.layout;
+  } else if (isCaOrGeneric) {
+    chosenLayoutKey = LAYOUT_KEYS[hash % LAYOUT_KEYS.length];
+  } else {
+    chosenLayoutKey = preset.defaultLayout;
   }
 
-  const layoutDef = CA_LAYOUTS[chosenLayoutKey];
+  const layoutDef = CA_LAYOUTS[chosenLayoutKey] || CA_LAYOUTS[preset.defaultLayout] || CA_LAYOUTS.MODERN_FINTECH;
 
-  // Theme selection: 4 themes (use shifted hash to decorrelate from layout)
-  const defaultThemeKey = THEME_KEYS[Math.floor(hash / LAYOUT_KEYS.length) % THEME_KEYS.length];
-  const defaultTheme = THEMES[defaultThemeKey] || THEMES.executiveNavy;
-
-  let chosenTheme: WebsiteTheme = defaultTheme;
+  // Theme selection: honor options.themeId, otherwise use preset.defaultTheme or CA hash theme
+  let chosenTheme: WebsiteTheme = preset.defaultTheme;
+  if (isCaOrGeneric) {
+    const defaultThemeKey = THEME_KEYS[Math.floor(hash / LAYOUT_KEYS.length) % THEME_KEYS.length];
+    chosenTheme = THEMES[defaultThemeKey] || THEMES.executiveNavy;
+  }
   if (options?.themeId) {
     const foundTheme = Object.values(THEMES).find((t) => t.id === options.themeId);
     if (foundTheme) {
@@ -575,11 +570,15 @@ export function selectWebsiteDesign(
     }
   }
 
+  const sectionOrder = options?.layout
+    ? [...layoutDef.sectionOrder]
+    : [...(preset.sectionOrder || layoutDef.sectionOrder)];
+
   return {
     layout: chosenLayoutKey,
-    template: layoutDef.template || (chosenLayoutKey as WebsiteTemplate),
+    template: layoutDef.template || preset.defaultTemplate || (chosenLayoutKey as WebsiteTemplate),
     theme: chosenTheme,
-    sectionOrder: [...layoutDef.sectionOrder],
+    sectionOrder,
     heroLayout: layoutDef.heroLayout,
     servicesLayout: layoutDef.servicesLayout,
     features: layoutDef.features,

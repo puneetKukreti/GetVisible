@@ -27,7 +27,7 @@ export function IndustriesSection({ industries, theme }: IndustriesSectionProps)
               {industries.sectionTitle}
             </h2>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Tailoring statutory compliance and advisory frameworks to specialized sector demands.
+              Tailoring specialized solutions and quality execution to diverse client and sector demands.
             </p>
           </div>
 

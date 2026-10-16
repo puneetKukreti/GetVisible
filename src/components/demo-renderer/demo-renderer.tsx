@@ -24,6 +24,7 @@ import { isStitchLayout } from '@/lib/demos/stitch-personalizer';
 import { StitchDemoView } from './stitch-demo-view';
 import { GallerySection } from './gallery-section';
 import { MenuPricingSection } from './menu-pricing-section';
+import { getProfessionPreset } from '@/lib/demos/profession-config';
 
 interface DemoRendererProps {
   content: WebsiteContent;
@@ -83,18 +84,11 @@ export function DemoRenderer({
   const activeTheme: WebsiteTheme =
     typeof rawTheme === 'string' ? JSON.parse(rawTheme) : rawTheme;
 
-  const rawLayout = activeDesign?.layout || safeContent.meta?.templateId || 'design-1-premium';
+  const preset = getProfessionPreset(safeContent.meta?.profession, safeContent.brand?.businessName);
+  const rawLayout = activeDesign?.layout || safeContent.meta?.templateId || preset.defaultLayout;
 
-  // Check if this business is specifically a Chartered Accountant / Tax Practice requesting a static Stitch template
-  const isCaOrAccounting = /chartered accountant|ca firm|tax advisory|auditor|accounting practice/i.test(
-    `${safeContent.meta?.profession || ''} ${safeContent.brand?.businessName || ''}`
-  );
-  const isAiSynthesized =
-    safeContent.hero?.provenance === 'AI_SYNTHESIZED' ||
-    safeContent.brand?.provenance === 'AI_SYNTHESIZED';
-
-  // Render high-end Stitch template for any layout matching Google Stitch designs
-  if (isStitchLayout(rawLayout)) {
+  // Render high-end Stitch template ONLY for verified CA practices explicitly requesting static Stitch designs
+  if (preset.isCaPractice && (rawLayout === 'design-1-premium' || rawLayout === 'design-2-minimalist' || rawLayout === 'design-3-contemporary')) {
     return (
       <StitchDemoView
         demoId={demoId}
@@ -106,21 +100,23 @@ export function DemoRenderer({
       />
     );
   }
+
   const safeTheme: WebsiteTheme = {
-    id: activeTheme?.id || 'executive-navy',
-    name: activeTheme?.name || 'Executive Navy',
-    primaryColor: activeTheme?.primaryColor || '#1e3a8a',
-    secondaryColor: activeTheme?.secondaryColor || '#1e293b',
-    accentColor: activeTheme?.accentColor || '#2563eb',
-    fontFamily: activeTheme?.fontFamily || 'sans',
-    style: activeTheme?.style || 'corporate',
-    borderRadius: activeTheme?.borderRadius || 'md',
+    id: activeTheme?.id || preset.defaultTheme.id || 'executive-navy',
+    name: activeTheme?.name || preset.defaultTheme.name || 'Executive Navy',
+    primaryColor: activeTheme?.primaryColor || preset.defaultTheme.primaryColor || '#1e3a8a',
+    secondaryColor: activeTheme?.secondaryColor || preset.defaultTheme.secondaryColor || '#1e293b',
+    accentColor: activeTheme?.accentColor || preset.defaultTheme.accentColor || '#2563eb',
+    fontFamily: activeTheme?.fontFamily || preset.defaultTheme.fontFamily || 'sans',
+    style: activeTheme?.style || preset.defaultTheme.style || 'corporate',
+    borderRadius: activeTheme?.borderRadius || preset.defaultTheme.borderRadius || 'md',
   };
 
   const activeTemplate: WebsiteTemplate =
     activeDesign?.template ||
     TEMPLATE_MAP[rawLayout] ||
     (TEMPLATE_MAP[activeDesign?.layout || ''] as WebsiteTemplate) ||
+    preset.defaultTemplate ||
     'MODERN_INDIAN';
 
   const layout: WebsiteLayout = activeTemplate;
@@ -128,23 +124,43 @@ export function DemoRenderer({
   const rawOrder = activeDesign?.sectionOrder;
   const sectionOrder: WebsiteSectionType[] =
     Array.isArray(rawOrder) && rawOrder.length > 0
-      ? rawOrder
-      : DEFAULT_SECTION_ORDER;
+      ? [...rawOrder]
+      : [...(preset.sectionOrder || DEFAULT_SECTION_ORDER)];
+
+  // If safeContent has gallery and sectionOrder doesn't include it, insert before CONTACT or at end
+  if (safeContent.gallery && !sectionOrder.includes('GALLERY')) {
+    const contactIdx = sectionOrder.indexOf('CONTACT');
+    if (contactIdx !== -1) {
+      sectionOrder.splice(contactIdx, 0, 'GALLERY');
+    } else {
+      sectionOrder.push('GALLERY');
+    }
+  }
+
+  // If safeContent has menu and sectionOrder doesn't include it, insert after SERVICES or at index 2
+  if (safeContent.menu && !sectionOrder.includes('MENU')) {
+    const srvIdx = sectionOrder.indexOf('SERVICES');
+    if (srvIdx !== -1) {
+      sectionOrder.splice(srvIdx + 1, 0, 'MENU');
+    } else {
+      sectionOrder.splice(2, 0, 'MENU');
+    }
+  }
 
   const brandData = safeContent.brand || {
-    businessName: 'Chartered Accountants',
-    tagline: 'Professional Chartered Accountancy & Tax Advisory',
+    businessName: safeContent.meta?.title?.split('|')[0]?.trim() || 'Professional Practice',
+    tagline: safeContent.hero?.headline || `${safeContent.meta?.profession || 'Professional'} Practice`,
     provenance: 'NEUTRAL_PLACEHOLDER' as const,
   };
 
   const navigationData = safeContent.navigation || {
-    items: [
+    items: preset.navItems || [
       { label: 'Home', href: '#hero' },
       { label: 'Services', href: '#services' },
       { label: 'About', href: '#about' },
       { label: 'Contact', href: '#contact' },
     ],
-    ctaText: 'Schedule Consultation',
+    ctaText: preset.ctaText || 'Schedule Consultation',
     ctaHref: '#contact',
   };
 

@@ -17,6 +17,8 @@ export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH',
   const firmName = brand?.businessName || '';
   const heading = getAboutHeading(firmName, template, about.title);
   const category = categorizeFirmName(firmName);
+  const aboutUrl = (typeof about?.imageUrl === 'string' && about.imageUrl) || (typeof images?.aboutImage === 'string' ? images.aboutImage : images?.aboutImage?.url);
+  const aboutAlt = (typeof images?.aboutImage === 'object' && images?.aboutImage?.alt) || firmName;
 
   // 1. Template 1: Editorial Finance — Asymmetric Editorial Storytelling
   if (template === 'EDITORIAL_FINANCE') {
@@ -47,6 +49,22 @@ export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH',
                 {about.body}
               </p>
 
+              {aboutUrl && (
+                <div className="pt-2">
+                  <div className="relative rounded-xl overflow-hidden shadow-md aspect-[16/9] border border-slate-200/80 dark:border-slate-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={aboutUrl}
+                      alt={aboutAlt}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="pt-8 grid grid-cols-1 sm:grid-cols-2 gap-6 border-t border-slate-100 dark:border-slate-800">
                 {about.highlights.map((item, idx) => (
                   <div key={idx} className="space-y-1">
@@ -72,7 +90,7 @@ export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH',
       <section id="about" className="py-20 sm:py-28 bg-slate-950 text-white border-b border-slate-800">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 text-center space-y-6 sm:space-y-8">
           <span className="text-[11px] font-mono tracking-[0.3em] uppercase text-slate-400">
-            PRACTICE HERITAGE
+            OUR HERITAGE & APPROACH
           </span>
           <h2 className={`${
             category === 'VERY_LONG'
@@ -92,6 +110,22 @@ export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH',
           <p className="text-sm font-sans text-slate-400 max-w-2xl mx-auto leading-relaxed">
             {about.body}
           </p>
+
+          {aboutUrl && (
+            <div className="pt-4 max-w-2xl mx-auto">
+              <div className="relative rounded-xl overflow-hidden shadow-2xl aspect-[16/9] border border-slate-800">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={aboutUrl}
+                  alt={aboutAlt}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="pt-10 sm:pt-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 border-t border-slate-800">
             {about.highlights.map((item, idx) => (
@@ -161,7 +195,7 @@ export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH',
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-start">
           <div className="lg:col-span-6 space-y-5 sm:space-y-6">
             <div className="inline-block rounded px-2.5 py-1 text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-100 dark:bg-slate-800">
-              About The Practice
+              About Us
             </div>
             <h2 className={`${
               category === 'VERY_LONG'
@@ -180,26 +214,21 @@ export function AboutSection({ about, brand, theme, template = 'MODERN_FINTECH',
             <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 leading-relaxed">
               {about.body}
             </p>
-            {(() => {
-              const aboutUrl = typeof images?.aboutImage === 'string' ? images.aboutImage : images?.aboutImage?.url;
-              const aboutAlt = (typeof images?.aboutImage === 'object' && images?.aboutImage?.alt) || firmName;
-              if (!aboutUrl) return null;
-              return (
-                <div className="pt-2">
-                  <div className="relative rounded-xl overflow-hidden shadow-md aspect-[16/9] border border-slate-200/80 dark:border-slate-800">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={aboutUrl}
-                      alt={aboutAlt}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
+            {aboutUrl && (
+              <div className="pt-2">
+                <div className="relative rounded-xl overflow-hidden shadow-md aspect-[16/9] border border-slate-200/80 dark:border-slate-800">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={aboutUrl}
+                    alt={aboutAlt}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
                 </div>
-              );
-            })()}
+              </div>
+            )}
           </div>
 
           <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">

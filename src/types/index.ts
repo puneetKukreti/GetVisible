@@ -315,6 +315,7 @@ export interface WebsiteContent {
     primaryCta: { label: string; href: string };
     secondaryCta: { label: string; href: string };
     provenance: ContentProvenance;
+    imageUrl?: string;
   };
   about: {
     title: string;
@@ -322,6 +323,7 @@ export interface WebsiteContent {
     body: string;
     highlights: { title: string; description: string }[];
     provenance: ContentProvenance;
+    imageUrl?: string;
   };
   services: {
     sectionTitle: string;

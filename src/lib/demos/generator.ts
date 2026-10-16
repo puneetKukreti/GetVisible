@@ -8,6 +8,7 @@ import { generateAiBusinessContent, getDeterministicProfessionProfile, getGemini
 import { classifyProfession } from './profession-engine';
 import { buildWebsiteImagesObject } from './image-engine';
 import { getIndustryImages } from './industry-images';
+import { getProfessionPreset } from './profession-config';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -217,20 +218,26 @@ export class WebsiteDemoGeneratorService {
       }
     }
 
-    // Contextual imagery injection from Industry & Image Engines
+    // Contextual imagery injection from Industry & Image Engines and Profession Presets
     const industryImgs = getIndustryImages(lead.profession, lead.businessName);
+    const preset = getProfessionPreset(lead.profession, lead.businessName);
     const imageSet = buildWebsiteImagesObject(lead.profession, lead.businessName);
-    if (industryImgs.heroImage) {
+    const heroImgUrl = industryImgs.heroImage || preset.heroImage || imageSet.heroImage?.url;
+    const aboutImgUrl = industryImgs.aboutImage || preset.aboutImage || imageSet.aboutImage?.url;
+
+    if (heroImgUrl) {
+      content.hero.imageUrl = heroImgUrl;
       imageSet.heroImage = {
-        url: industryImgs.heroImage,
+        url: heroImgUrl,
         alt: `${lead.businessName} - ${lead.profession}`,
         slot: 'HERO' as const,
         aspectRatio: '16:9',
       };
     }
-    if (industryImgs.aboutImage) {
+    if (aboutImgUrl) {
+      content.about.imageUrl = aboutImgUrl;
       imageSet.aboutImage = {
-        url: industryImgs.aboutImage,
+        url: aboutImgUrl,
         alt: `About ${lead.businessName}`,
         slot: 'ABOUT' as const,
         aspectRatio: '4:5',
@@ -257,29 +264,46 @@ export class WebsiteDemoGeneratorService {
       ['INTERIOR_DESIGNER', 'SALON_SPA', 'GYM_FITNESS', 'PHOTOGRAPHER_EVENT', 'RESTAURANT_CAFE'].includes(
         professionProfile.id
       ) ||
+      preset.galleryImages.length > 0 ||
       /interior|architect|decor|salon|spa|gym|fitness|photo|studio|wedding|bakery|cafe/i.test(
         `${lead.profession} ${lead.businessName}`
       );
 
-    if (isVisualProfession && !content.gallery && imageSet.gallery && imageSet.gallery.length > 0) {
-      content.gallery = {
-        sectionTitle: 'Portfolio & Work Gallery',
-        sectionSubtitle: `Explore our signature projects and craftsmanship across ${lead.city}`,
-        items: imageSet.gallery.map((g, idx) => ({
-          id: `gal-${idx + 1}`,
-          title: `${lead.businessName} Showcase ${idx + 1}`,
-          category: lead.profession,
-          imageUrl: g.url,
-          url: g.url,
-          description: `Signature delivery and professional execution in ${lead.city}`,
-        })),
-      };
-      if (!design.sectionOrder.includes('GALLERY')) {
-        const contactIdx = design.sectionOrder.indexOf('CONTACT');
-        if (contactIdx !== -1) {
-          design.sectionOrder.splice(contactIdx, 0, 'GALLERY');
-        } else {
-          design.sectionOrder.push('GALLERY');
+    if (isVisualProfession && !content.gallery) {
+      const galleryItems =
+        preset.galleryImages && preset.galleryImages.length > 0
+          ? preset.galleryImages.map((g, idx) => ({
+              id: `gal-${idx + 1}`,
+              title: g.caption || `${lead.businessName} Showcase ${idx + 1}`,
+              category: g.category || lead.profession,
+              imageUrl: g.url,
+              url: g.url,
+              description: g.caption || `Signature delivery and professional execution in ${lead.city}`,
+            }))
+          : imageSet.gallery && imageSet.gallery.length > 0
+          ? imageSet.gallery.map((g, idx) => ({
+              id: `gal-${idx + 1}`,
+              title: `${lead.businessName} Showcase ${idx + 1}`,
+              category: lead.profession,
+              imageUrl: g.url,
+              url: g.url,
+              description: `Signature delivery and professional execution in ${lead.city}`,
+            }))
+          : null;
+
+      if (galleryItems && galleryItems.length > 0) {
+        content.gallery = {
+          sectionTitle: 'Portfolio & Work Gallery',
+          sectionSubtitle: `Explore our signature projects and craftsmanship across ${lead.city}`,
+          items: galleryItems,
+        };
+        if (!design.sectionOrder.includes('GALLERY')) {
+          const contactIdx = design.sectionOrder.indexOf('CONTACT');
+          if (contactIdx !== -1) {
+            design.sectionOrder.splice(contactIdx, 0, 'GALLERY');
+          } else {
+            design.sectionOrder.push('GALLERY');
+          }
         }
       }
     }

@@ -13,7 +13,7 @@ interface HeaderProps {
 }
 
 export function TemplateHeader({ brand, navigation, theme, template = 'MODERN_FINTECH' }: HeaderProps) {
-  const firmName = brand?.businessName || 'Chartered Accountants';
+  const firmName = brand?.businessName || 'Professional Practice';
   const typo = getHeaderTypographyConfig(firmName, template);
   const split = splitFirmName(firmName);
 

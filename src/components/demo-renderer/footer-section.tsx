@@ -13,7 +13,7 @@ interface FooterSectionProps {
 }
 
 export function FooterSection({ footer, brand, navigation, theme }: FooterSectionProps) {
-  const firmName = brand?.businessName || 'Chartered Accountants';
+  const firmName = brand?.businessName || 'Professional Practice';
   const category = categorizeFirmName(firmName);
   const split = splitFirmName(firmName);
 

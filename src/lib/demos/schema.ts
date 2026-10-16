@@ -219,6 +219,7 @@ export const WebsiteContentSchema = z.object({
       href: safeUrlSchema,
     }),
     provenance: ContentProvenanceSchema,
+    imageUrl: safeUrlSchema.optional(),
   }),
   about: z.object({
     title: z.string().min(2).max(100),
@@ -231,6 +232,7 @@ export const WebsiteContentSchema = z.object({
       })
     ),
     provenance: ContentProvenanceSchema,
+    imageUrl: safeUrlSchema.optional(),
   }),
   services: z.object({
     sectionTitle: z.string().min(2).max(80),
