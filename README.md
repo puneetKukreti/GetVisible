@@ -124,6 +124,32 @@ Public demo links are per-prospect and time-limited:
 - Pruning deletes only the demo row. The underlying lead record is never deleted, so
   the pipeline history is preserved.
 
+### Default WhatsApp message
+
+Step-1 outreach uses the copy below. WhatsApp bold is `*text*`. The greeting uses the
+prospect's contact name when one is on record (`Sachin ji`), otherwise the business name.
+
+```text
+Namaste *{name}* 👋
+
+I was looking for your practice online and couldn't find an official website, so I created a *custom website demo for {name}* to show how your practice could look online.
+
+🖼️ *(preview image attached above 👆)*
+
+🌐 *View your demo:*
+https://get-visible-web.vercel.app/demo/{token}
+
+It's a concept made specifically for your practice, not a generic template.
+
+To help *{name}* build that instant digital trust, would you like to see how this could work for your firm? Just reply *"YES"* and I'll explain the next steps.
+
+— Puneet | GetVisible
+```
+
+Implemented in `src/lib/sales/outreach.ts` (`generateDeterministicOutreach`) and
+mirrored client-side for the campaigns workspace in
+`src/app/(dashboard)/campaigns/page.tsx` (`getMeaningfulWhatsAppMessage`).
+
 ### 5. Running the Application
 ```bash
 npm run dev
