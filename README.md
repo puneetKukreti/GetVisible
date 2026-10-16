@@ -150,6 +150,24 @@ Implemented in `src/lib/sales/outreach.ts` (`generateDeterministicOutreach`) and
 mirrored client-side for the campaigns workspace in
 `src/app/(dashboard)/campaigns/page.tsx` (`getMeaningfulWhatsAppMessage`).
 
+### Demo preview screenshot
+
+The screenshot attached to WhatsApp/email must always show the **prospect's own name**,
+never a shared sample. `GET /api/demos/[id]/screenshot?format=image` therefore:
+
+- returns a real headless-browser capture of the personalized page when a local Chrome is
+  available (local dev / VPS), and
+- otherwise returns a self-contained, website-styled **SVG concept card** that leads with
+  the prospect's name, city, profession and a browser frame. The campaigns workspace
+  rasterizes it to PNG in the browser for the clipboard ("Copy Image") and the preview.
+
+Email clients cannot render SVG, so `POST /api/outreach/send-email` resolves the inline
+image to the bundled raster template art for the prospect's chosen layout (with a live
+screenshot service as a last resort). The bundled `public/demo-templates/<id>/hero.png`
+files are neutral template thumbnails only — they intentionally contain a generic sample
+business, not any real prospect. See `src/lib/providers/screenshot.provider.ts`
+(`generateHeroMockupSvg`) and `src/app/api/demos/[id]/screenshot/route.ts`.
+
 ### 5. Running the Application
 ```bash
 npm run dev

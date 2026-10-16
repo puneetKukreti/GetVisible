@@ -112,27 +112,23 @@ export function generateHeroMockupSvg(
   headline?: string,
   subheadline?: string
 ): string {
-  const escapedBrand = (brandName || 'Chartered Accountants')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-  const escapedCity = (city || 'Gurgaon')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
-  const escapedProf = (profession || 'Chartered Accountants')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  const escapeXml = (value: string) =>
+    (value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
 
-  // Compute 2-letter initials from business brand name
-  const cleanParts = (brandName || '')
+  const brand = brandName || 'Chartered Accountants';
+  const cityName = city || 'Gurgaon';
+  const profName = profession || 'Chartered Accountants';
+
+  const escapedBrand = escapeXml(brand);
+  const escapedCity = escapeXml(cityName);
+
+  // Compute 2-letter initials from business brand name.
+  const cleanParts = brand
     .trim()
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .split(/\s+/)
@@ -142,78 +138,157 @@ export function generateHeroMockupSvg(
       ? (cleanParts[0][0] + cleanParts[1][0]).toUpperCase()
       : cleanParts[0]?.slice(0, 2).toUpperCase() || 'GV';
 
-  const escapedHeadline = (headline || `${escapedProf} Excellence &amp; Advisory`)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+  // Greedy word-wrap so long headlines never collide with the hero artwork.
+  const wrapText = (text: string, maxChars: number, maxLines: number): string[] => {
+    const words = (text || '').trim().split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (current && candidate.length > maxChars) {
+        lines.push(current);
+        current = word;
+        if (lines.length === maxLines) break;
+      } else {
+        current = candidate;
+      }
+    }
+    if (lines.length < maxLines && current) lines.push(current);
+    return lines.slice(0, maxLines);
+  };
 
-  const escapedSubheadline = (
+  const rawHeadline = headline || `${profName} Excellence & Advisory`;
+  const rawSubheadline =
     subheadline ||
-    `Dedicated ${escapedProf.toLowerCase()} services, trusted expertise &amp; comprehensive advisory in ${escapedCity}.`
-  )
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    `Dedicated ${profName.toLowerCase()} services, trusted expertise and comprehensive advisory in ${cityName}.`;
+
+  const headlineLines = wrapText(rawHeadline, 44, 2);
+  const subheadlineLines = wrapText(rawSubheadline, 68, 2);
+
+  // URL slug shown in the browser chrome.
+  const slug =
+    brand.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') ||
+    'your-brand';
+
+  // Keep the hero name dominant, but scale it down for long business names.
+  const brandLength = brand.trim().length;
+  const heroNameSize = brandLength <= 14 ? 62 : brandLength <= 20 ? 54 : brandLength <= 28 ? 46 : 38;
+
+  const HERO_LEFT = 70;
+  const HERO_TEXT_MAX = 548;
+
+  // Constrain glyphs to the text column so even very long names never spill
+  // into the hero artwork on the right.
+  const nameEstimatedWidth = escapedBrand.length * heroNameSize * 0.56;
+  const nameFitAttr =
+    nameEstimatedWidth > HERO_TEXT_MAX
+      ? ` textLength="${HERO_TEXT_MAX}" lengthAdjust="spacingAndGlyphs"`
+      : '';
+
+  const badgeWidth = Math.min(
+    560,
+    Math.max(220, escapedBrand.length * 8 + escapedCity.length * 7 + 120)
+  );
+
+  const headlineStartY = 326;
+  const headlineSvg = headlineLines
+    .map(
+      (line, i) =>
+        `    <text x="${HERO_LEFT}" y="${headlineStartY + i * 32}" font-family="Georgia, 'Times New Roman', serif" font-size="22" fill="#e2e8f0">${escapeXml(line)}</text>`
+    )
+    .join('\n');
+
+  const subheadlineStartY = headlineStartY + headlineLines.length * 32 + 12;
+  const subheadlineSvg = subheadlineLines
+    .map(
+      (line, i) =>
+        `    <text x="${HERO_LEFT}" y="${subheadlineStartY + i * 22}" font-family="system-ui, -apple-system, sans-serif" font-size="15" fill="#94a3b8">${escapeXml(line)}</text>`
+    )
+    .join('\n');
+
+  const ctaY = subheadlineStartY + subheadlineLines.length * 22 + 18;
+  const trustY = ctaY + 48 + 40;
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 640" width="1024" height="640">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00152a"/>
-      <stop offset="50%" stop-color="#08213d"/>
-      <stop offset="100%" stop-color="#0c2d52"/>
+    <linearGradient id="pageBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#eef2f7"/>
+      <stop offset="100%" stop-color="#d9e2ee"/>
     </linearGradient>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+    <linearGradient id="heroBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a1f3c"/>
+      <stop offset="55%" stop-color="#0e2c50"/>
+      <stop offset="100%" stop-color="#15406e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
       <stop offset="0%" stop-color="#fde047"/>
       <stop offset="100%" stop-color="#d4af37"/>
     </linearGradient>
+    <clipPath id="windowClip"><rect x="32" y="28" width="960" height="584" rx="18"/></clipPath>
   </defs>
-  <rect width="1024" height="640" fill="url(#bg)"/>
-  <g stroke="#ffffff" stroke-opacity="0.05" stroke-width="1">
-    <line x1="0" y1="80" x2="1024" y2="80"/>
-    <line x1="0" y1="160" x2="1024" y2="160"/>
-    <line x1="0" y1="240" x2="1024" y2="240"/>
-    <line x1="0" y1="320" x2="1024" y2="320"/>
-    <line x1="0" y1="400" x2="1024" y2="400"/>
-    <line x1="0" y1="480" x2="1024" y2="480"/>
+
+  <rect width="1024" height="640" fill="url(#pageBg)"/>
+
+  <!-- Browser window -->
+  <rect x="32" y="28" width="960" height="584" rx="18" fill="#ffffff" stroke="#c3cede" stroke-width="1.5"/>
+
+  <!-- Title bar -->
+  <g clip-path="url(#windowClip)"><rect x="32" y="28" width="960" height="46" fill="#f1f5f9"/></g>
+  <line x1="32" y1="74" x2="992" y2="74" stroke="#e2e8f0" stroke-width="1"/>
+  <circle cx="58" cy="51" r="6" fill="#f87171"/>
+  <circle cx="78" cy="51" r="6" fill="#fbbf24"/>
+  <circle cx="98" cy="51" r="6" fill="#34d399"/>
+  <rect x="126" y="40" width="540" height="22" rx="11" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="146" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#64748b">https://${slug}.com</text>
+
+  <!-- Navbar -->
+  <rect x="52" y="92" width="34" height="34" rx="9" fill="#0a1f3c"/>
+  <text x="69" y="115" font-family="Georgia, 'Times New Roman', serif" font-size="15" font-weight="bold" fill="#d4af37" text-anchor="middle">${initials}</text>
+  <text x="96" y="116" font-family="Georgia, 'Times New Roman', serif" font-size="19" font-weight="bold" fill="#0f172a">${escapedBrand}</text>
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="12.5" font-weight="500" fill="#64748b">
+    <text x="596" y="114">Services</text>
+    <text x="660" y="114">About</text>
+    <text x="712" y="114">Process</text>
+    <text x="772" y="114">Contact</text>
   </g>
-  <rect width="1024" height="74" fill="#001122" fill-opacity="0.95"/>
-  <line x1="0" y1="74" x2="1024" y2="74" stroke="#ffffff" stroke-opacity="0.1" stroke-width="1"/>
-  <circle cx="56" cy="37" r="16" fill="#fde047" fill-opacity="0.15" stroke="#fde047" stroke-width="1.5"/>
-  <text x="56" y="42" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="bold" fill="#fde047" text-anchor="middle">${initials}</text>
-  <text x="86" y="38" font-family="Georgia, serif" font-size="16" font-weight="bold" fill="#ffffff">${escapedBrand}</text>
-  <text x="86" y="52" font-family="system-ui, sans-serif" font-size="10" letter-spacing="1.5" fill="#a0aec0">${escapedProf.toUpperCase()}</text>
-  <g font-family="system-ui, sans-serif" font-size="13" font-weight="500" fill="#cbd5e1">
-    <text x="640" y="42">Home</text>
-    <text x="710" y="42">Services</text>
-    <text x="795" y="42">About</text>
-    <text x="865" y="42">Contact</text>
-  </g>
-  <rect x="70" y="140" width="380" height="34" rx="17" fill="#fde047" fill-opacity="0.15" stroke="#fde047" stroke-opacity="0.4" stroke-width="1.5"/>
-  <text x="90" y="162" font-family="system-ui, sans-serif" font-size="12" font-weight="700" fill="#fde047" letter-spacing="0.5">✦ ${escapedBrand} • ${escapedCity.toUpperCase()}</text>
-  <text x="70" y="235" font-family="Georgia, serif" font-size="44" font-weight="bold" fill="#ffffff">${escapedBrand}</text>
-  <text x="70" y="285" font-family="Georgia, serif" font-size="28" font-weight="normal" fill="#e2e8f0">${escapedHeadline}</text>
-  <text x="70" y="325" font-family="system-ui, sans-serif" font-size="17" fill="#94a3b8">${escapedSubheadline}</text>
-  <rect x="70" y="385" width="220" height="48" rx="8" fill="url(#gold)"/>
-  <text x="180" y="415" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#00152a" text-anchor="middle">Schedule Consultation →</text>
-  <rect x="310" y="385" width="180" height="48" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
-  <text x="400" y="415" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">Explore Practice</text>
-  <g font-family="system-ui, sans-serif" font-size="12" font-weight="600" fill="#cbd5e1">
-    <text x="70" y="490">✓ Verified Practice</text>
-    <text x="250" y="490">✓ Direct Consultation</text>
-    <text x="430" y="490">✓ ${escapedCity} Office</text>
-  </g>
-  <g transform="translate(640, 160)">
-    <rect width="310" height="360" rx="16" fill="#001a33" stroke="#fde047" stroke-opacity="0.25" stroke-width="1.5"/>
-    <circle cx="155" cy="150" r="85" fill="none" stroke="#fde047" stroke-opacity="0.2" stroke-width="2"/>
-    <circle cx="155" cy="150" r="55" fill="none" stroke="#60a5fa" stroke-opacity="0.3" stroke-width="2"/>
-    <rect x="40" y="270" width="230" height="18" rx="4" fill="#ffffff" fill-opacity="0.15"/>
-    <rect x="40" y="300" width="160" height="14" rx="4" fill="#fde047" fill-opacity="0.4"/>
+  <rect x="866" y="94" width="110" height="30" rx="8" fill="#0a1f3c"/>
+  <text x="921" y="114" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="700" fill="#ffffff" text-anchor="middle">Get a Demo</text>
+
+  <!-- Hero -->
+  <g clip-path="url(#windowClip)">
+    <rect x="32" y="140" width="960" height="472" fill="url(#heroBg)"/>
+
+    <g transform="translate(648,176)">
+      <rect width="296" height="380" rx="16" fill="#001a33" stroke="#fde047" stroke-opacity="0.25" stroke-width="1.5"/>
+      <circle cx="148" cy="140" r="86" fill="none" stroke="#fde047" stroke-opacity="0.18" stroke-width="2"/>
+      <circle cx="148" cy="140" r="56" fill="none" stroke="#60a5fa" stroke-opacity="0.28" stroke-width="2"/>
+      <text x="148" y="152" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="bold" fill="#fde047" text-anchor="middle">${initials}</text>
+      <rect x="44" y="266" width="208" height="18" rx="4" fill="#ffffff" fill-opacity="0.14"/>
+      <rect x="44" y="296" width="150" height="14" rx="4" fill="#fde047" fill-opacity="0.38"/>
+      <rect x="44" y="322" width="180" height="14" rx="4" fill="#ffffff" fill-opacity="0.1"/>
+    </g>
+
+    <rect x="72" y="178" width="${badgeWidth}" height="34" rx="17" fill="#fde047" fill-opacity="0.14" stroke="#fde047" stroke-opacity="0.4" stroke-width="1.5"/>
+    <text x="92" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="12.5" font-weight="700" fill="#fde047" letter-spacing="0.5">&#10022; ${escapedBrand} &#8226; ${escapedCity.toUpperCase()}</text>
+
+    <!-- The prospect's name is the dominant element so they instantly see it is theirs. -->
+    <text x="${HERO_LEFT}" y="282" font-family="Georgia, 'Times New Roman', serif" font-size="${heroNameSize}" font-weight="bold" fill="#ffffff"${nameFitAttr}>${escapedBrand}</text>
+${headlineSvg}
+${subheadlineSvg}
+
+    <rect x="70" y="${ctaY}" width="224" height="48" rx="8" fill="url(#gold)"/>
+    <text x="182" y="${ctaY + 30}" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="700" fill="#0a1f3c" text-anchor="middle">Schedule Consultation &#8594;</text>
+    <rect x="306" y="${ctaY}" width="184" height="48" rx="8" fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="1.5"/>
+    <text x="398" y="${ctaY + 30}" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">Explore Practice</text>
+
+    <g font-family="system-ui, -apple-system, sans-serif" font-size="12.5" font-weight="600" fill="#cbd5e1">
+      <text x="70" y="${trustY}">&#10003; Verified Practice</text>
+      <text x="252" y="${trustY}">&#10003; Direct Consultation</text>
+      <text x="434" y="${trustY}">&#10003; ${escapedCity} Office</text>
+    </g>
   </g>
 </svg>`;
+
 }
 
 export interface IScreenshotProvider {

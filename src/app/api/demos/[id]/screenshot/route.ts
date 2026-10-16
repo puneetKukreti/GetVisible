@@ -168,15 +168,38 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
     const hasLocalBrowser = Boolean(findSystemBrowser());
 
+    if (!hasLocalBrowser && isImageFormat) {
+      // No headless browser on this host (e.g. Vercel serverless), so the static
+      // template art cannot be personalized per prospect. Return a self-contained
+      // SVG that leads with the prospect's name instead — the client rasterizes it
+      // to PNG for WhatsApp/email attachment.
+      const svg = generateHeroMockupSvg(
+        brandName,
+        city,
+        profession,
+        content?.hero?.headline,
+        content?.hero?.subheadline
+      );
+
+      return new NextResponse(svg, {
+        headers: {
+          'Content-Type': 'image/svg+xml; charset=utf-8',
+          'Cache-Control': 'public, max-age=3600',
+          'Access-Control-Allow-Origin': '*',
+          'Content-Disposition': 'inline; filename="website_concept.svg"',
+        },
+      });
+    }
+
     if (!hasLocalBrowser && templatePreviewPath.endsWith('.png')) {
-      if (isImageFormat) {
-        return NextResponse.redirect(new URL(templatePreviewPath, request.url));
-      }
+      // The bundled template art is a neutral placeholder, so point clients at the
+      // personalized preview route (which renders the prospect's own name) rather
+      // than a static image that shows someone else's business.
       return NextResponse.json({
         success: true,
-        screenshotUrl: templatePreviewPath,
-        cached: true,
-        source: 'stitch_template',
+        screenshotUrl: dynamicImageUrl,
+        cached: false,
+        source: 'personalized_preview',
       });
     }
 

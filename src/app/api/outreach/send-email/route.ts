@@ -69,14 +69,34 @@ export async function POST(request: NextRequest) {
       emailBody = `${emailBody}\n\nPreview the concept: ${demoUrl}`.trim();
     }
 
-    const absoluteScreenshot =
-      typeof screenshotUrl === 'string' && screenshotUrl.trim().length > 0
-        ? screenshotUrl.startsWith('http')
-          ? screenshotUrl
-          : new URL(screenshotUrl, origin).toString()
-        : `${origin}/api/demos/${encodeURIComponent(lead.id)}/screenshot?format=image&name=${encodeURIComponent(
-            lead.businessName || ''
-          )}&city=${encodeURIComponent(lead.city || '')}&profession=${encodeURIComponent(lead.profession || '')}`;
+    // Resolve the inline preview image. The personalized screenshot route returns
+    // an SVG when no headless browser is available, and email clients cannot render
+    // SVG, so prefer the bundled raster template art (matching the prospect's
+    // chosen layout) in that case.
+    const personalizedRouteUrl = `${origin}/api/demos/${encodeURIComponent(lead.id)}/screenshot`;
+    const isPersonalizedRoute = (u: string) =>
+      u.startsWith('/api/demos/') || u.startsWith(personalizedRouteUrl);
+
+    let absoluteScreenshot: string;
+    if (
+      typeof screenshotUrl === 'string' &&
+      screenshotUrl.trim().length > 0 &&
+      !isPersonalizedRoute(screenshotUrl)
+    ) {
+      absoluteScreenshot = screenshotUrl.startsWith('http')
+        ? screenshotUrl
+        : new URL(screenshotUrl, origin).toString();
+    } else if (activeDemo?.screenshotUrl) {
+      absoluteScreenshot = activeDemo.screenshotUrl.startsWith('http')
+        ? activeDemo.screenshotUrl
+        : new URL(activeDemo.screenshotUrl, origin).toString();
+    } else {
+      absoluteScreenshot = `${personalizedRouteUrl}?format=image&name=${encodeURIComponent(
+        lead.businessName || ''
+      )}&city=${encodeURIComponent(lead.city || '')}&profession=${encodeURIComponent(
+        lead.profession || ''
+      )}`;
+    }
 
     // Prioritize Gmail SMTP (sends from authentic govisibleonweb@gmail.com to ANY recipient)
     const gmailProvider = new GmailSmtpProvider();

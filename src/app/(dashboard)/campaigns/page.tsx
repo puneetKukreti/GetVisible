@@ -398,7 +398,9 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       if (data.whatsappMessage) setWhatsappMessage(data.whatsappMessage);
       if (data.whatsappFollowUpWithLink) setWhatsappFollowUpWithLink(data.whatsappFollowUpWithLink);
       if (data.subject) setDraftSubject(data.subject);
-      if (data.screenshotUrl) setScreenshotUrl(data.screenshotUrl);
+      // Keep the preview pointed at the personalized screenshot route: it renders
+      // the prospect's own name (and returns a real capture when a local browser is
+      // available), so we never fall back to the shared template art here.
       if (data.whatsappShareUrl) setWhatsappShareUrl(data.whatsappShareUrl);
       if (data.whatsappFollowUpShareUrl) setWhatsappFollowUpShareUrl(data.whatsappFollowUpShareUrl);
 

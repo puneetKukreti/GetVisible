@@ -53,6 +53,19 @@ describe('Gemini AI Content Generator & Multi-Profession Generalization', () => 
     expect(svgCa).toContain('Sharma &amp; Associates');
   });
 
+  it('renders the prospect name as the dominant element of a website-style preview', () => {
+    const svg = generateHeroMockupSvg('Sachin Narang', 'Gurgaon', 'Chartered Accountant');
+
+    // The name is the dominant hero element, not a small label.
+    expect(svg).toContain('font-size="62"');
+    expect(svg).toContain('Sachin Narang');
+
+    // Framed as a browser window (URL bar + navbar) so it reads as a website.
+    expect(svg).toContain('https://sachin-narang.com');
+    expect(svg).toContain('windowClip');
+    expect(svg).toContain('Get a Demo');
+  });
+
   it('3. generateDemo integrates AI content and marks provenance as AI_SYNTHESIZED when available', async () => {
     const testLead: LeadData = {
       id: 'lead-dentist-01',

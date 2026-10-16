@@ -50,6 +50,9 @@ async function fetchImageBuffer(url: string): Promise<Buffer | null> {
     const res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
     clearTimeout(timer);
     if (!res.ok) return null;
+    // Email clients cannot embed SVG, so never attach it as an inline image.
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('image/svg')) return null;
     const buffer = Buffer.from(await res.arrayBuffer());
     return buffer.length > 0 ? buffer : null;
   } catch {
