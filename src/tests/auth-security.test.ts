@@ -162,5 +162,64 @@ describe('Solo Owner Password & Middleware Security', () => {
       );
       expect(authedRes.status).toBe(200);
     });
+
+    // Regression: the previous middleware skipped authentication for ANY path
+    // containing a dot (`pathname.includes('.')`). Dotted API paths therefore ran
+    // mutating route handlers unauthenticated, e.g. DELETE /api/demos/<id>.png.
+    describe('Dotted-path bypass regression', () => {
+      it('requires a session for API paths with an asset-like extension', async () => {
+        const demoDelete = await middleware(
+          new NextRequest('http://localhost:3000/api/demos/any-id.png', { method: 'DELETE' })
+        );
+        expect(demoDelete.status).toBe(401);
+
+        const leadPatch = await middleware(
+          new NextRequest('http://localhost:3000/api/leads/any-id.x', { method: 'PATCH' })
+        );
+        expect(leadPatch.status).toBe(401);
+
+        const leadGet = await middleware(
+          new NextRequest('http://localhost:3000/api/leads/any-id.json', { method: 'GET' })
+        );
+        expect(leadGet.status).toBe(401);
+
+        const csvPost = await middleware(
+          new NextRequest('http://localhost:3000/api/discovery/csv-import.csv', { method: 'POST' })
+        );
+        expect(csvPost.status).toBe(401);
+      });
+
+      it('still serves genuine non-API static assets without a session', async () => {
+        for (const asset of [
+          'http://localhost:3000/logo.png',
+          'http://localhost:3000/icon.svg',
+          'http://localhost:3000/robots.txt',
+          'http://localhost:3000/demo-templates/design-1-premium/index.html',
+        ]) {
+          expect((await middleware(new NextRequest(asset))).status).toBe(200);
+        }
+      });
+
+      it('does not extend the dotted GET allowance to nested demo API paths', async () => {
+        // Only the documented public sub-routes stay open; a nested mutation is not
+        // covered by the GET/request-changes allowance.
+        const publishGet = await middleware(
+          new NextRequest('http://localhost:3000/api/demos/any-id/html', { method: 'GET' })
+        );
+        expect(publishGet.status).toBe(200);
+
+        const publishPost = await middleware(
+          new NextRequest('http://localhost:3000/api/demos/any-id/html', { method: 'POST' })
+        );
+        expect(publishPost.status).toBe(401);
+
+        const regeneratePost = await middleware(
+          new NextRequest('http://localhost:3000/api/demos/any-id/regenerate-section', {
+            method: 'POST',
+          })
+        );
+        expect(regeneratePost.status).toBe(401);
+      });
+    });
   });
 });
