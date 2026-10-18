@@ -8,6 +8,17 @@ import { GET as screenshotGET } from '@/app/api/demos/[id]/screenshot/route';
 import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
+import { OWNER_AUTH_COOKIE, createOwnerSessionToken } from '@/lib/session';
+
+/**
+ * These API handlers now enforce the owner session themselves (defence in depth
+ * behind the edge middleware), so direct handler invocations in tests must carry
+ * a valid signed session cookie exactly like the browser does.
+ */
+async function ownerSessionCookie(): Promise<string> {
+  const token = await createOwnerSessionToken();
+  return `${OWNER_AUTH_COOKIE}=${token}`;
+}
 
 describe('Growth & Workflow Upgrades', () => {
   beforeEach(async () => {
@@ -72,6 +83,7 @@ describe('Growth & Workflow Upgrades', () => {
         headers: {
           'Content-Type': 'application/json',
           'x-organization-id': DEMO_ORGANIZATION_ID,
+          cookie: await ownerSessionCookie(),
         },
         body: JSON.stringify({
           csvContent: csvData,
@@ -117,6 +129,7 @@ describe('Growth & Workflow Upgrades', () => {
         method: 'POST',
         headers: {
           'x-organization-id': DEMO_ORGANIZATION_ID,
+          cookie: await ownerSessionCookie(),
         },
       });
 
@@ -153,6 +166,7 @@ describe('Growth & Workflow Upgrades', () => {
         headers: {
           'Content-Type': 'application/json',
           'x-organization-id': DEMO_ORGANIZATION_ID,
+          cookie: await ownerSessionCookie(),
         },
         body: JSON.stringify({
           leadId: testLead.id,

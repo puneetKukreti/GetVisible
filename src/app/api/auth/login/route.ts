@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import {
   createOwnerSessionToken,
   isOwnerAuthConfigured,
@@ -7,6 +8,18 @@ import {
 } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
+
+/**
+ * Constant-time password comparison.
+ *
+ * Both values are hashed first so the comparison neither leaks length nor
+ * short-circuits on the first differing character.
+ */
+function safeCompare(candidate: string, expected: string): boolean {
+  const candidateHash = crypto.createHash('sha256').update(candidate, 'utf8').digest();
+  const expectedHash = crypto.createHash('sha256').update(expected, 'utf8').digest();
+  return crypto.timingSafeEqual(candidateHash, expectedHash);
+}
 
 const MAX_ATTEMPTS = 8;
 const ATTEMPT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
@@ -81,7 +94,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!password || password !== expectedPassword) {
+    if (!password || !safeCompare(password, expectedPassword)) {
       return NextResponse.json(
         { success: false, error: 'Invalid owner password' },
         { status: 401 }

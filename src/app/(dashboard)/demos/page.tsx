@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { WebsiteDemoData, LeadData } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -177,10 +178,12 @@ export default function DemosPage() {
               className="rounded-xl border border-border bg-card overflow-hidden hover:border-amber-500/50 transition-all shadow-sm hover:shadow-md flex flex-col justify-between"
             >
               <div className="relative aspect-[16/9] bg-slate-950 overflow-hidden border-b border-border">
-                <img
+                <Image
                   src={tmpl.thumbnail}
                   alt={tmpl.name}
-                  className="w-full h-full object-cover object-top"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 33vw"
+                  className="object-cover object-top"
                 />
                 <Badge className="absolute top-2 left-2 bg-slate-900/90 text-amber-400 border border-amber-400/30 text-[10px]">
                   {tmpl.badge}

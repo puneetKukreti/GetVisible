@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { LeadStatus } from '@/types';
 
@@ -15,6 +16,9 @@ export async function GET(
   { params }: RouteProps
 ) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
@@ -49,6 +53,9 @@ export async function PATCH(
   { params }: RouteProps
 ) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
@@ -105,6 +112,9 @@ export async function DELETE(
   { params }: RouteProps
 ) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = (await getResolvedOrganizationId(request)) || DEMO_ORGANIZATION_ID;
     const resolvedParams = await Promise.resolve(params);
     const leadId = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';

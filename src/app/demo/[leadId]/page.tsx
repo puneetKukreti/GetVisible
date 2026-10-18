@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
@@ -8,6 +8,7 @@ import { isRealHumanVisit, generatePublicDemoToken } from '@/lib/demos/public';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { getProfessionPreset } from '@/lib/demos/profession-config';
 import { selectWebsiteDesign } from '@/lib/demos/personalization';
+import { OWNER_AUTH_COOKIE, verifyOwnerSessionToken } from '@/lib/session';
 import { DemoViewWrapper } from './demo-view-wrapper';
 import { WebsiteDemoData, LeadData } from '@/types';
 
@@ -89,9 +90,16 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
   } catch {}
 
   // 2. Check if user is reviewing an internal lead in active organization or fallback org
+  //
+  // SECURITY: the internal branch renders the prospect CRM editor (lead data,
+  // regeneration controls). It is only reachable with a valid owner session; an
+  // anonymous visitor hitting /demo/<leadId> gets the same "not found" state as a
+  // bogus token instead of internal pipeline data.
+  const isOwner = await verifyOwnerSessionToken(cookies().get(OWNER_AUTH_COOKIE)?.value);
+
   let initialLead: LeadData | null = null;
   let initialDemos: WebsiteDemoData[] = [];
-  try {
+  if (isOwner) try {
     initialLead = await LeadRepository.getLeadById(tokenOrId, orgId);
     if (!initialLead) {
       initialLead = await LeadRepository.getLeadById(tokenOrId, altOrgId);
@@ -112,7 +120,7 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
             version: 1,
           });
           generated.id = `demo-${initialLead.id}-v1`;
-          generated.publicToken = generatePublicDemoToken();
+          generated.publicToken = generatePublicDemoToken(initialLead.businessName);
           generated.approvalStatus = 'APPROVED';
           const saved = await WebsiteDemoRepository.saveDemo(targetOrg, generated, 'system');
           if (saved) {
@@ -140,7 +148,7 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
               version: 1,
               generationStatus: 'COMPLETED',
               approvalStatus: 'APPROVED',
-              publicToken: generatePublicDemoToken(),
+              publicToken: generatePublicDemoToken(initialLead.businessName),
               viewCount: 0,
               theme: preset.defaultTheme,
               content: {
@@ -165,7 +173,7 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
   } catch {}
 
   // 3. If tokenOrId was a demo ID instead of lead ID, resolve the demo and lead
-  if (!initialLead && !initialPublicDemo) {
+  if (isOwner && !initialLead && !initialPublicDemo) {
     try {
       let demo = await WebsiteDemoRepository.getDemo(orgId, tokenOrId);
       if (!demo) {

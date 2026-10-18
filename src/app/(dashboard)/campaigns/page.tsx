@@ -230,6 +230,23 @@ async function renderUrlToPngBlob(imageUrl: string): Promise<Blob> {
   });
 }
 
+async function renderUrlToPngDataUrl(imageUrl: string): Promise<string | null> {
+  try {
+    const blob = await renderUrlToPngBlob(imageUrl);
+    // The API rejects inline images larger than 4MB, so skip oversized renders
+    // instead of sending a payload that would be dropped anyway.
+    if (blob.size === 0 || blob.size > 3 * 1024 * 1024) return null;
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error('Failed to read rendered preview'));
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 function getMeaningfulWhatsAppMessage(lead: LeadData): {
   message: string;
   demoUrl: string;
@@ -342,6 +359,11 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
     }, 2200);
 
     return () => clearTimeout(timer);
+    // Intentionally keyed on lead identity only. The base copy must be rebuilt
+    // when the panel switches to another lead, but NOT while the operator edits
+    // the draft (channel / whatsappStep changes are handled explicitly in
+    // handleSelectChannel and handleSwitchWhatsappStep).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id, lead.businessName]);
 
   const handleSelectChannel = (ch: OutreachChannel) => {
@@ -564,6 +586,11 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
     setEmailSending(true);
     setDraftError('');
     try {
+      // Embed the same personalized preview card the operator sends on WhatsApp,
+      // so the email recipient sees their own business name instead of neutral
+      // template art (email clients cannot render the SVG the route returns).
+      const inlinePreview = await renderUrlToPngDataUrl(screenshotUrl || getScreenshotImageUrl(lead));
+
       const res = await fetch('/api/outreach/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -572,6 +599,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
           subject: draftSubject || `Website Concept Prepared for ${lead.businessName}`,
           message: emailDraft || draft,
           screenshotUrl,
+          screenshotDataUrl: inlinePreview || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));

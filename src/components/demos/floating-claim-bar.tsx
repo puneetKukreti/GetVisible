@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { MessageCircle, ChevronUp, X } from 'lucide-react';
+import { getOwnerWhatsAppNumber } from '@/lib/owner-whatsapp';
 
 interface FloatingClaimBarProps {
   businessName: string;
@@ -22,13 +23,11 @@ export function FloatingClaimBar({ businessName }: FloatingClaimBarProps) {
 
   if (isScreenshotMode) return null;
 
-  // WhatsApp Link Generation
-  const rawPhone =
-    process.env.NEXT_PUBLIC_PUNEET_WHATSAPP ||
-    process.env.NEXT_PUBLIC_AGENCY_WHATSAPP ||
-    process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ||
-    '919811122233';
-  const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+  // No owner WhatsApp number configured -> hide the claim CTA entirely rather
+  // than sending prospects to a placeholder number.
+  const cleanPhone = getOwnerWhatsAppNumber();
+  if (!cleanPhone) return null;
+
   const encodedWhatsAppMsg = encodeURIComponent(
     `Hi, I just viewed the website preview for ${businessName} and want to discuss making it live.`
   );

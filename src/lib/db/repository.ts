@@ -23,7 +23,7 @@ import {
   DEMO_ORGANIZATION_ID,
   isExplicitDemoMode,
 } from './demo-data';
-import { createAuditLogEntry } from '../audit';
+import { createAuditLogEntry, CreateAuditLogParams } from '../audit';
 import { validateStatusTransition } from '../sales/lifecycle';
 import {
   generatePublicDemoToken,
@@ -1052,6 +1052,14 @@ export class LeadRepository {
       throw new Error(`Lead ${leadId} not found in organization.`);
     }
 
+    // Enforce the same lifecycle rules as the in-memory branch. Without this the
+    // Prisma/Postgres path accepted any status jump (e.g. LOST -> CONTACTED or
+    // DO_NOT_CONTACT -> INTERESTED), silently resurrecting suppressed leads.
+    const transition = validateStatusTransition(existing.leadStatus as LeadStatus, newStatus);
+    if (!transition.allowed) {
+      throw new Error(transition.reason || `Transition from ${existing.leadStatus} to ${newStatus} is not allowed.`);
+    }
+
     const updated = await prisma.lead.update({
       where: { id: leadId },
       data: {
@@ -1303,6 +1311,46 @@ export class LeadRepository {
   }
 
   /**
+   * Persists an audit log entry in whichever storage mode is active.
+   *
+   * `createAuditLogEntry()` only *builds* the object — it does not write it. Every
+   * call site must route through this helper, otherwise `await
+   * createAuditLogEntry({...})` silently discards the entry (which is what
+   * happened for DEMO_GENERATED/DEMO_APPROVED/DEMO_REJECTED events).
+   */
+  static async addAuditLog(
+    organizationId: string,
+    params: CreateAuditLogParams
+  ): Promise<AuditLogData> {
+    await ensureDatabaseMode();
+
+    if (!organizationId) {
+      throw new Error('Unauthorized: organizationId is required for data isolation.');
+    }
+
+    const entry = createAuditLogEntry({ ...params, organizationId });
+
+    if (isExplicitDemoMode()) {
+      demoStore.getOrgAuditLogs(organizationId).unshift(entry);
+      return entry;
+    }
+
+    const { prisma } = await import('./prisma');
+    await prisma.auditLog.create({
+      data: {
+        action: entry.action,
+        entity: entry.entity,
+        entityId: entry.entityId,
+        actor: entry.actor,
+        organizationId,
+        details: (entry.details || {}) as never,
+      },
+    });
+
+    return entry;
+  }
+
+  /**
    * List audit logs strictly scoped by organizationId.
    */
   static async getAuditLogs(organizationId: string, entityId?: string): Promise<AuditLogData[]> {
@@ -1360,6 +1408,16 @@ export class LeadRepository {
   }
 }
 
+/**
+ * Collapses duplicate public-view reports for the same demo.
+ *
+ * A single prospect visit can be reported twice: once by the server-rendered
+ * demo page and once by the client-side fallback fetch. The window is short
+ * enough that it never suppresses a genuine second visit.
+ */
+const recentPublicDemoViews = new Map<string, number>();
+const PUBLIC_DEMO_VIEW_DEDUPE_MS = 5_000;
+
 export class WebsiteDemoRepository {
   /**
    * Delete a website demo by demoId, leadId, or publicToken.
@@ -1373,6 +1431,8 @@ export class WebsiteDemoRepository {
       demoStore.syncFromDisk();
       let deleted = false;
       for (const [org, demos] of Array.from(demoStore.getDemosMap().entries())) {
+        // Tenancy guard: never touch another organization's demos.
+        if (org !== organizationId) continue;
         const initialLen = demos.length;
         const filtered = demos.filter(
           (d) =>
@@ -1395,6 +1455,7 @@ export class WebsiteDemoRepository {
     const { prisma } = await import('./prisma');
     const res = await prisma.websiteDemo.deleteMany({
       where: {
+        organizationId,
         OR: [
           { id: cleanId },
           { leadId: cleanId },
@@ -1417,6 +1478,8 @@ export class WebsiteDemoRepository {
       demoStore.syncFromDisk();
       let count = 0;
       for (const [org, demos] of Array.from(demoStore.getDemosMap().entries())) {
+        // Tenancy guard: never touch another organization's demos.
+        if (org !== organizationId) continue;
         const initialLen = demos.length;
         const filtered = demos.filter((d) => d.leadId !== cleanId && d.id !== cleanId);
         const removed = initialLen - filtered.length;
@@ -1433,7 +1496,7 @@ export class WebsiteDemoRepository {
 
     const { prisma } = await import('./prisma');
     const res = await prisma.websiteDemo.deleteMany({
-      where: { leadId: cleanId },
+      where: { leadId: cleanId, organizationId },
     });
     return res.count;
   }
@@ -1560,7 +1623,7 @@ export class WebsiteDemoRepository {
 
     if (isExplicitDemoMode()) {
       const saved = demoStore.saveDemo(organizationId, demoWithToken);
-      await createAuditLogEntry({
+      await LeadRepository.addAuditLog(organizationId, {
         action: 'DEMO_GENERATED',
         entity: 'WebsiteDemo',
         entityId: demo.id,
@@ -1589,7 +1652,7 @@ export class WebsiteDemoRepository {
       },
     });
 
-    await createAuditLogEntry({
+    await LeadRepository.addAuditLog(organizationId, {
       action: 'DEMO_GENERATED',
       entity: 'WebsiteDemo',
       entityId: demo.id,
@@ -1619,7 +1682,7 @@ export class WebsiteDemoRepository {
     if (isExplicitDemoMode()) {
       const updated = demoStore.updateDemo(organizationId, id, updates);
       if (updated) {
-        await createAuditLogEntry({
+        await LeadRepository.addAuditLog(organizationId, {
           action: 'LEAD_UPDATED',
           entity: 'WebsiteDemo',
           entityId: id,
@@ -1651,7 +1714,7 @@ export class WebsiteDemoRepository {
       data: dataToUpdate,
     });
 
-    await createAuditLogEntry({
+    await LeadRepository.addAuditLog(organizationId, {
       action: 'LEAD_UPDATED',
       entity: 'WebsiteDemo',
       entityId: id,
@@ -1718,7 +1781,7 @@ export class WebsiteDemoRepository {
     );
 
     // Audit Log
-    await createAuditLogEntry({
+    await LeadRepository.addAuditLog(organizationId, {
       action: 'DEMO_APPROVED',
       entity: 'WebsiteDemo',
       entityId: demoId,
@@ -1779,7 +1842,7 @@ export class WebsiteDemoRepository {
     );
 
     // Audit Log
-    await createAuditLogEntry({
+    await LeadRepository.addAuditLog(organizationId, {
       action: 'DEMO_REJECTED',
       entity: 'WebsiteDemo',
       entityId: demoId,
@@ -1820,19 +1883,25 @@ export class WebsiteDemoRepository {
     }
 
     const { prisma } = await import('./prisma');
+    // Exact, case-insensitive lookup on the indexed unique column first.
     let demo = await prisma.websiteDemo.findFirst({
       where: {
-        publicToken: cleanToken,
+        publicToken: { equals: cleanToken, mode: 'insensitive' },
         approvalStatus: 'APPROVED',
       },
     });
 
     if (!demo) {
-      const allApproved = await prisma.websiteDemo.findMany({
+      // Legacy fallback for demos whose stored publicToken is not the readable
+      // brand slug. Bounded and index-ordered (createdAt) so this can never
+      // degrade into an unbounded full-table scan on every public request.
+      const recentApproved = await prisma.websiteDemo.findMany({
         where: { approvalStatus: 'APPROVED' },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
       });
       demo =
-        allApproved.find((d) => {
+        recentApproved.find((d) => {
           if (d.publicToken?.toLowerCase() === cleanToken.toLowerCase()) return true;
           const brandName =
             (d.content as any)?.brand?.businessName ||
@@ -1863,6 +1932,19 @@ export class WebsiteDemoRepository {
     demoId: string,
     organizationId: string
   ): Promise<void> {
+    // Deduplicate: the SSR page and the client fallback can both report the same
+    // visit, which previously incremented viewCount twice for one prospect.
+    const dedupeKey = `${organizationId}:${demoId}`;
+    const nowMs = Date.now();
+    const lastSeen = recentPublicDemoViews.get(dedupeKey) || 0;
+    if (nowMs - lastSeen < PUBLIC_DEMO_VIEW_DEDUPE_MS) return;
+    if (recentPublicDemoViews.size > 5_000) {
+      for (const [key, seenAt] of Array.from(recentPublicDemoViews.entries())) {
+        if (nowMs - seenAt >= PUBLIC_DEMO_VIEW_DEDUPE_MS) recentPublicDemoViews.delete(key);
+      }
+    }
+    recentPublicDemoViews.set(dedupeKey, nowMs);
+
     const demo = await this.getDemo(organizationId, demoId);
     if (!demo) return;
 

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { STITCH_TEMPLATES } from '@/lib/demos/stitch-templates';
 import {
   Sparkles,
@@ -105,10 +106,12 @@ export default function DemoTemplatesPage() {
           >
             {/* Card Thumbnail Image */}
             <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden border-b border-border/50">
-              <img
+              <Image
                 src={tmpl.thumbnail}
                 alt={tmpl.name}
-                className="w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
               <div className="absolute top-3 left-3">

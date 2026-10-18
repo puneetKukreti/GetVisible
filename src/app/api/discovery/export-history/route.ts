@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { LeadExtractorStorage } from '@/lib/discovery/storage';
 import { z } from 'zod';
 
@@ -16,6 +17,9 @@ const CreateExportHistorySchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = (await getResolvedOrganizationId(request)) || 'demo-org-getvisible';
     const history = LeadExtractorStorage.listExportHistory(orgId);
     return NextResponse.json(history);
@@ -26,6 +30,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = (await getResolvedOrganizationId(request)) || 'demo-org-getvisible';
     const body = await request.json();
     const validated = CreateExportHistorySchema.parse(body);
@@ -42,6 +49,9 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = (await getResolvedOrganizationId(request)) || 'demo-org-getvisible';
     const url = new URL(request.url);
     const id = url.searchParams.get('id');

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { WebsiteContentSchema } from '@/lib/demos/schema';
 import {
@@ -9,6 +10,8 @@ import {
 } from '@/lib/demos/ai-content-generator';
 
 export const dynamic = 'force-dynamic';
+// One AI regeneration call per request.
+export const maxDuration = 60;
 
 interface RouteProps {
   params: { id: string } | Promise<{ id: string }>;
@@ -16,6 +19,9 @@ interface RouteProps {
 
 export async function POST(request: NextRequest, { params }: RouteProps) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const resolvedParams = await Promise.resolve(params);
     const id = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';
 

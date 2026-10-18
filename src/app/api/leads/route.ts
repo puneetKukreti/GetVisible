@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { z } from 'zod';
 import { LeadFilterParams, LeadStatus, WebsiteStatus, Channel } from '@/types';
@@ -24,6 +25,9 @@ const CreateLeadSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const { searchParams } = new URL(request.url);
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
@@ -78,6 +82,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });

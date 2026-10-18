@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { LeadRepository } from '@/lib/db/repository';
 import { ProductionEmailProvider, MockEmailProvider, GmailSmtpProvider } from '@/lib/providers/email.provider';
 import { checkOutreachEligibility } from '@/lib/compliance';
 
 export const dynamic = 'force-dynamic';
+// SMTP dispatch plus a bounded (9s) screenshot fetch.
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json(
@@ -17,7 +23,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { leadId, subject, message, screenshotUrl } = body;
+    const { leadId, subject, message, screenshotUrl, screenshotDataUrl } = body;
 
     if (!leadId) {
       return NextResponse.json(
@@ -91,11 +97,11 @@ export async function POST(request: NextRequest) {
         ? activeDemo.screenshotUrl
         : new URL(activeDemo.screenshotUrl, origin).toString();
     } else {
-      absoluteScreenshot = `${personalizedRouteUrl}?format=image&name=${encodeURIComponent(
-        lead.businessName || ''
-      )}&city=${encodeURIComponent(lead.city || '')}&profession=${encodeURIComponent(
-        lead.profession || ''
-      )}`;
+      // No personalization query params: the route already resolves the lead's own
+      // business name/city/profession server-side. Passing them here would mark the
+      // request as an operator override, which now requires an owner session - and
+      // the mail provider fetches this URL anonymously.
+      absoluteScreenshot = `${personalizedRouteUrl}?format=image`;
     }
 
     // Prioritize Gmail SMTP (sends from authentic govisibleonweb@gmail.com to ANY recipient)
@@ -107,6 +113,17 @@ export async function POST(request: NextRequest) {
       ? resendProvider
       : new MockEmailProvider();
 
+    // The dashboard may hand us a raster of the personalized preview card it
+    // already rendered (and attached on WhatsApp). That is the only way an email
+    // recipient sees their OWN business name on a host where the screenshot route
+    // can only produce SVG. Guard the size so a huge payload cannot be relayed.
+    const inlinePreview =
+      typeof screenshotDataUrl === 'string' &&
+      screenshotDataUrl.startsWith('data:image/') &&
+      screenshotDataUrl.length <= 8 * 1024 * 1024
+        ? screenshotDataUrl
+        : undefined;
+
     const sendResult = await emailProvider.sendOutreachEmail({
       to: lead.publicEmail,
       subject: subject || `Website Concept Prepared for ${lead.businessName}`,
@@ -115,6 +132,7 @@ export async function POST(request: NextRequest) {
       organizationId: orgId,
       approvedByHuman: true,
       screenshotUrl: absoluteScreenshot,
+      screenshotDataUrl: inlinePreview,
     });
 
     if (!sendResult.success) {

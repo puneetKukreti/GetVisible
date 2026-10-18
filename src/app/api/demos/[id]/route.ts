@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { WebsiteContentSchema, WebsiteThemeSchema } from '@/lib/demos/schema';
 import { isRealHumanVisit } from '@/lib/demos/public';
@@ -43,7 +44,17 @@ export async function GET(
       );
     }
 
-    // 2. Internal Authenticated GetVisible Sales Specialist
+    // 2. Internal GetVisible sales-specialist branches require an owner session.
+    //    Fail with the same 404 the public path would produce so an unauthenticated
+    //    caller cannot probe which ids exist.
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) {
+      return NextResponse.json(
+        { success: false, error: 'Demo concept or lead not found' },
+        { status: 404 }
+      );
+    }
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });
@@ -112,6 +123,9 @@ export async function PATCH(
   { params }: RouteProps
 ) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });
@@ -170,12 +184,23 @@ export async function PATCH(
 
 export async function DELETE(request: NextRequest, { params }: RouteProps) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = (await getResolvedOrganizationId(request)) || DEMO_ORGANIZATION_ID;
+    const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
     const resolvedParams = await Promise.resolve(params);
     const id = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';
     if (!id) return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 });
-    await WebsiteDemoRepository.deleteDemo(orgId, id);
+    // Deletions are organization-scoped, so attempt both workspaces the single
+    // operator may own (the id may be a demoId, a leadId or a public token).
+    const deletedDemo = await WebsiteDemoRepository.deleteDemo(orgId, id);
+    const deletedAltDemo = deletedDemo ? false : await WebsiteDemoRepository.deleteDemo(altOrgId, id);
     await WebsiteDemoRepository.deleteDemosForLead(orgId, id);
+    await WebsiteDemoRepository.deleteDemosForLead(altOrgId, id);
+    if (!deletedDemo && !deletedAltDemo) {
+      return NextResponse.json({ success: false, error: 'Demo not found' }, { status: 404 });
+    }
     return NextResponse.json({ success: true, message: 'Demo deleted and public link revoked' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to delete demo';

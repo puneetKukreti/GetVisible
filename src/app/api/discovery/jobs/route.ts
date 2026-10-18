@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DiscoveryJobRunner } from '@/lib/discovery/job-runner';
 import { DiscoverySearchInput } from '@/lib/discovery/providers/types';
 import { z } from 'zod';
@@ -25,6 +26,9 @@ const DiscoveryRequestSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });
@@ -59,6 +63,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ error: 'Unauthorized: Organization context required' }, { status: 401 });

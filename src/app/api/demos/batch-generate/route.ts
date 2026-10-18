@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 
 export const dynamic = 'force-dynamic';
+// AI demo generation runs per lead; the default serverless budget is too small
+// and previously surfaced as a 504 mid-batch.
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json(

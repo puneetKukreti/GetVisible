@@ -353,6 +353,10 @@ export function personalizeStitchHtml(
   html = html.replaceAll('+91 011 2345 6789', escapeHtml(phone));
   html = html.replaceAll('+9101123456789', escapeHtml(cleanPhone));
   html = html.replaceAll('tel:+9101123456789', `tel:${escapeHtml(cleanPhone)}`);
+  // The WhatsApp links in the Stitch templates omit the leading "+" (e.g.
+  // `https://wa.me/9101123456789`), so they need their own replacement or the
+  // published concept keeps dialing the placeholder number.
+  html = html.replaceAll('wa.me/9101123456789', `wa.me/${escapeHtml(cleanPhone)}`);
   html = html.replaceAll('consultations@sharmaassociates-ca.in', escapeHtml(email));
   html = html.replaceAll('mailto:consultations@sharmaassociates-ca.in', `mailto:${escapeHtml(email)}`);
 
@@ -664,6 +668,15 @@ export function personalizeStitchHtml(
   return html;
 }
 
+/**
+ * Escapes characters that are unsafe in HTML text/attribute context.
+ *
+ * `$` is included on purpose. Every substitution below feeds these values into
+ * `String.prototype.replace`/`replaceAll`, whose replacement string interprets
+ * `$$`, `$&`, `` $` ``, `$'` and `$<n>` sequences. A prospect whose name, city or
+ * service title contains a `$` (e.g. "A $ B Associates") would otherwise corrupt
+ * the rendered concept. `&#36;` renders as a literal `$`, so this is lossless.
+ */
 function escapeHtml(str: string): string {
   if (!str) return '';
   return str
@@ -671,7 +684,8 @@ function escapeHtml(str: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/'/g, '&#39;')
+    .replace(/\$/g, '&#36;');
 }
 
 /**

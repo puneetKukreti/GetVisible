@@ -10,6 +10,14 @@ export interface EmailSendPayload {
   approvedByHuman: boolean;
   /** Absolute URL of the captured website-concept screenshot to embed. */
   screenshotUrl?: string;
+  /**
+   * Pre-rendered raster (`data:image/png;base64,...`) of the personalized
+   * website-concept card, produced by the operator's browser. Preferred over
+   * `screenshotUrl` because it always shows the prospect's own business name,
+   * even on hosts where the screenshot route can only return SVG (which no email
+   * client can render).
+   */
+  screenshotDataUrl?: string;
 }
 
 export interface IEmailProvider {
@@ -21,6 +29,30 @@ export interface IEmailProvider {
 
 const SCREENSHOT_TIMEOUT_MS = 9000;
 const SCREENSHOT_CID = 'websitepreview';
+/** Inline attachments above this size are rejected to protect mail delivery. */
+const MAX_INLINE_IMAGE_BYTES = 4 * 1024 * 1024;
+const ALLOWED_INLINE_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+
+/**
+ * Decodes a `data:<mime>;base64,<payload>` raster supplied by the client.
+ * Returns null for anything that is not a small, safe raster image.
+ */
+export function decodeInlineImageDataUrl(dataUrl?: string): Buffer | null {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+
+  const match = /^data:([a-z0-9.+-]+\/[a-z0-9.+-]+);base64,([a-z0-9+/=\s]+)$/i.exec(dataUrl.trim());
+  if (!match) return null;
+
+  if (!ALLOWED_INLINE_IMAGE_TYPES.includes(match[1].toLowerCase())) return null;
+
+  try {
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length === 0 || buffer.length > MAX_INLINE_IMAGE_BYTES) return null;
+    return buffer;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Extracts the first http(s) URL from the outreach body. This is the demo link
@@ -68,9 +100,12 @@ async function resolveScreenshot(
   payload: EmailSendPayload,
   demoUrl: string | null
 ): Promise<{ imageBuffer: Buffer | null; remoteSrc: string | null }> {
-  let imageBuffer: Buffer | null = null;
+  // 1. Prefer the raster the operator's browser already rendered from the
+  //    personalized preview card (guaranteed to show the prospect's own name).
+  let imageBuffer: Buffer | null = decodeInlineImageDataUrl(payload.screenshotDataUrl);
 
-  if (payload.screenshotUrl) {
+  // 2. Otherwise fetch the supplied screenshot URL.
+  if (!imageBuffer && payload.screenshotUrl) {
     imageBuffer = await fetchImageBuffer(payload.screenshotUrl);
   }
 
@@ -304,7 +339,8 @@ export class ProductionEmailProvider implements IEmailProvider {
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
       const demoUrl = extractDemoUrl(payload.body);
       const { imageBuffer, remoteSrc } = await resolveScreenshot(payload, demoUrl);
-      const hasInlineCid = Boolean(imageBuffer) && Boolean(remoteSrc);
+      // An inline CID attachment works with or without a public fallback URL.
+      const hasInlineCid = Boolean(imageBuffer);
       const imageSrc = hasInlineCid ? `cid:${SCREENSHOT_CID}` : remoteSrc;
 
       const htmlBody = buildInboxFriendlyHtml(payload, imageSrc, demoUrl);

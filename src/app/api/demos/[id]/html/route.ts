@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { personalizeStitchHtml, isStitchLayout } from '@/lib/demos/stitch-personalizer';
@@ -11,6 +12,8 @@ import { getProfessionStitchLayout, isProfessionStitchLayout } from '@/lib/demos
 import { WebsiteContent } from '@/types';
 
 export const dynamic = 'force-dynamic';
+// May generate a demo on the fly when a lead has none yet.
+export const maxDuration = 60;
 
 interface RouteProps {
   params: { id: string } | Promise<{ id: string }>;
@@ -26,7 +29,19 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     }
 
     const { searchParams } = new URL(request.url);
-    const layoutOverride = searchParams.get('layout') || undefined;
+    const rawLayoutOverride = searchParams.get('layout') || undefined;
+
+    // A layout override lets a caller render any bundled design. It is only used
+    // by the authenticated template gallery, so it requires an owner session and
+    // must name a known Stitch layout (never an arbitrary string/path).
+    let layoutOverride: string | undefined;
+    if (rawLayoutOverride) {
+      const unauthorized = await requireOwnerSession(request);
+      if (unauthorized) return unauthorized;
+      if (isStitchLayout(rawLayoutOverride)) {
+        layoutOverride = rawLayoutOverride;
+      }
+    }
 
     // 1. Try public token lookup first
     let demo = await WebsiteDemoRepository.getApprovedDemoByPublicToken(id);

@@ -4,6 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import {
   findSystemBrowser,
@@ -17,6 +18,8 @@ import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
 import { WebsiteContent } from '@/types';
 
 export const dynamic = 'force-dynamic';
+// Where a local Chrome is available the capture path is slow; give it room.
+export const maxDuration = 60;
 
 interface RouteProps {
   params: { id: string } | Promise<{ id: string }>;
@@ -36,6 +39,15 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
   let profession = queryProf || 'Chartered Accountants';
 
   try {
+    // Personalization overrides (name/city/profession) let a caller render an
+    // arbitrary business identity through our renderer. They are only used by the
+    // authenticated template gallery, so they require an owner session. The plain
+    // prospect-facing screenshot (no overrides) stays public.
+    if (queryName || queryCity || queryProf) {
+      const unauthorized = await requireOwnerSession(request);
+      if (unauthorized) return unauthorized;
+    }
+
     const resolvedParams = await Promise.resolve(params);
     const id = resolvedParams?.id ? decodeURIComponent(resolvedParams.id).trim() : '';
 

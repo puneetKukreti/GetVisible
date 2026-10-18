@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { OutreachGeneratorService } from '@/lib/sales/outreach';
 import { getAppBaseUrl, getPublicDemoUrl } from '@/lib/demos/public';
 
 export const dynamic = 'force-dynamic';
+// Deterministic copy is instant, but the AI-personalized draft path is not.
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json(

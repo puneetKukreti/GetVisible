@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { WebsiteDemoData, LeadData, WebsiteTheme, WebsiteLayout, WebsiteTemplate } from '@/types';
 import { WatermarkBanner } from '@/components/demo-renderer/watermark-banner';
 import { DemoRenderer } from '@/components/demo-renderer/demo-renderer';
@@ -44,34 +44,40 @@ export function DemoClient({ initialLead, initialDemos }: DemoClientProps) {
   const [viewport, setViewport] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [error, setError] = useState<string | null>(null);
 
-  const activeDemo: WebsiteDemoData =
-    demos.find((d) => d.version === activeVersion) ||
-    demos[0] ||
-    ({
-      id: `demo-${initialLead.id}-v1`,
-      leadId: initialLead.id,
-      organizationId: initialLead.organizationId || 'org-demo-gurgaon',
-      templateId: 'design-1-premium',
-      version: 1,
-      generationStatus: 'COMPLETED',
-      approvalStatus: 'APPROVED',
-      publicToken: `token-${initialLead.id}`,
-      viewCount: 0,
-      theme: activeTheme,
-      content: {
-        brand: { businessName: initialLead.businessName },
-        location: { city: initialLead.city, address: initialLead.address },
-        contact: { publicPhone: initialLead.publicPhone, publicEmail: initialLead.publicEmail },
-        meta: { profession: initialLead.profession },
-      } as any,
-      design: {
-        layout: activeLayout,
-        template: activeLayout as WebsiteTemplate,
+  // Memoized so the downstream `renderedContent` useMemo (which depends on it)
+  // does not invalidate on every render just because this expression rebuilt its
+  // fallback object.
+  const activeDemo: WebsiteDemoData = useMemo(
+    () =>
+      demos.find((d) => d.version === activeVersion) ||
+      demos[0] ||
+      ({
+        id: `demo-${initialLead.id}-v1`,
+        leadId: initialLead.id,
+        organizationId: initialLead.organizationId || 'org-demo-gurgaon',
+        templateId: 'design-1-premium',
+        version: 1,
+        generationStatus: 'COMPLETED',
+        approvalStatus: 'APPROVED',
+        publicToken: `token-${initialLead.id}`,
+        viewCount: 0,
         theme: activeTheme,
-      },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    } as WebsiteDemoData);
+        content: {
+          brand: { businessName: initialLead.businessName },
+          location: { city: initialLead.city, address: initialLead.address },
+          contact: { publicPhone: initialLead.publicPhone, publicEmail: initialLead.publicEmail },
+          meta: { profession: initialLead.profession },
+        } as any,
+        design: {
+          layout: activeLayout,
+          template: activeLayout as WebsiteTemplate,
+          theme: activeTheme,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      } as WebsiteDemoData),
+    [demos, activeVersion, initialLead, activeTheme, activeLayout]
+  );
 
   const handleGenerate = async () => {
     setGenerating(true);

@@ -1,21 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { OWNER_AUTH_COOKIE, verifyOwnerSessionToken } from '@/lib/session';
 
+/**
+ * Static asset extensions that may be served without an owner session.
+ *
+ * SECURITY: this is an explicit allowlist. Never gate public assets on a blanket
+ * `pathname.includes('.')` check — that lets ANY dotted path (for example
+ * `/api/leads/<id>.png` or `/api/demos/<id>.png`) skip authentication entirely
+ * and execute a mutating route handler unauthenticated.
+ */
+const PUBLIC_ASSET_EXTENSION_RE =
+  /\.(?:png|jpe?g|gif|svg|ico|webp|avif|bmp|css|js|mjs|map|txt|xml|webmanifest|woff2?|ttf|otf|eot|pdf)$/i;
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const method = request.method;
+  const isApiRoute = pathname.startsWith('/api/');
 
-  // 1. Static assets and Next.js internals are always public
+  // 1. Next.js internals are always public.
+  if (pathname.startsWith('/_next') || pathname === '/favicon.ico') {
+    return NextResponse.next();
+  }
+
+  // 2. Public static assets. Deliberately scoped to NON-API paths so that a
+  //    dotted API path can never bypass authentication.
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon.ico') ||
-    pathname.startsWith('/demo-templates') ||
-    pathname.includes('.')
+    !isApiRoute &&
+    (pathname.startsWith('/demo-templates') || PUBLIC_ASSET_EXTENSION_RE.test(pathname))
   ) {
     return NextResponse.next();
   }
 
-  // 2. Authentication routes
+  // 3. Authentication routes.
   if (pathname === '/login' || pathname.startsWith('/api/auth')) {
     // If already authenticated and trying to access /login, redirect to /campaigns
     if (pathname === '/login') {
@@ -27,41 +43,39 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2b. Retention cron endpoint (self-authenticated via CRON_SECRET in the route)
+  // 4. Retention cron endpoint (self-authenticated via CRON_SECRET in the route).
   if (pathname.startsWith('/api/cron')) {
     return NextResponse.next();
   }
 
-  // 3. Public marketing pages (no owner session required)
+  // 5. Public marketing pages (no owner session required).
   if (pathname === '/pricing') {
     return NextResponse.next();
   }
 
-  // 4. Prospect-facing public demos (must remain accessible without authentication)
+  // 6. Prospect-facing public demos (must remain accessible without authentication).
   if (pathname.startsWith('/demo/')) {
     return NextResponse.next();
   }
 
-  // 5. Public demo APIs for prospect view, automated screenshots, and change requests
-  //    Matches: /api/demos/:id/html, /api/demos/:id/screenshot, /api/demos/:id, /api/demos/:id/request-changes
-  if (pathname.startsWith('/api/demos/') && pathname !== '/api/demos') {
-    // Allow all GET requests to demo details/html/screenshots
+  // 7. Public demo APIs: read-only GETs for prospect rendering/screenshots, plus
+  //    prospect change requests. Every other /api/** route requires the session.
+  if (pathname !== '/api/demos' && pathname.startsWith('/api/demos/')) {
     if (method === 'GET') {
       return NextResponse.next();
     }
-    // Allow prospect change requests
     if (method === 'POST' && pathname.endsWith('/request-changes')) {
       return NextResponse.next();
     }
   }
 
-  // 6. Verify the signed owner session token for all other routes
+  // 8. Verify the signed owner session token for all other routes.
   const authCookie = request.cookies.get(OWNER_AUTH_COOKIE)?.value;
   const isAuthenticated = await verifyOwnerSessionToken(authCookie);
 
   if (!isAuthenticated) {
     // Return 401 for protected API requests
-    if (pathname.startsWith('/api/')) {
+    if (isApiRoute) {
       return NextResponse.json(
         { error: 'Unauthorized: Owner authentication required' },
         { status: 401 }

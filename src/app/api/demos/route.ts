@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { getResolvedOrganizationId } from '@/lib/auth';
+import { requireOwnerSession } from '@/lib/owner-guard';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
+// Single-lead demo generation makes an AI provider call before responding.
+export const maxDuration = 60;
 
 const GenerateDemoRequestSchema = z.object({
   leadId: z.string().min(1, 'Lead ID is required'),
@@ -17,6 +20,9 @@ const GenerateDemoRequestSchema = z.object({
 
 export async function GET(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });
@@ -38,6 +44,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const unauthorized = await requireOwnerSession(request);
+    if (unauthorized) return unauthorized;
+
     const orgId = await getResolvedOrganizationId(request);
     if (!orgId) {
       return NextResponse.json({ success: false, error: 'Unauthorized: Organization context required' }, { status: 401 });

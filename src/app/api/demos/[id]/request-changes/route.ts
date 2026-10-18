@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
+import { validateStatusTransition } from '@/lib/sales/lifecycle';
+import { LeadStatus } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +21,21 @@ export async function POST(
 
     if (!rawId) {
       return NextResponse.json({ success: false, error: 'ID parameter required' }, { status: 400 });
+    }
+
+    // Abuse brake. This endpoint is public by design (prospects submit it from the
+    // live website concept), so cap submissions per client + target to prevent an
+    // unauthenticated caller flooding the CRM with activities.
+    const rateLimit = checkRateLimit(
+      `request-changes:${getClientIp(request)}:${rawId}`,
+      5,
+      60_000
+    );
+    if (rateLimit.limited) {
+      return NextResponse.json(
+        { success: false, error: 'Too many change requests received. Please try again shortly.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+      );
     }
 
     // 1. Resolve demo & lead (by publicToken, demoId, or leadId across workspaces)
@@ -70,15 +88,21 @@ export async function POST(
     const notesText = notes ? ` | Notes: ${notes}` : '';
     const summary = `Prospect requested free changes from live website concept: ${changeList.join(', ')}${callText}${phoneText}${notesText}`;
 
-    // 3. Automatically advance lead status to INTERESTED in CRM
-    const updatedLead = await LeadRepository.updateLeadStatus(
-      leadId,
-      'INTERESTED',
-      targetOrg,
-      'Prospect (Public Demo)',
-      summary,
-      'WHATSAPP'
-    );
+    // 3. Advance the lead to INTERESTED only when the lifecycle rules allow it.
+    //    A public form must never resurrect a suppressed/closed lead (the same
+    //    `validateStatusTransition` single source of truth the CRM uses), so an
+    //    invalid transition is acknowledged without mutating pipeline state.
+    const transition = validateStatusTransition(lead.leadStatus as LeadStatus, 'INTERESTED');
+    const updatedLead = transition.allowed
+      ? await LeadRepository.updateLeadStatus(
+          leadId,
+          'INTERESTED',
+          targetOrg,
+          'Prospect (Public Demo)',
+          summary,
+          'WHATSAPP'
+        )
+      : lead;
 
     // 4. Record detailed prospect interaction activity
     await LeadRepository.addActivity(targetOrg, leadId, {
