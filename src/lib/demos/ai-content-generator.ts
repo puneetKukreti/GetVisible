@@ -1131,6 +1131,125 @@ ${options.industryBrief}
   return null;
 }
 
+/* -------------------------------------------------------------------------- */
+/*  AI diagnostics (owner-facing)                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Explains *why* AI-authored output did or did not happen.
+ *
+ * The model and the deterministic fallback deliberately produce the same shape
+ * of result, so "did the AI actually run?" is otherwise unanswerable from the
+ * outside. This reports which variable names are populated (never their values),
+ * whether a value was found in a `.env` file, and the outcome of each attempt.
+ */
+export interface GeminiKeyState {
+  /** Variable names this app actually reads, and whether each is populated. */
+  envVars: Record<string, boolean>;
+  /** Populated variable names we do NOT read — usually a naming mistake. */
+  unexpectedVars: Record<string, boolean>;
+  /** A value was found by reading `.env.local` / `.env` from disk. */
+  foundInEnvFile: boolean;
+  /** `getGeminiApiKey()` resolves, i.e. AI calls will be attempted at all. */
+  resolved: boolean;
+}
+
+const READ_KEY_NAMES = ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'];
+const OTHER_KEY_NAMES = [
+  'GOOGLE_API_KEY',
+  'GEMINI_KEY',
+  'GOOGLE_GEMINI_API_KEY',
+  'GOOGLE_AI_API_KEY',
+];
+
+function isPopulated(name: string): boolean {
+  const value = process.env[name];
+  return Boolean(value && value.trim().length > 0);
+}
+
+function keyFoundInEnvFile(): boolean {
+  try {
+    for (const file of ['.env.local', '.env']) {
+      const fullPath = path.join(process.cwd(), file);
+      if (!fs.existsSync(fullPath)) continue;
+      const text = fs.readFileSync(fullPath, 'utf8');
+      for (const line of text.split(/\r?\n/)) {
+        const m = line.match(/^\s*(?:GEMINI_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY)\s*=\s*(.*)$/);
+        if (m && m[1] && m[1].trim().replace(/^['"]|['"]$/g, '').length > 5) return true;
+      }
+    }
+  } catch {
+    // Diagnostics must never throw.
+  }
+  return false;
+}
+
+export function describeGeminiKeyState(): GeminiKeyState {
+  const envVars: Record<string, boolean> = {};
+  for (const name of READ_KEY_NAMES) envVars[name] = isPopulated(name);
+
+  const unexpectedVars: Record<string, boolean> = {};
+  for (const name of OTHER_KEY_NAMES) {
+    if (isPopulated(name)) unexpectedVars[name] = true;
+  }
+
+  return {
+    envVars,
+    unexpectedVars,
+    foundInEnvFile: keyFoundInEnvFile(),
+    resolved: Boolean(getGeminiApiKey()),
+  };
+}
+
+/**
+ * Strips anything that could carry a credential out of an error we log or
+ * report — Google's URLs embed the key in a query parameter, so a raw error
+ * could otherwise leak it into logs.
+ */
+export function scrubSecretText(input: unknown): string {
+  const text =
+    typeof input === 'string' ? input : input instanceof Error ? input.message : String(input ?? '');
+  return text
+    .replace(/key=[^&\s"']+/gi, 'key=***')
+    .replace(/AIza[0-9A-Za-z_\-]{10,}/g, 'AIza***')
+    .slice(0, 200);
+}
+
+export interface IndustryBlueprintAiDiagnostics {
+  /** The key resolved, so a call was actually attempted. */
+  keyResolved: boolean;
+  /** Outcome of each model attempt, in order. */
+  attempts: Array<{ model: string; status?: number; error?: string }>;
+  /** A usable blueprint came back. */
+  authored: boolean;
+  /** Which model authored it. */
+  model: string | null;
+  at: string | null;
+}
+
+let lastBlueprintAiDiagnostics: IndustryBlueprintAiDiagnostics = {
+  keyResolved: false,
+  attempts: [],
+  authored: false,
+  model: null,
+  at: null,
+};
+
+export function getIndustryBlueprintAiDiagnostics(): IndustryBlueprintAiDiagnostics {
+  return lastBlueprintAiDiagnostics;
+}
+
+/** Marks a request boundary so the report describes that request only. */
+export function resetIndustryBlueprintAiDiagnostics(): void {
+  lastBlueprintAiDiagnostics = {
+    keyResolved: false,
+    attempts: [],
+    authored: false,
+    model: null,
+    at: null,
+  };
+}
+
 export interface IndustryBlueprintAiFacts {
   profession: string;
   city?: string;
@@ -1155,8 +1274,22 @@ export interface IndustryBlueprintAiFacts {
 export async function generateIndustryBlueprintJson(
   facts: IndustryBlueprintAiFacts
 ): Promise<unknown | null> {
+  const attempts: Array<{ model: string; status?: number; error?: string }> = [];
+  const report = (patch: Partial<IndustryBlueprintAiDiagnostics>) => {
+    lastBlueprintAiDiagnostics = {
+      ...lastBlueprintAiDiagnostics,
+      attempts,
+      at: new Date().toISOString(),
+      ...patch,
+    };
+  };
+
   const apiKey = getGeminiApiKey();
-  if (!apiKey || apiKey.trim().length === 0) return null;
+  if (!apiKey || apiKey.trim().length === 0) {
+    report({ keyResolved: false, authored: false, model: null });
+    return null;
+  }
+  report({ keyResolved: true, authored: false, model: null });
 
   const profession = facts.profession?.trim() || 'Local Business';
   const city = facts.city?.trim() || 'India';
@@ -1216,13 +1349,19 @@ LOCALISATION: assume Indian market context; keep wording professional Indian Eng
       });
 
       if (!res.ok) {
-        console.warn(`[Gemini AI] Blueprint model ${model} returned (${res.status}): ${res.statusText}`);
+        attempts.push({ model, status: res.status, error: scrubSecretText(res.statusText) });
+        console.warn(
+          `[Gemini AI] Blueprint model ${model} returned (${res.status}): ${scrubSecretText(res.statusText)}`
+        );
         continue;
       }
 
       const data = await res.json();
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!rawText) continue;
+      if (!rawText) {
+        attempts.push({ model, error: 'empty response' });
+        continue;
+      }
 
       const cleaned = rawText
         .replace(/^```json\s*/i, '')
@@ -1231,14 +1370,19 @@ LOCALISATION: assume Indian market context; keep wording professional Indian Eng
 
       const parsed = JSON.parse(cleaned);
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.sectionOrder)) {
+        attempts.push({ model, status: 200 });
+        report({ authored: true, model });
         console.log(`[Gemini AI] Industry blueprint authored with ${model} for "${profession}"`);
         return parsed;
       }
+      attempts.push({ model, error: 'unusable payload (no sectionOrder)' });
     } catch (err) {
-      console.warn(`[Gemini AI] Blueprint call failed on ${model}:`, err);
+      attempts.push({ model, error: scrubSecretText(err) });
+      console.warn(`[Gemini AI] Blueprint call failed on ${model}: ${scrubSecretText(err)}`);
     }
   }
 
+  report({ authored: false, model: null });
   return null;
 }
 

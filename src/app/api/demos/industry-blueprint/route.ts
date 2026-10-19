@@ -6,6 +6,11 @@ import {
   reauthorIndustryDesignBlueprint,
 } from '@/lib/demos/industry-blueprint';
 import { getIndustryPalette } from '@/lib/demos/industry-palettes';
+import {
+  describeGeminiKeyState,
+  getIndustryBlueprintAiDiagnostics,
+  resetIndustryBlueprintAiDiagnostics,
+} from '@/lib/demos/ai-content-generator';
 
 // Owner-only maintenance for per-industry design blueprints.
 export const dynamic = 'force-dynamic';
@@ -17,7 +22,10 @@ const BlueprintQuerySchema = z.object({
   city: z.string().max(80).optional(),
 });
 
-function present(blueprint: Awaited<ReturnType<typeof getIndustryDesignBlueprint>>) {
+function present(
+  blueprint: Awaited<ReturnType<typeof getIndustryDesignBlueprint>>,
+  checkedThisRequest: boolean
+) {
   const palette = getIndustryPalette(blueprint.paletteId);
   return {
     key: blueprint.key,
@@ -35,6 +43,17 @@ function present(blueprint: Awaited<ReturnType<typeof getIndustryDesignBlueprint
     referenceBasis: blueprint.referenceBasis,
     version: blueprint.version,
     createdAt: blueprint.createdAt,
+    /**
+     * Why the design was (or was not) authored by AI. Never contains a key:
+     * only which variable names are populated and each attempt's outcome.
+     */
+    ai: {
+      checkedThisRequest,
+      disabledByEnv: process.env.DISABLE_INDUSTRY_BLUEPRINT_AI === 'true',
+      runtime: process.env.NODE_ENV || null,
+      key: describeGeminiKeyState(),
+      authoring: getIndustryBlueprintAiDiagnostics(),
+    },
   };
 }
 
@@ -61,7 +80,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const blueprint = await getIndustryDesignBlueprint(parsed.data);
-    return NextResponse.json({ success: true, blueprint: present(blueprint) });
+    return NextResponse.json({ success: true, blueprint: present(blueprint, false) });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Could not resolve the industry design';
     return NextResponse.json({ success: false, error: message }, { status: 500 });
@@ -93,8 +112,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    resetIndustryBlueprintAiDiagnostics();
     const blueprint = await reauthorIndustryDesignBlueprint(parsed.data);
-    return NextResponse.json({ success: true, refreshed: true, blueprint: present(blueprint) });
+    return NextResponse.json({
+      success: true,
+      refreshed: true,
+      blueprint: present(blueprint, true),
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Could not re-author the industry design';
     return NextResponse.json({ success: false, error: message }, { status: 500 });

@@ -14,6 +14,13 @@ import {
   applyStitchOverrides,
 } from '@/lib/demos/profession-stitch';
 import { isIndustryPaletteId } from '@/lib/demos/industry-palettes';
+import {
+  describeGeminiKeyState,
+  generateIndustryBlueprintJson,
+  getIndustryBlueprintAiDiagnostics,
+  resetIndustryBlueprintAiDiagnostics,
+  scrubSecretText,
+} from '@/lib/demos/ai-content-generator';
 import { personalizeStitchHtml } from '@/lib/demos/stitch-personalizer';
 import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { IndustryBlueprintRepository } from '@/lib/db/repository';
@@ -29,6 +36,98 @@ import { WebsiteSectionType } from '@/types';
  * These tests lock in the safety rules (allow-list only, never throws) and the
  * per-industry determinism/caching.
  */
+
+describe('AI diagnostics', () => {
+  const facts = {
+    profession: 'Plumber',
+    archetypeIds: ['design-classic-professional'],
+    paletteIds: ['clean-industrial'],
+    sectionIds: ['HERO', 'SERVICES', 'CONTACT'],
+  };
+
+  const silent = () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  };
+
+  it('reports which key names are populated, without leaking values', () => {
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-probe-value-1234567890');
+    vi.stubEnv('GOOGLE_API_KEY', 'maps-key-not-read-by-this-app');
+
+    const state = describeGeminiKeyState();
+    expect(state.envVars.GEMINI_API_KEY).toBe(true);
+    expect(state.resolved).toBe(true);
+    // A populated-but-unread name is exactly the "wrong variable name" signal.
+    expect(state.unexpectedVars.GOOGLE_API_KEY).toBe(true);
+    expect(JSON.stringify(state)).not.toContain('AIza-probe-value');
+    expect(JSON.stringify(state)).not.toContain('maps-key');
+
+    vi.unstubAllEnvs();
+  });
+
+  it('records every model attempt when the key is rejected', async () => {
+    silent();
+    resetIndustryBlueprintAiDiagnostics();
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-secret-value-123456');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('denied', { status: 403, statusText: 'Forbidden' }))
+    );
+
+    const result = await generateIndustryBlueprintJson(facts);
+    expect(result).toBeNull();
+
+    const diag = getIndustryBlueprintAiDiagnostics();
+    expect(diag.keyResolved).toBe(true);
+    expect(diag.authored).toBe(false);
+    expect(diag.attempts).toHaveLength(3);
+    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-2.5-flash', status: 403 });
+    expect(JSON.stringify(diag)).not.toContain('AIza-secret-value');
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('records success and the model that authored it', async () => {
+    silent();
+    resetIndustryBlueprintAiDiagnostics();
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-ok-value-123456');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              candidates: [
+                { content: { parts: [{ text: JSON.stringify({ sectionOrder: ['HERO', 'SERVICES', 'CONTACT'] }) }] } },
+              ],
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    const result = await generateIndustryBlueprintJson(facts);
+    expect(result).toBeTruthy();
+
+    const diag = getIndustryBlueprintAiDiagnostics();
+    expect(diag.authored).toBe(true);
+    expect(diag.model).toBe('gemini-2.5-flash');
+    expect(diag.at).toBeTruthy();
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('scrubs credentials out of error text', () => {
+    expect(scrubSecretText('GET https://x/y?key=AIzaSySECRET123&a=1 failed')).toBe(
+      'GET https://x/y?key=***&a=1 failed'
+    );
+    expect(scrubSecretText('rejected AIzaSyABCDEFGHIJKLMNOP')).toBe('rejected AIza***');
+  });
+});
 
 describe('industry design blueprints', () => {
   it('normalises a profession into a stable industry key', () => {
