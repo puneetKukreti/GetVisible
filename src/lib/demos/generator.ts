@@ -153,7 +153,12 @@ export class WebsiteDemoGeneratorService {
           ...content,
           meta: {
             ...content.meta,
-            title: (aiProfile.seo?.title || `${lead.businessName} | ${aiProfile.heroBadge || lead.profession} in ${lead.city}`).slice(0, 150),
+            title: buildDemoSeoTitle(
+              lead.businessName,
+              lead.city,
+              [aiProfile.heroBadge || '', lead.profession || ''],
+              aiProfile.seo?.title
+            ),
             description: (aiProfile.seo?.description || aiProfile.heroSubheadline || content.meta.description).slice(0, 300),
             profession: lead.profession,
           },
@@ -651,6 +656,33 @@ export class WebsiteDemoGeneratorService {
       return content;
     }
   }
+}
+
+/**
+ * Builds the demo page/browser title. The AI-generated hero badge frequently
+ * already ends with the city ("… Workshop • Gurgaon"), so naively appending
+ * "in {city}" produced titles like "… • Gurgaon in Gurgaon" in the tab and in
+ * WhatsApp link previews. Candidates are tried in order after stripping a
+ * trailing city mention, so a badge that is *only* the city falls through to
+ * the profession.
+ */
+export function buildDemoSeoTitle(
+  businessName: string,
+  city: string | undefined,
+  candidates: string[],
+  explicitTitle?: string
+): string {
+  if (explicitTitle) return explicitTitle.slice(0, 150);
+  const cleanCity = (city || '').trim();
+  const strip = (value: string): string => {
+    let out = (value || '').trim();
+    if (cleanCity && out.toLowerCase().endsWith(cleanCity.toLowerCase())) {
+      out = out.slice(0, out.length - cleanCity.length);
+    }
+    return out.replace(/[\s•\-–|,]+$/, '').trim();
+  };
+  const label = candidates.map(strip).find((c) => c.length > 0) || 'Local Business';
+  return `${businessName} | ${label} in ${cleanCity}`.slice(0, 150);
 }
 
 /**
