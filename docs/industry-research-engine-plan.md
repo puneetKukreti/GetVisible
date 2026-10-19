@@ -86,9 +86,13 @@ designs genuinely distinct, all allow-listed (no raw CSS ever):
   density, radius, type scale, palette id, accent, section order, copy framing, imagery treatment.
 - Every field validated and repaired against the allow-list; unknown values fall back per field.
 
-**Where research runs** (needs a decision — see §6): an **offline/local CLI** is the reliable option
-(`npm run research:profession -- "Car Detailing"`), with a hosted option (Microlink + Gemini vision,
-no local browser) for running inside the app. Both write to the same store, so runtime is unchanged.
+**Where research runs** (decided: in-app, keyless, no browser). Research executes inside the app
+using the search engines it already has, `fetch` for page text, and keyless Microlink for screenshots.
+Because all routes are capped at 60s and a 3–5 site sweep does not fit in one request, the work is a
+**persisted state machine** (`industry_research.status`) advanced one bounded step per call:
+`SEARCH → FILTER → FETCH(one site) → EXTRACT(one site) → SCREENSHOT(one site) → SYNTHESIZE → READY`.
+An owner-triggered request claims the next step, does one unit inside the time budget, and the client
+polls. A run is therefore resumable, observable, and can never time out mid-flight.
 
 **Storage**: new `industry_research` table (profession id, status, sites[]
 {url, domain, title, screenshot ref, extracted structure}, synthesis, spec JSONB, source, version,
@@ -102,14 +106,20 @@ their tuned archetypes; the deterministic rule table stays as the last-resort fa
 
 ## 5. Phases
 
-- **P1 — Research core (no browser).** Reuse the search engines; add domain filtering tuned for
-  "business site only"; add robots-aware `fetch` with retries; add `cheerio`-based extraction of
-  structure and copy patterns (nav, section order, headings, services, CTAs, FAQ/review presence).
-  Output: `ResearchRecord` with 3–5 real sites. Fully unit-testable with fixtures.
-- **P2 — Evidence.** Screenshots per site via local Chrome (CLI) or Microlink (hosted); store refs.
-  Add a compact "visual digest" (colours sampled, image density, hero type, above-fold CTA).
-- **P3 — Synthesis.** Gemini vision + structure → `DesignSpec`; validate/repair against allow-lists;
-  expand the renderer vocabulary to honour the new knobs.
+- **P1 — Research core (no browser, no AI key).** Reuse the search engines; add keyless search
+  resilience (Bing HTML scrape + DuckDuckGo HTML + Mojeek, so losing one endpoint is not fatal); add
+  robots-aware `fetch` with timeouts/backoff; add `cheerio`-based extraction of structure and copy
+  patterns (nav, section order, headings, services, CTAs, FAQ/review presence, image density).
+  Output: `ResearchRecord` with 3–5 real business sites. Fully unit-testable with HTML fixtures —
+  no network, no AI, no browser.
+- **P2 — Evidence.** Screenshots per site via keyless Microlink, stored like `DemoMedia`; plus a
+  compact visual digest (sampled colours, image density, hero type, above-fold CTA). Degrades to
+  structure-only when a screenshot cannot be taken.
+- **P3 — Synthesis.** Frequency analysis of the extracted structures produces a `DesignSpec` with
+  **no AI at all** — the section order and section mix that a majority of real sites share is itself
+  the finding. When `GEMINI_API_KEY` resolves, Gemini vision over the screenshots enriches it
+  (imagery mood, palette, emphasis, hero treatment). Validate/repair every field against the
+  allow-lists with a per-field fallback. Expand the renderer vocabulary to honour the new knobs.
 - **P4 — Library + integration.** `industry_research` table + repository + demo-ledger key;
   first-writer-wins caching; feed the generator; deterministic fallback preserved.
 - **P5 — Admin.** Owner-only UI/endpoints: run research for a profession, inspect the 3–5 sites and
@@ -118,19 +128,28 @@ their tuned archetypes; the deterministic rule table stays as the last-resort fa
 - **P6 — Pre-warm.** CLI to research a list of professions in bulk and commit the resulting specs,
   so production serves researched designs with **zero** runtime research cost.
 
-## 6. Decisions needed before coding
+## 6. Decisions recorded
 
-1. **Where should research run?**
-   - (a) Local/offline CLI + committed/bulk pre-warm — most reliable, no Vercel limits (recommended).
-   - (b) Inside the app, keyless (existing search + Microlink + Gemini vision) — no local browser,
-     slower, but fully in-app.
-   - (c) Real Playwright in production — heaviest; needs chromium packaging, memory and duration
-     increases, and may need a plan upgrade.
-2. **Search provider:** which keys exist today (`SERPAPI_API_KEY`, `GOOGLE_SEARCH_API_KEY` +
-   `GOOGLE_SEARCH_ENGINE_ID`/`GOOGLE_CSE_ID`, `TAVILY_API_KEY`)? Without any, only the keyless Bing
-   scrape is available, which is fragile.
-3. **Relationship to what we already shipped:** should researched specs *replace* the AI-knowledge
-   blueprint for a profession, or sit in front of it with the current blueprint as fallback?
+1. **Where research runs: in-app, keyless** — no local browser, no Chromium on Vercel. This is why §4
+   uses a step-wise state machine: the 60s request cap cannot hold a 3–5 site sweep.
+2. **Search: keyless for now** (Bing HTML scrape is all that exists today). P1 adds a second and third
+   keyless engine so one blocked endpoint does not stop a run; a key (SerpAPI / Google CSE / Tavily)
+   can be added later behind the same adapter.
+3. **Researched spec wins; the shipped blueprint stays as the fallback.** Nothing that works today
+   breaks, and any trade that has not been researched behaves exactly as it does now.
+
+### Prerequisite discovered while planning
+
+`GEMINI_API_KEY` is **not visible to the production runtime**. A live probe of
+`/api/demos/industry-blueprint` (which now reports what the running function can actually see)
+returned `keyResolved=false`, `GEMINI_API_KEY=false`, `GOOGLE_GENERATIVE_AI_API_KEY=false`, and no
+populated alternative name. The check treats whitespace-only as empty, so this also covers a variable
+that exists with a blank value.
+
+Consequence: **P1 and P2 do not need the key** — search, fetch, extraction and screenshots are
+keyless — and P3 still produces a spec from structure frequency alone. Only the vision enrichment in
+P3 depends on the key being fixed. The blueprint for any trade stays deterministic until either the
+key is fixed or P3's keyless synthesis lands, and neither blocks starting P1.
 
 ## 7. Note on the earlier decision
 
