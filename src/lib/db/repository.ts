@@ -435,6 +435,22 @@ class DemoDataStore {
     return JSON.parse(JSON.stringify(list[index]));
   }
 
+  /**
+   * True when a public token is already used by a *different* demo in the
+   * in-memory ledger (mirrors the unique `publicToken` column in Postgres).
+   */
+  hasPublicToken(token: string, exceptDemoId?: string): boolean {
+    this.syncFromDisk();
+    const clean = token.trim().toLowerCase();
+    if (!clean) return false;
+    for (const demos of Array.from(this.demos.values())) {
+      if (demos.some((d) => d.id !== exceptDemoId && d.publicToken?.toLowerCase() === clean)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   getDemoByPublicToken(token: string): WebsiteDemoData | null {
     this.syncFromDisk();
     const cleanToken = token.trim().toLowerCase();
@@ -1661,6 +1677,41 @@ export class WebsiteDemoRepository {
   /**
    * Save a newly generated website demo concept.
    */
+  /**
+   * Public tokens are readable brand slugs ("sharma-and-associates"), so two
+   * demos for the same business name — a regeneration (v2 keeps v1), a second
+   * lead with a similar name, or the demo page auto-creating one — would try to
+   * write the same token into the unique `publicToken` column and fail with
+   * `Unique constraint failed on the fields: (publicToken)`.
+   *
+   * Keeps the readable slug for the first demo and appends `-2`, `-3`, … for
+   * later ones. Concurrent writers are additionally covered by the P2002 retry
+   * in `saveDemo`.
+   */
+  private static async resolveUniquePublicToken(base: string, demoId: string): Promise<string> {
+    const cleanBase = (base || '').trim() || crypto.randomBytes(16).toString('base64url');
+
+    const isTaken = async (candidate: string): Promise<boolean> => {
+      if (isExplicitDemoMode()) {
+        return demoStore.hasPublicToken(candidate, demoId);
+      }
+      const { prisma } = await import('./prisma');
+      const hit = await prisma.websiteDemo.findFirst({
+        where: { publicToken: { equals: candidate, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      return Boolean(hit && hit.id !== demoId);
+    };
+
+    if (!(await isTaken(cleanBase))) return cleanBase;
+
+    for (let suffix = 2; suffix < 50; suffix += 1) {
+      const candidate = `${cleanBase}-${suffix}`;
+      if (!(await isTaken(candidate))) return candidate;
+    }
+    return `${cleanBase}-${crypto.randomBytes(3).toString('hex')}`;
+  }
+
   static async saveDemo(
     organizationId: string,
     demo: WebsiteDemoData,
@@ -1676,7 +1727,10 @@ export class WebsiteDemoRepository {
       (demo.content as any)?.brand?.businessName ||
       (demo.content as any)?.brandName ||
       (demo as any).businessName;
-    const publicToken = demo.publicToken || generatePublicDemoToken(brandName);
+    const publicToken = await this.resolveUniquePublicToken(
+      demo.publicToken || generatePublicDemoToken(brandName),
+      demo.id
+    );
 
     const demoWithToken: WebsiteDemoData = {
       ...demo,
@@ -1699,22 +1753,42 @@ export class WebsiteDemoRepository {
     }
 
     const { prisma } = await import('./prisma');
-    const created = await prisma.websiteDemo.create({
-      data: {
-        id: demoWithToken.id,
-        leadId: demoWithToken.leadId,
-        organizationId,
-        templateId: demoWithToken.templateId,
-        version: demoWithToken.version,
-        generationStatus: demoWithToken.generationStatus,
-        approvalStatus: demoWithToken.approvalStatus,
-        publicToken: demoWithToken.publicToken,
-        viewCount: demoWithToken.viewCount || 0,
-        content: demoWithToken.content as any,
-        theme: demoWithToken.theme as any,
-        error: demoWithToken.error || null,
-      },
-    });
+    const createDemoRow = (token: string) =>
+      prisma.websiteDemo.create({
+        data: {
+          id: demoWithToken.id,
+          leadId: demoWithToken.leadId,
+          organizationId,
+          templateId: demoWithToken.templateId,
+          version: demoWithToken.version,
+          generationStatus: demoWithToken.generationStatus,
+          approvalStatus: demoWithToken.approvalStatus,
+          publicToken: token,
+          viewCount: demoWithToken.viewCount || 0,
+          content: demoWithToken.content as any,
+          theme: demoWithToken.theme as any,
+          error: demoWithToken.error || null,
+        },
+      });
+
+    let created;
+    try {
+      created = await createDemoRow(publicToken);
+    } catch (error: unknown) {
+      // Race: another generation claimed the same brand slug between our
+      // uniqueness probe and the insert. Fall back to a random suffix.
+      const code = (error as { code?: string } | null)?.code;
+      const target = String(
+        (error as { meta?: { target?: unknown } } | null)?.meta?.target || ''
+      ).toLowerCase();
+      if (code === 'P2002' && target.includes('publictoken')) {
+        created = await createDemoRow(
+          `${publicToken}-${crypto.randomBytes(3).toString('hex')}`
+        );
+      } else {
+        throw error;
+      }
+    }
 
     await LeadRepository.addAuditLog(organizationId, {
       action: 'DEMO_GENERATED',
