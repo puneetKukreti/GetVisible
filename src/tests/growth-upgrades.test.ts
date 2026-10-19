@@ -26,7 +26,7 @@ describe('Growth & Workflow Upgrades', () => {
   });
 
   describe('Upgrade 1: High-Converting Branded WhatsApp Strategy', () => {
-    it('generates a Touch 1 WhatsApp message with value hook, branded demo link, and 1-click interested link', () => {
+    it('generates a Touch 1 WhatsApp message with value hook, benefit checklist, and the branded demo link', () => {
       const outreach = generateDeterministicOutreach({
         businessName: 'Sharma & Singhal CA',
         profession: 'Chartered Accountant',
@@ -40,15 +40,23 @@ describe('Growth & Workflow Upgrades', () => {
       expect(outreach.whatsappMessage).toBeDefined();
       const touch1 = outreach.whatsappMessage!;
 
-      // Direct greeting without generic "team"
-      expect(touch1).toContain('Namaste *Sharma & Singhal CA* 👋');
-      expect(touch1).not.toContain('team 👋');
+      // Attention hook + free-website promise
+      expect(touch1).toContain('👋 *Want to Attract More Clients to Your Business?*');
+      expect(touch1).toContain('🌐 *Get Your Own FREE Website!* 🎉');
 
-      // Value hook and trust building
-      expect(touch1).toContain('preview image attached above 👆');
-      expect(touch1).toContain('instant digital trust');
+      // Four-point benefit checklist
+      expect(touch1.match(/✅ /g) || []).toHaveLength(4);
+      expect(touch1).toContain('✅ Showcase your services professionally');
+      expect(touch1).toContain('✅ Help more people discover your business online');
+
+      // Demo link travels in the first-touch message
+      expect(touch1).toContain('👀 *See what your website could look like!*');
+      expect(touch1).toContain('👉 *View Your Website Demo:*');
       expect(touch1).toContain('https://getvisible.in/demo/sharma-ca');
-      expect(touch1).toContain('YES');
+      expect(touch1).toContain('📩 Interested? Click the link above to explore your demo and learn more.');
+
+      // Never leak the raw screenshot URL as a link, and never self-link wa.me
+      expect(touch1).not.toContain('screenshot.png');
       expect(touch1).not.toContain('https://wa.me/');
     });
 
@@ -238,5 +246,36 @@ describe('Growth & Workflow Upgrades', () => {
       // Verify image binary payload is delivered
       expect(arrayBuf.byteLength).toBeGreaterThan(1000);
     }, 15000);
+
+    it('serves a portrait mobile concept card when viewport=mobile is requested', async () => {
+      const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
+      const testLead = leads[0];
+
+      const req = new NextRequest(
+        `http://localhost:3000/api/demos/${testLead.id}/screenshot?format=image&viewport=mobile`,
+        {
+          method: 'GET',
+          headers: {
+            'x-organization-id': DEMO_ORGANIZATION_ID,
+          },
+        }
+      );
+
+      const res = await screenshotGET(req, { params: { id: testLead.id } });
+      expect(res.status).toBe(200);
+      expect(res.headers.get('content-type')).toMatch(/image\/(png|svg\+xml)/);
+
+      const body = Buffer.from(await res.arrayBuffer());
+      expect(body.byteLength).toBeGreaterThan(1000);
+
+      // Where a local browser is available this is a 390x844 PNG capture;
+      // otherwise the SVG card must be the tall 1080x1350 portrait variant.
+      if (res.headers.get('content-type')?.includes('svg')) {
+        const svg = body.toString('utf-8');
+        expect(svg).toContain('viewBox="0 0 1080 1350"');
+        expect(svg).toContain('WEBSITE CONCEPT PREVIEW');
+        expect(svg).not.toContain('0 0 1024 640');
+      }
+    }, 45000);
   });
 });

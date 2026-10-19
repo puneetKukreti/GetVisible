@@ -32,6 +32,9 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
   const queryName = searchParams.get('name') || '';
   const queryCity = searchParams.get('city') || '';
   const queryProf = searchParams.get('profession') || '';
+  // Presentation-only switch: the portrait card is what reads well in a phone
+  // chat bubble. It cannot carry caller-supplied content, so it needs no session.
+  const isMobileViewport = searchParams.get('viewport') === 'mobile';
 
   let actualLeadId = 'preview';
   let brandName = queryName || 'Chartered Accountants';
@@ -116,12 +119,18 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }
     } catch {}
 
-    const heroDiskPath = path.join(cacheDir, `${actualLeadId}.png`);
-    const heroSvgPath = path.join(cacheDir, `${actualLeadId}.svg`);
-    const dynamicImageUrl = `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}&profession=${encodeURIComponent(profession)}`;
+    const variantSuffix = isMobileViewport ? '-mobile' : '';
+    // A headless `--window-size=390` capture is laid out at Chrome's ~500px
+    // minimum window width and then cropped back to 390, so it comes back with
+    // the hero copy sliced mid-word. The portrait variant is therefore always the
+    // designed 1080x1350 concept card (see generateMobileHeroMockupSvg); only the
+    // wide variant uses a real pixel capture.
+    const heroDiskPath = path.join(cacheDir, `${actualLeadId}${variantSuffix}.png`);
+    const heroSvgPath = path.join(cacheDir, `${actualLeadId}${variantSuffix}.svg`);
+    const dynamicImageUrl = `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}&profession=${encodeURIComponent(profession)}${isMobileViewport ? '&viewport=mobile' : ''}`;
 
     // 2. Return cached local hero screenshot if already exists and not refreshing
-    if (!forceRefresh) {
+    if (!forceRefresh && !isMobileViewport) {
       try {
         if (fs.existsSync(heroDiskPath) && fs.statSync(heroDiskPath).size > 1000) {
           if (isImageFormat) {
@@ -131,7 +140,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
                 'Content-Type': 'image/png',
                 'Cache-Control': 'public, max-age=86400',
                 'Access-Control-Allow-Origin': '*',
-                'Content-Disposition': 'inline; filename="hero_preview.png"',
+                'Content-Disposition': `inline; filename="hero_preview${isMobileViewport ? '_mobile' : ''}.png"`,
               },
             });
           }
@@ -154,7 +163,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
                 'Content-Type': 'image/svg+xml; charset=utf-8',
                 'Cache-Control': 'public, max-age=86400',
                 'Access-Control-Allow-Origin': '*',
-                'Content-Disposition': 'inline; filename="hero_preview.svg"',
+                'Content-Disposition': `inline; filename="hero_preview${isMobileViewport ? '_mobile' : ''}.svg"`,
               },
             });
           }
@@ -190,7 +199,8 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
         city,
         profession,
         content?.hero?.headline,
-        content?.hero?.subheadline
+        content?.hero?.subheadline,
+        { viewport: isMobileViewport ? 'mobile' : 'desktop' }
       );
 
       return new NextResponse(svg, {
@@ -198,7 +208,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
           'Content-Type': 'image/svg+xml; charset=utf-8',
           'Cache-Control': 'public, max-age=3600',
           'Access-Control-Allow-Origin': '*',
-          'Content-Disposition': 'inline; filename="website_concept.svg"',
+          'Content-Disposition': `inline; filename="website_concept${isMobileViewport ? '_mobile' : ''}.svg"`,
         },
       });
     }
@@ -217,7 +227,8 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
     // 3b. If a local headless browser is available (local dev / VPS with Chrome),
     // capture a fresh, pixel-perfect PNG of the personalized Stitch template.
-    if (hasLocalBrowser) {
+    // Skipped for the portrait variant, which is always the designed concept card.
+    if (hasLocalBrowser && !isMobileViewport) {
       let personalizedHtml = '';
       try {
         const rawHtml = getStitchRawHtml(layout);
@@ -234,8 +245,11 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
         let captured = false;
         try {
           captured = await captureLocalHeroScreenshot(personalizedHtml, heroDiskPath, {
-            width: 1024,
-            height: 640,
+            // The Stitch shells use a 1280px (max-w-7xl) desktop grid; a 1024px
+            // window squeezes the nav into the header CTA and clips it, so the
+            // live capture renders at the design's intended desktop width.
+            width: 1280,
+            height: 800,
           });
         } catch (captureErr) {
           console.warn('Local browser screenshot capture failed:', captureErr);
@@ -260,7 +274,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
                 'Content-Type': 'image/png',
                 'Cache-Control': 'public, max-age=86400',
                 'Access-Control-Allow-Origin': '*',
-                'Content-Disposition': 'inline; filename="hero_preview.png"',
+                'Content-Disposition': `inline; filename="hero_preview${isMobileViewport ? '_mobile' : ''}.png"`,
               },
             });
           }
@@ -278,7 +292,9 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     // 4. Zero-fail instant SVG Hero Mockup (Works 100% on Vercel Serverless / Cloud without Chrome)
     const heroHeadline = content?.hero?.headline;
     const heroSubheadline = content?.hero?.subheadline;
-    const svgContent = generateHeroMockupSvg(brandName, city, profession, heroHeadline, heroSubheadline);
+    const svgContent = generateHeroMockupSvg(brandName, city, profession, heroHeadline, heroSubheadline, {
+      viewport: isMobileViewport ? 'mobile' : 'desktop',
+    });
     try {
       fs.writeFileSync(heroSvgPath, svgContent, 'utf-8');
     } catch {}
@@ -290,7 +306,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
           'Content-Type': 'image/svg+xml; charset=utf-8',
           'Cache-Control': 'public, max-age=86400',
           'Access-Control-Allow-Origin': '*',
-          'Content-Disposition': 'inline; filename="hero_preview.svg"',
+          'Content-Disposition': `inline; filename="hero_preview${isMobileViewport ? '_mobile' : ''}.svg"`,
         },
       });
     }
@@ -303,7 +319,9 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     });
   } catch (error: unknown) {
     console.error('Hero screenshot capture error, delivering instant SVG fallback:', error);
-    const svgFallback = generateHeroMockupSvg(brandName, city, profession);
+    const svgFallback = generateHeroMockupSvg(brandName, city, profession, undefined, undefined, {
+      viewport: isMobileViewport ? 'mobile' : 'desktop',
+    });
 
     if (isImageFormat) {
       return new NextResponse(svgFallback, {
@@ -312,14 +330,14 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
           'Content-Type': 'image/svg+xml; charset=utf-8',
           'Cache-Control': 'public, max-age=86400',
           'Access-Control-Allow-Origin': '*',
-          'Content-Disposition': 'inline; filename="hero_preview.svg"',
+          'Content-Disposition': `inline; filename="hero_preview${isMobileViewport ? '_mobile' : ''}.svg"`,
         },
       });
     }
 
     return NextResponse.json({
       success: true,
-      screenshotUrl: `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}`,
+      screenshotUrl: `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}${isMobileViewport ? '&viewport=mobile' : ''}`,
       cached: false,
       source: 'svg_mockup',
     });

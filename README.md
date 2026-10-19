@@ -126,22 +126,30 @@ Public demo links are per-prospect and time-limited:
 
 ### Default WhatsApp message
 
-Step-1 outreach uses the copy below. WhatsApp bold is `*text*`. The greeting uses the
-prospect's contact name when one is on record (`Sachin ji`), otherwise the business name.
+Step-1 outreach uses the copy below. WhatsApp bold is `*text*`. The message is written for
+a **phone-sized chat window first** (where most WhatsApp traffic is), so it leads with a
+one-line hook, a four-point benefit checklist, and a single tappable demo link.
 
 ```text
-Namaste *{name}* 👋
+👋 *Want to Attract More Clients to Your Business?*
 
-I was looking for your practice online and couldn't find an official website, so I created a *custom website demo for {name}* to show how your practice could look online.
+Did you know that having a professional website can help potential clients find you online and build trust in your services?
 
-🖼️ *(preview image attached above 👆)*
+🌐 *Get Your Own FREE Website!* 🎉
 
-🌐 *View your demo:*
+✅ Showcase your services professionally
+✅ Make it easier for potential clients to contact you
+✅ Build trust and stand out from competitors
+✅ Help more people discover your business online
+
+👀 *See what your website could look like!*
+
+👉 *View Your Website Demo:*
 https://get-visible-web.vercel.app/demo/{token}
 
-It's a concept made specifically for your practice, not a generic template.
+🎁 Get started with your free website today!
 
-To help *{name}* build that instant digital trust, would you like to see how this could work for your firm? Just reply *"YES"* and I'll explain the next steps.
+📩 Interested? Click the link above to explore your demo and learn more.
 
 — Puneet | GetVisible
 ```
@@ -153,20 +161,45 @@ mirrored client-side for the campaigns workspace in
 ### Demo preview screenshot
 
 The screenshot attached to WhatsApp/email must always show the **prospect's own name**,
-never a shared sample. `GET /api/demos/[id]/screenshot?format=image` therefore:
+never a shared sample. `GET /api/demos/[id]/screenshot?format=image` therefore returns a
+self-contained, website-styled **SVG concept card** that leads with the prospect's name,
+city and profession (the campaigns workspace rasterizes it to PNG in the browser for the
+clipboard, "Copy Image", and the preview).
 
-- returns a real headless-browser capture of the personalized page when a local Chrome is
-  available (local dev / VPS), and
-- otherwise returns a self-contained, website-styled **SVG concept card** that leads with
-  the prospect's name, city, profession and a browser frame. The campaigns workspace
-  rasterizes it to PNG in the browser for the clipboard ("Copy Image") and the preview.
+Two attachment shapes are available and can be toggled in the campaigns panel:
+
+- `viewport=mobile` (default) — a tall **1080×1350 portrait card** that looks like a phone
+  screen. Type is sized so the firm name, headline and CTA stay legible once WhatsApp scales
+  the image down to a chat bubble (a landscape card renders most of its copy illegibly).
+- `viewport=desktop` — a wide browser-window card. When a local Chrome is available (local
+  dev / VPS) this one is a real pixel capture of the personalized page at 1280×800; otherwise
+  it is a 1024×640 mock card.
+
+The portrait variant is always the designed card, never a live capture: headless Chrome
+enforces a ~500px minimum window width, so a `--window-size=390` capture is laid out wide and
+then sliced mid-word.
 
 Email clients cannot render SVG, so `POST /api/outreach/send-email` resolves the inline
 image to the bundled raster template art for the prospect's chosen layout (with a live
 screenshot service as a last resort). The bundled `public/demo-templates/<id>/hero.png`
 files are neutral template thumbnails only — they intentionally contain a generic sample
 business, not any real prospect. See `src/lib/providers/screenshot.provider.ts`
-(`generateHeroMockupSvg`) and `src/app/api/demos/[id]/screenshot/route.ts`.
+(`generateHeroMockupSvg` / `generateMobileHeroMockupSvg`) and
+`src/app/api/demos/[id]/screenshot/route.ts`.
+
+### Phone-width rendering of the live demo
+
+The demo link is opened on phones, so the Stitch shells are hardened for narrow viewports in
+two places:
+
+- `src/lib/demos/stitch-personalizer.ts` — CA templates. Below 1024px the desktop nav is
+  already hidden, but the fixed-width brand block plus the in-header "Request a
+  Consultation" button used to overflow a 360-390px screen and push that button completely
+  off-canvas. The duplicate header CTA is now dropped on phones (the hero CTA and the
+  floating WhatsApp bar are already visible there), the brand name is stepped down and
+  allowed to ellipsize, and the whole firm name stays on screen.
+- `src/lib/demos/profession-stitch-renderer.ts` — non-CA profession templates get the same
+  treatment below 620px in `buildStyles()`.
 
 ### 5. Running the Application
 ```bash

@@ -102,6 +102,65 @@ export async function captureLocalHeroScreenshot(
 }
 
 /**
+ * Escapes the five XML special characters for safe SVG text/attribute output.
+ */
+export function escapeSvgXml(value: string): string {
+  return (value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/** 2-letter initials used for the monogram mark in the preview cards. */
+function brandInitials(brandName: string): string {
+  const cleanParts = (brandName || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(Boolean);
+  return cleanParts.length >= 2
+    ? (cleanParts[0][0] + cleanParts[1][0]).toUpperCase()
+    : cleanParts[0]?.slice(0, 2).toUpperCase() || 'GV';
+}
+
+/** Greedy word-wrap so long copy never collides with the surrounding artwork. */
+function wrapSvgText(text: string, maxChars: number, maxLines: number): string[] {
+  const words = (text || '').trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = '';
+  let truncated = false;
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word;
+    if (current && candidate.length > maxChars) {
+      lines.push(current);
+      current = word;
+      if (lines.length === maxLines) {
+        truncated = true;
+        break;
+      }
+    } else {
+      current = candidate;
+    }
+  }
+  if (!truncated && current && lines.length < maxLines) lines.push(current);
+  if (truncated && lines.length > 0) {
+    lines[lines.length - 1] = `${lines[lines.length - 1]}\u2026`;
+  }
+  return lines.slice(0, maxLines);
+}
+
+export interface HeroMockupOptions {
+  /**
+   * `mobile` renders a tall 1080x1350 portrait card (the layout that travels
+   * well in a phone-sized WhatsApp chat bubble); `desktop` keeps the original
+   * wide 1024x640 browser-window card.
+   */
+  viewport?: 'desktop' | 'mobile';
+}
+
+/**
  * Generates an authentic SVG hero preview as a bulletproof zero-dependency fallback
  * featuring the exact prospect firm name, city, badge, and navbar.
  */
@@ -110,15 +169,14 @@ export function generateHeroMockupSvg(
   city: string,
   profession: string = 'Chartered Accountants',
   headline?: string,
-  subheadline?: string
+  subheadline?: string,
+  options?: HeroMockupOptions
 ): string {
-  const escapeXml = (value: string) =>
-    (value || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&apos;');
+  if (options?.viewport === 'mobile') {
+    return generateMobileHeroMockupSvg(brandName, city, profession, headline, subheadline);
+  }
+
+  const escapeXml = escapeSvgXml;
 
   const brand = brandName || 'Chartered Accountants';
   const cityName = city || 'Gurgaon';
@@ -127,16 +185,7 @@ export function generateHeroMockupSvg(
   const escapedBrand = escapeXml(brand);
   const escapedCity = escapeXml(cityName);
 
-  // Compute 2-letter initials from business brand name.
-  const cleanParts = brand
-    .trim()
-    .replace(/[^a-zA-Z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter(Boolean);
-  const initials =
-    cleanParts.length >= 2
-      ? (cleanParts[0][0] + cleanParts[1][0]).toUpperCase()
-      : cleanParts[0]?.slice(0, 2).toUpperCase() || 'GV';
+  const initials = brandInitials(brand);
 
   // Greedy word-wrap so long headlines never collide with the hero artwork.
   const wrapText = (text: string, maxChars: number, maxLines: number): string[] => {
@@ -289,6 +338,183 @@ ${subheadlineSvg}
   </g>
 </svg>`;
 
+}
+
+/**
+ * Portrait (4:5) "phone screen" concept card.
+ *
+ * Landscape cards are rendered at a fraction of a phone's screen width, so most
+ * of their copy is illegible in a chat thumbnail. This variant is built the
+ * other way round: a tall 1080x1350 card whose type is sized to stay readable
+ * once WhatsApp scales it down to a chat bubble (>= 34px source text), with the
+ * prospect's own name as the dominant element near the top.
+ */
+export function generateMobileHeroMockupSvg(
+  brandName: string,
+  city: string,
+  profession: string = 'Chartered Accountants',
+  headline?: string,
+  subheadline?: string
+): string {
+  const brand = brandName || 'Chartered Accountants';
+  const cityName = city || 'Gurgaon';
+  const profName = profession || 'Chartered Accountants';
+
+  const escapedBrand = escapeSvgXml(brand);
+  const escapedCity = escapeSvgXml(cityName);
+  const initials = brandInitials(brand);
+
+  // Screen geometry
+  const PHONE_X = 140;
+  const PHONE_Y = 96;
+  const PHONE_W = 800;
+  const PHONE_H = 1158;
+  const SCREEN_X = PHONE_X + 16;
+  const SCREEN_Y = PHONE_Y + 16;
+  const SCREEN_W = PHONE_W - 32;
+  const SCREEN_H = PHONE_H - 32;
+  const TEXT_LEFT = SCREEN_X + 42;
+  const TEXT_MAX_W = SCREEN_W - 84;
+
+  // The prospect's name is sized to the longest word-safe width so it always
+  // fits the screen in at most two lines.
+  const brandLength = brand.trim().length;
+  const heroNameSize =
+    brandLength <= 12 ? 92 : brandLength <= 18 ? 80 : brandLength <= 24 ? 70 : brandLength <= 32 ? 60 : 54;
+  const heroNameMaxChars = Math.max(10, Math.floor(TEXT_MAX_W / (heroNameSize * 0.56)));
+  const heroNameLines = wrapSvgText(brand, heroNameMaxChars, 2);
+
+  const rawHeadline = headline || `${profName} Excellence & Advisory`;
+  const rawSubheadline =
+    subheadline ||
+    `Dedicated ${profName.toLowerCase()} services and trusted advisory for clients in ${cityName}.`;
+  const headlineLines = wrapSvgText(rawHeadline, Math.floor(TEXT_MAX_W / 24), 2);
+  const subheadlineLines = wrapSvgText(rawSubheadline, Math.floor(TEXT_MAX_W / 17), 2);
+
+  const squeeze = (line: string, size: number, maxWidth: number = TEXT_MAX_W) => {
+    const estimated = escapeSvgXml(line).length * size * 0.56;
+    return estimated > maxWidth
+      ? ` textLength="${maxWidth}" lengthAdjust="spacingAndGlyphs"`
+      : '';
+  };
+
+  const heroNameStartY = 452;
+  const heroNameSvg = heroNameLines
+    .map(
+      (line, i) =>
+        `  <text x="${TEXT_LEFT}" y="${heroNameStartY + i * 88}" font-family="Georgia, 'Times New Roman', serif" font-size="${heroNameSize}" font-weight="bold" fill="#0a1f3c"${squeeze(line, heroNameSize)}>${escapeSvgXml(line)}</text>`
+    )
+    .join('\n');
+
+  const headlineStartY = heroNameStartY + heroNameLines.length * 88 + 12;
+  const headlineSvg = headlineLines
+    .map(
+      (line, i) =>
+        `  <text x="${TEXT_LEFT}" y="${headlineStartY + i * 54}" font-family="Georgia, 'Times New Roman', serif" font-size="42" fill="#334155"${squeeze(line, 42)}>${escapeSvgXml(line)}</text>`
+    )
+    .join('\n');
+
+  const subheadlineStartY = headlineStartY + headlineLines.length * 54 + 14;
+  const subheadlineSvg = subheadlineLines
+    .map(
+      (line, i) =>
+        `  <text x="${TEXT_LEFT}" y="${subheadlineStartY + i * 46}" font-family="system-ui, -apple-system, sans-serif" font-size="36" fill="#64748b"${squeeze(line, 36)}>${escapeSvgXml(line)}</text>`
+    )
+    .join('\n');
+
+  const ctaY = subheadlineStartY + subheadlineLines.length * 46 + 20;
+  const ctaH = 96;
+  const benefitY = ctaY + ctaH + 50;
+  const footerStripY = SCREEN_Y + SCREEN_H - 96;
+
+  const badgeText = `\u2726 ${escapedBrand} \u2022 ${escapedCity.toUpperCase()}`;
+  const BADGE_FONT = 32;
+  const badgeTextEstimate = badgeText.length * BADGE_FONT * 0.62;
+  const badgeWidth = Math.min(TEXT_MAX_W, Math.max(320, badgeTextEstimate + 60));
+  const badgeFit =
+    badgeTextEstimate > badgeWidth - 60
+      ? ` textLength="${Math.round(badgeWidth - 60)}" lengthAdjust="spacingAndGlyphs"`
+      : '';
+
+  const benefits = [`Verified Practice`, `Direct Consultation`, `${escapedCity} Office`];
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 1350" width="1080" height="1350">
+  <defs>
+    <linearGradient id="cardBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#071729"/>
+      <stop offset="55%" stop-color="#0c2745"/>
+      <stop offset="100%" stop-color="#123a63"/>
+    </linearGradient>
+    <radialGradient id="cardGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fde047" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#fde047" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="screenBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#f3f6fa"/>
+    </linearGradient>
+    <linearGradient id="cardGold" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+    <clipPath id="screenClip">
+      <rect x="${SCREEN_X}" y="${SCREEN_Y}" width="${SCREEN_W}" height="${SCREEN_H}" rx="40"/>
+    </clipPath>
+  </defs>
+
+  <rect width="1080" height="1350" fill="url(#cardBg)"/>
+  <circle cx="880" cy="170" r="420" fill="url(#cardGlow)"/>
+
+  <text x="140" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="30" font-weight="700" letter-spacing="6" fill="#fde047">WEBSITE CONCEPT PREVIEW</text>
+
+  <!-- Phone frame -->
+  <rect x="${PHONE_X}" y="${PHONE_Y}" width="${PHONE_W}" height="${PHONE_H}" rx="56" fill="#05090f" stroke="#fde047" stroke-opacity="0.28" stroke-width="2"/>
+
+  <g clip-path="url(#screenClip)">
+    <rect x="${SCREEN_X}" y="${SCREEN_Y}" width="${SCREEN_W}" height="${SCREEN_H}" fill="url(#screenBg)"/>
+
+    <!-- Status bar -->
+    <text x="${TEXT_LEFT}" y="${SCREEN_Y + 46}" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#0f172a">9:41</text>
+    <g fill="#0f172a" fill-opacity="0.75">
+      <rect x="${SCREEN_X + SCREEN_W - 150}" y="${SCREEN_Y + 30}" width="10" height="18" rx="3"/>
+      <rect x="${SCREEN_X + SCREEN_W - 134}" y="${SCREEN_Y + 24}" width="10" height="24" rx="3"/>
+      <rect x="${SCREEN_X + SCREEN_W - 118}" y="${SCREEN_Y + 18}" width="10" height="30" rx="3"/>
+      <rect x="${SCREEN_X + SCREEN_W - 96}" y="${SCREEN_Y + 20}" width="56" height="26" rx="7" fill="none" stroke="#0f172a" stroke-opacity="0.6" stroke-width="2.5"/>
+      <rect x="${SCREEN_X + SCREEN_W - 92}" y="${SCREEN_Y + 24}" width="40" height="18" rx="4"/>
+    </g>
+
+    <!-- Site navbar -->
+    <rect x="${TEXT_LEFT}" y="${SCREEN_Y + 78}" width="66" height="66" rx="14" fill="#0a1f3c"/>
+    <text x="${TEXT_LEFT + 33}" y="${SCREEN_Y + 122}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="bold" fill="#d4af37">${initials}</text>
+    <text x="${TEXT_LEFT + 84}" y="${SCREEN_Y + 106}" font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="bold" fill="#0f172a"${squeeze(brand, 34, TEXT_MAX_W - 84)}>${escapedBrand}</text>
+    <text x="${TEXT_LEFT + 84}" y="${SCREEN_Y + 142}" font-family="system-ui, -apple-system, sans-serif" font-size="24" letter-spacing="3" fill="#64748b">${escapeSvgXml(profName.toUpperCase())}</text>
+    <line x1="${TEXT_LEFT}" y1="${SCREEN_Y + 182}" x2="${SCREEN_X + SCREEN_W - 42}" y2="${SCREEN_Y + 182}" stroke="#e2e8f0" stroke-width="2"/>
+
+    <!-- Firm badge -->
+    <rect x="${TEXT_LEFT}" y="${SCREEN_Y + 208}" width="${badgeWidth}" height="58" rx="29" fill="#fde047" fill-opacity="0.16" stroke="#d4af37" stroke-opacity="0.5" stroke-width="2"/>
+    <text x="${TEXT_LEFT + 26}" y="${SCREEN_Y + 246}" font-family="system-ui, -apple-system, sans-serif" font-size="${BADGE_FONT}" font-weight="700" fill="#b45309"${badgeFit}>${badgeText}</text>
+
+${heroNameSvg}
+${headlineSvg}
+${subheadlineSvg}
+
+    <!-- Primary call to action -->
+    <rect x="${TEXT_LEFT}" y="${ctaY}" width="${TEXT_MAX_W}" height="${ctaH}" rx="16" fill="url(#cardGold)"/>
+    <text x="${TEXT_LEFT + TEXT_MAX_W / 2}" y="${ctaY + 60}" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="#0a1f3c">Schedule Consultation &#8594;</text>
+
+    <!-- Trust rows -->
+    <g font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="#0f172a">
+${benefits.map((b, i) => `      <text x="${TEXT_LEFT}" y="${benefitY + i * 48}">&#10003; ${b}</text>`).join('\n')}
+    </g>
+
+    <!-- Mini site footer, so the card reads as a real page screenshot -->
+    <rect x="${SCREEN_X}" y="${footerStripY}" width="${SCREEN_W}" height="96" fill="#0a1f3c"/>
+    <text x="${TEXT_LEFT}" y="${footerStripY + 58}" font-family="system-ui, -apple-system, sans-serif" font-size="28" fill="#e2e8f0"${squeeze(`\u00a9 ${brand} \u2022 ${city}`, 28, TEXT_MAX_W - 190)}>&#169; ${escapedBrand} &#8226; ${escapedCity}</text>
+    <text x="${SCREEN_X + SCREEN_W - 42}" y="${footerStripY + 58}" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="700" fill="#fde047">Contact &#8594;</text>
+  </g>
+
+  <text x="540" y="1308" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="34" font-weight="600" fill="#e2e8f0"${squeeze(`Live preview prepared for ${brand}`, 34, 960)}>Live preview prepared for ${escapedBrand}</text>
+</svg>`;
 }
 
 export interface IScreenshotProvider {

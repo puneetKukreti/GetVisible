@@ -281,7 +281,7 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(lawyerNoWeb.hookQuestion).toContain('Would you be open to reviewing the live concept');
     });
 
-    it('generates clean WhatsApp copy referencing attached image without raw image URLs', () => {
+    it('generates the new attract-more-clients WhatsApp copy with the demo link and no raw image URLs', () => {
       const outreach = generateDeterministicOutreach({
         businessName: 'Apex Tax Partners CA',
         profession: 'Chartered Accountant',
@@ -297,9 +297,19 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
 
       // Verifies no raw screenshot URL link spam
       expect(wa).not.toContain('screenshot.png');
-      expect(wa).toContain('preview image attached above 👆');
-      expect(wa).toContain('Namaste *Apex Tax Partners CA* 👋');
-      expect(wa).toContain('YES');
+
+      // Verifies the new outreach copy
+      expect(wa).toContain('👋 *Want to Attract More Clients to Your Business?*');
+      expect(wa).toContain('🌐 *Get Your Own FREE Website!* 🎉');
+      expect(wa).toContain('✅ Showcase your services professionally');
+      expect(wa).toContain('✅ Make it easier for potential clients to contact you');
+      expect(wa).toContain('✅ Build trust and stand out from competitors');
+      expect(wa).toContain('✅ Help more people discover your business online');
+      expect(wa).toContain('👀 *See what your website could look like!*');
+      expect(wa).toContain('👉 *View Your Website Demo:*');
+
+      // The demo link must stay in the first-touch message.
+      expect(wa).toContain('https://example.com/demo/apex-1');
 
       // Verifies WhatsApp Follow-Up contains the demoUrl
       expect(outreach.whatsappFollowUpWithLink).toBeDefined();

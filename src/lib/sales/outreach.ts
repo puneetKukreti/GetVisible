@@ -237,11 +237,9 @@ Best regards,
 GetVisible Digital Team`;
 
   // WhatsApp optimized message:
-  // - Formatted with bolding (*)
-  // - Direct image friendly: references attached preview mockup above (NO raw screenshot URL links!)
-  // - Clear bullet points on how it improves business
-  // - Clean demo link
-  // - Low friction hook question to gauge interest
+  // - Formatted with WhatsApp bolding (*text*)
+  // - Clean demo link (NO raw screenshot URL links!)
+  // - Benefit checklist + soft, low-friction call to action
   const cleanPhone = (input.publicPhone || '').replace(/[^0-9]/g, '');
   const waRecipient = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
   const businessSlug = generatePublicDemoToken(input.businessName);
@@ -251,27 +249,27 @@ GetVisible Digital Team`;
       ? input.demoUrl
       : `${baseOrigin}/demo/${businessSlug}`;
 
-  const contactName = (input.contactName || '').trim();
-  const firstName = contactName.split(/\s+/)[0] || '';
-  const salutation = firstName ? `${firstName} ji` : input.businessName;
-  const displayName = contactName || input.businessName;
+  const whatsappMessage = `👋 *Want to Attract More Clients to Your Business?*
 
-  const meaningfulMsg = `Namaste *${salutation}* 👋
+Did you know that having a professional website can help potential clients find you online and build trust in your services?
 
-I was looking for your practice online and couldn't find an official website, so I created a *custom website demo for ${displayName}* to show how your practice could look online.
+🌐 *Get Your Own FREE Website!* 🎉
 
-🖼️ *(preview image attached above 👆)*
+✅ Showcase your services professionally
+✅ Make it easier for potential clients to contact you
+✅ Build trust and stand out from competitors
+✅ Help more people discover your business online
 
-🌐 *View your demo:*
+👀 *See what your website could look like!*
+
+👉 *View Your Website Demo:*
 ${demoUrl}
 
-It's a concept made specifically for your practice, not a generic template.
+🎁 Get started with your free website today!
 
-To help *${displayName}* build that instant digital trust, would you like to see how this could work for your firm? Just reply *"YES"* and I'll explain the next steps.
+📩 Interested? Click the link above to explore your demo and learn more.
 
 — Puneet | GetVisible`;
-
-  const whatsappMessage = meaningfulMsg;
 
   // Touch 2: Follow-up Link Reply (Sent after prospect replies "PREVIEW" or "YES")
   const whatsappFollowUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${input.businessName}*:

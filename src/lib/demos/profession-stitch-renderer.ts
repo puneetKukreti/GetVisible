@@ -339,6 +339,12 @@ a { color: inherit; text-decoration: none; }
   .gv-gallery--masonry { columns: 1; }
   .gv-cta { padding: 36px 22px; }
   .gv-footer__grid { grid-template-columns: 1fr; gap: 26px; }
+  /* Phone header: the in-header CTA duplicates the hero CTA and the floating
+     WhatsApp bar, and it squeezes the firm name. Keep the name legible instead. */
+  .gv-header__inner { gap: 12px; }
+  .gv-header__inner .gv-btn { display: none; }
+  .gv-brand { font-size: 17px; max-width: 100%; min-width: 0; }
+  .gv-brand__tag { display: none; }
 }
 `;
 }

@@ -142,4 +142,28 @@ describe('Google Stitch HTML Multi-Profession Personalization & DOM Hydration', 
     expect(html).not.toContain('googleusercontent.com/aida');
     expect(html).toContain('images.unsplash.com');
   });
+
+  it('hardens the header for phone widths so the firm name and CTA never leave the screen', () => {
+    const content = {
+      brand: { businessName: 'Shri Radhakrishnan Venkateshwara Associates' },
+      location: { city: 'Gurgaon', address: 'Sector 44, Gurgaon' },
+      contact: { publicPhone: '+91 98111 22233' },
+      meta: { profession: 'Chartered Accountant' },
+    };
+
+    for (const layout of ['design-1-premium', 'design-2-minimalist', 'design-3-contemporary']) {
+      const html = personalizeStitchHtml(getStitchRawHtml(layout), content as any);
+
+      // A phone-scoped media query, so wide-screen layouts are untouched.
+      expect(html).toContain('@media (max-width: 1023.98px)');
+
+      // The duplicate in-header CTA is dropped on phones…
+      expect(html).toMatch(/header a\[data-path="request-a-consultation"\]/);
+      expect(html).toMatch(/display: none !important/);
+
+      // …and the brand block may compress and ellipsize instead of overflowing.
+      expect(html).toMatch(/header > div > :first-child,\s*header > div > div > :first-child \{\s*min-width: 0 !important;\s*flex-shrink: 1 !important;/);
+      expect(html).toMatch(/text-overflow: ellipsis !important/);
+    }
+  });
 });

@@ -123,6 +123,21 @@ describe('Profession-specific Stitch template sets', () => {
     expect(getProfessionStitchDesign('design-photo-editorial')?.category).toBe('PHOTOGRAPHY_CREATIVE');
   });
 
+  it('keeps the profession header on one line at phone widths', () => {
+    for (const id of Object.keys(PROFESSION_STITCH_DESIGNS)) {
+      const shell = getStitchRawHtml(id);
+
+      // Phone-scoped rules inside the existing 620px breakpoint…
+      expect(shell).toContain('@media (max-width: 620px)');
+      // …that drop the duplicate in-header CTA and its redundant profession tag,
+      // leaving the firm name the full width of the bar.
+      expect(shell).toContain('.gv-header__inner { gap: 12px; }');
+      expect(shell).toContain('.gv-header__inner .gv-btn { display: none; }');
+      expect(shell).toContain('.gv-brand { font-size: 17px; max-width: 100%; min-width: 0; }');
+      expect(shell).toContain('.gv-brand__tag { display: none; }');
+    }
+  });
+
   it('photographer: masonry portfolio, image-led copy, zero CA leakage', async () => {
     const { html, layout } = await generate('Professional Photographer', 'Amit Photography Studio', 'Delhi NCR');
     expect(layout).toBe('design-photo-editorial');

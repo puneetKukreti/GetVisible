@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateAiBusinessContent } from '@/lib/demos/ai-content-generator';
-import { generateHeroMockupSvg } from '@/lib/providers/screenshot.provider';
+import { generateHeroMockupSvg, generateMobileHeroMockupSvg } from '@/lib/providers/screenshot.provider';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { LeadData } from '@/types';
 
@@ -64,6 +64,65 @@ describe('Gemini AI Content Generator & Multi-Profession Generalization', () => 
     expect(svg).toContain('https://sachin-narang.com');
     expect(svg).toContain('windowClip');
     expect(svg).toContain('Get a Demo');
+  });
+
+  it('renders a tall portrait concept card for phone-sized WhatsApp bubbles', () => {
+    const svg = generateMobileHeroMockupSvg(
+      'Apex Dental',
+      'Noida',
+      'Dentist',
+      'Gentle & Advanced Dental Care',
+      'Pain-free implants, root canals and cosmetic smile designs.'
+    );
+
+    // Portrait 4:5 canvas — the shape that fills a mobile chat bubble.
+    expect(svg).toContain('viewBox="0 0 1080 1350"');
+    expect(svg).toContain('width="1080"');
+    expect(svg).toContain('height="1350"');
+
+    // The prospect's own name is the dominant element, at chat-thumbnail scale.
+    expect(svg).toContain('font-size="92"');
+    expect(svg).toContain('>Apex Dental<');
+    expect(svg).toContain('✦ Apex Dental • NOIDA');
+    expect(svg).toContain('WEBSITE CONCEPT PREVIEW');
+    expect(svg).toContain('Live preview prepared for Apex Dental');
+
+    // Reads as a phone screen: status bar, site navbar, CTA and trust rows.
+    expect(svg).toContain('Schedule Consultation');
+    expect(svg).toContain('screenClip');
+    expect(svg).toContain('Verified Practice');
+    expect(svg).toContain('Noida Office');
+  });
+
+  it('dispatches the mobile viewport option and keeps long names inside the card', () => {
+    expect(
+      generateHeroMockupSvg('Apex Dental', 'Noida', 'Dentist', undefined, undefined, {
+        viewport: 'mobile',
+      })
+    ).toBe(generateMobileHeroMockupSvg('Apex Dental', 'Noida', 'Dentist'));
+
+    // The wide browser-window card stays the default when no viewport is requested.
+    expect(generateHeroMockupSvg('Apex Dental', 'Noida', 'Dentist')).toContain('0 0 1024 640');
+
+    // Very long firm names are wrapped (and squeezed) instead of overrunning the screen.
+    const longName = generateMobileHeroMockupSvg(
+      'Shri Radhakrishnan Venkateshwara Associates',
+      'Bengaluru',
+      'Chartered Accountant'
+    );
+    expect(longName).toContain('textLength=');
+    expect(longName).toContain('>Shri Radhakrishnan</text>');
+    expect(longName).toContain('Venkateshwara…</text>');
+
+    // Hostile brand input can never break out of the SVG document.
+    const hostile = generateMobileHeroMockupSvg(
+      'Sharma & Sons <script>alert(1)</script>',
+      'Delhi',
+      "Dentist's Clinic"
+    );
+    expect(hostile).not.toContain('<script>');
+    expect(hostile).toContain('Sharma &amp; Sons');
+    expect(hostile).toContain('&lt;script&gt;');
   });
 
   it('3. generateDemo integrates AI content and marks provenance as AI_SYNTHESIZED when available', async () => {

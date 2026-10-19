@@ -449,6 +449,52 @@ export function personalizeStitchHtml(
     zoom: 1.22 !important;
     overflow: hidden !important;
   }
+
+  /* --- Phone header hardening ---------------------------------------------
+     Below the 1024px breakpoint these shells hide their desktop nav but keep a
+     fixed-width brand block (shrink-0) next to an in-header "Request a
+     Consultation" button. On a 360-390px phone that pair is ~660px wide, so the
+     header CTA used to be pushed completely off-canvas and the firm name was
+     clipped at the edge. The hero CTA and the floating WhatsApp bar already give
+     a prominent, thumb-reachable action on a phone, so here we drop the
+     duplicate header button and let the prospect's whole firm name show. */
+  @media (max-width: 1023.98px) {
+    header a[data-path="request-a-consultation"],
+    header a[class*="bg-"][class*="px-"] {
+      display: none !important;
+    }
+    header > div {
+      gap: 8px !important;
+    }
+    /* The brand block ships with shrink-0; allow it to compress instead. */
+    header > div > :first-child,
+    header > div > div > :first-child {
+      min-width: 0 !important;
+      flex-shrink: 1 !important;
+    }
+    /* …and its text trunk (min-width:auto by default) may compress too. */
+    header > div > :first-child a,
+    header > div > :first-child a > div,
+    header > div > :first-child > div,
+    header > div > div > :first-child a,
+    header > div > div > :first-child a > div {
+      min-width: 0 !important;
+    }
+    header > div > :first-child span,
+    header > div > div > :first-child span {
+      display: block !important;
+      max-width: 100% !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      white-space: nowrap !important;
+    }
+    /* Drop the firm name a couple of steps on phones so long names fit whole
+       instead of relying on the ellipsis fallback above. */
+    header a span:first-of-type {
+      font-size: 16px !important;
+      line-height: 1.15 !important;
+    }
+  }
 </style>
 `;
 

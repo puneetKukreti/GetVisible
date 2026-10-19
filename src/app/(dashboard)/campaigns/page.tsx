@@ -101,18 +101,67 @@ function scoreColor(score: number) {
 
 // ─── Screenshot & Media Utilities ──────────────────────────────────────────
 
-function getScreenshotImageUrl(lead: LeadData, refresh = false) {
+/** Portrait card for phone-sized WhatsApp bubbles, wide card for desktop/email. */
+type ScreenshotViewport = 'mobile' | 'desktop';
+
+function getScreenshotImageUrl(
+  lead: LeadData,
+  refresh = false,
+  viewport: ScreenshotViewport = 'mobile'
+) {
   const params = new URLSearchParams({
     format: 'image',
     name: lead.businessName || '',
     city: lead.city || 'Delhi NCR',
     profession: lead.profession || 'CA',
   });
+  if (viewport === 'mobile') params.set('viewport', 'mobile');
   if (refresh) {
     params.set('refresh', 'true');
     params.set('t', String(Date.now()));
   }
   return `/api/demos/${encodeURIComponent(lead.id)}/screenshot?${params.toString()}`;
+}
+
+function ScreenshotViewportToggle({
+  value,
+  onChange,
+}: {
+  value: ScreenshotViewport;
+  onChange: (v: ScreenshotViewport) => void;
+}) {
+  const base =
+    'px-2 py-1 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer';
+  return (
+    <div className="inline-flex rounded border border-border bg-card/95 backdrop-blur-xs overflow-hidden shadow-xs">
+      <button
+        type="button"
+        onClick={() => onChange('mobile')}
+        title="Portrait 4:5 card — reads clearly in a phone WhatsApp chat"
+        className={`${base} ${
+          value === 'mobile'
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-muted'
+        }`}
+      >
+        <span>📱</span>
+        <span>Mobile</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('desktop')}
+        title="Wide 16:10 card — best for desktop / email clients"
+        className={`${base} ${
+          value === 'desktop'
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-muted'
+        }`}
+      >
+        <span>🖥</span>
+        <span>Desktop</span>
+      </button>
+    </div>
+  );
 }
 
 function generateInlineSvgDataUri(
@@ -256,27 +305,25 @@ function getMeaningfulWhatsAppMessage(lead: LeadData): {
   const baseOrigin = typeof window !== 'undefined' ? window.location.origin : getAppBaseUrl();
   const demoUrl = `${baseOrigin}/demo/${lead.websiteDemos?.[0]?.publicToken || businessSlug}`;
 
-  const contactName = (
-    lead.contacts?.find((c) => c.isPrimary)?.name ||
-    lead.contacts?.[0]?.name ||
-    ''
-  ).trim();
-  const firstName = contactName.split(/\s+/)[0] || '';
-  const salutation = firstName ? `${firstName} ji` : lead.businessName;
-  const displayName = contactName || lead.businessName;
+  const message = `👋 *Want to Attract More Clients to Your Business?*
 
-  const message = `Namaste *${salutation}* 👋
+Did you know that having a professional website can help potential clients find you online and build trust in your services?
 
-I was looking for your practice online and couldn't find an official website, so I created a *custom website demo for ${displayName}* to show how your practice could look online.
+🌐 *Get Your Own FREE Website!* 🎉
 
-🖼️ *(preview image attached above 👆)*
+✅ Showcase your services professionally
+✅ Make it easier for potential clients to contact you
+✅ Build trust and stand out from competitors
+✅ Help more people discover your business online
 
-🌐 *View your demo:*
+👀 *See what your website could look like!*
+
+👉 *View Your Website Demo:*
 ${demoUrl}
 
-It's a concept made specifically for your practice, not a generic template.
+🎁 Get started with your free website today!
 
-To help *${displayName}* build that instant digital trust, would you like to see how this could work for your firm? Just reply *"YES"* and I'll explain the next steps.
+📩 Interested? Click the link above to explore your demo and learn more.
 
 — Puneet | GetVisible`;
 
@@ -308,6 +355,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const [whatsappMessage, setWhatsappMessage] = useState(initialWa.message);
   const [whatsappFollowUpWithLink, setWhatsappFollowUpWithLink] = useState(initialWa.followUpWithLink);
   const [screenshotUrl, setScreenshotUrl] = useState<string>(() => getScreenshotImageUrl(lead));
+  const [screenshotViewport, setScreenshotViewport] = useState<ScreenshotViewport>('mobile');
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [refreshingHeroShot, setRefreshingHeroShot] = useState(false);
@@ -348,7 +396,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       setWhatsappFollowUpShareUrl(`https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(wa.followUpWithLink)}`);
     }
 
-    setScreenshotUrl(getScreenshotImageUrl(lead));
+    setScreenshotUrl(getScreenshotImageUrl(lead, false, screenshotViewport));
     setImgLoaded(false);
 
     // Hard fallback timeout: ensure loading overlay never stays stuck over 2.2s
@@ -365,6 +413,14 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
     // handleSelectChannel and handleSwitchWhatsappStep).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id, lead.businessName]);
+
+  // Switching the preview shape (portrait phone card vs wide browser card) only
+  // needs to re-point the image, never to rebuild the outreach copy.
+  useEffect(() => {
+    setScreenshotUrl(getScreenshotImageUrl(lead, false, screenshotViewport));
+    setImgLoaded(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screenshotViewport]);
 
   const handleSelectChannel = (ch: OutreachChannel) => {
     setChannel(ch);
@@ -485,7 +541,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const copyScreenshotImage = async () => {
     setCopyImageStatus('COPYING');
     try {
-      const imgUrl = screenshotUrl || getScreenshotImageUrl(lead);
+      const imgUrl = screenshotUrl || getScreenshotImageUrl(lead, false, screenshotViewport);
       const pngBlob = await renderUrlToPngBlob(imgUrl);
       await navigator.clipboard.write([
         new ClipboardItem({ 'image/png': pngBlob }),
@@ -501,21 +557,22 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   };
 
   const downloadScreenshot = async () => {
+    const fileName = `${(lead.businessName || 'website').replace(/[^a-z0-9]/gi, '_')}_${screenshotViewport}_concept.png`;
     try {
-      const imgUrl = screenshotUrl || getScreenshotImageUrl(lead);
+      const imgUrl = screenshotUrl || getScreenshotImageUrl(lead, false, screenshotViewport);
       const pngBlob = await renderUrlToPngBlob(imgUrl);
       const url = URL.createObjectURL(pngBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${(lead.businessName || 'website').replace(/[^a-z0-9]/gi, '_')}_hero_concept.png`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
       const a = document.createElement('a');
-      a.href = getScreenshotImageUrl(lead);
-      a.download = `${(lead.businessName || 'website').replace(/[^a-z0-9]/gi, '_')}_hero_concept.png`;
+      a.href = getScreenshotImageUrl(lead, false, screenshotViewport);
+      a.download = fileName;
       a.target = '_blank';
       a.click();
     }
@@ -524,7 +581,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const handleRefreshHeroShot = () => {
     setRefreshingHeroShot(true);
     setImgLoaded(false);
-    const newUrl = getScreenshotImageUrl(lead, true);
+    const newUrl = getScreenshotImageUrl(lead, true, screenshotViewport);
     setScreenshotUrl(newUrl);
     setTimeout(() => {
       setRefreshingHeroShot(false);
@@ -589,7 +646,9 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
       // Embed the same personalized preview card the operator sends on WhatsApp,
       // so the email recipient sees their own business name instead of neutral
       // template art (email clients cannot render the SVG the route returns).
-      const inlinePreview = await renderUrlToPngDataUrl(screenshotUrl || getScreenshotImageUrl(lead));
+      const inlinePreview = await renderUrlToPngDataUrl(
+        screenshotUrl || getScreenshotImageUrl(lead, false, screenshotViewport)
+      );
 
       const res = await fetch('/api/outreach/send-email', {
         method: 'POST',
@@ -867,16 +926,22 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                   Quick Reply Card
                 </Badge>
               </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsEditingDraft(!isEditingDraft)}
-                className="h-6 text-[11px] px-2 gap-1 text-muted-foreground hover:text-foreground"
-              >
-                <Edit3 className="w-3 h-3" />
-                <span>{isEditingDraft ? 'Card Preview' : 'Edit Text'}</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <ScreenshotViewportToggle
+                  value={screenshotViewport}
+                  onChange={setScreenshotViewport}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditingDraft(!isEditingDraft)}
+                  className="h-6 text-[11px] px-2 gap-1 text-muted-foreground hover:text-foreground"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  <span>{isEditingDraft ? 'Card Preview' : 'Edit Text'}</span>
+                </Button>
+              </div>
             </div>
 
             {isEditingDraft ? (
@@ -918,7 +983,11 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                   {/* 3. The WhatsApp Card Bubble (Identical to image) */}
                   <div className="bg-white dark:bg-[#1f2c34] rounded-2xl shadow-sm border border-black/5 dark:border-white/5 overflow-hidden max-w-sm mx-auto">
                     {/* Image at Top */}
-                    <div className="relative aspect-[16/10] bg-slate-900 overflow-hidden border-b border-border/30 group">
+                    <div
+                      className={`relative ${
+                        screenshotViewport === 'mobile' ? 'aspect-[4/5]' : 'aspect-[16/10]'
+                      } max-h-[520px] bg-slate-900 overflow-hidden border-b border-border/30 group`}
+                    >
                       {/* Loading & Rendering Overlay */}
                       {(!imgLoaded || screenshotLoading || refreshingHeroShot) && (
                         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-xs z-10 text-center p-3 text-slate-200">
@@ -1112,6 +1181,10 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       <Loader2 className="w-3 h-3 animate-spin" /> Capturing snapshot…
                     </span>
                   )}
+                  <ScreenshotViewportToggle
+                    value={screenshotViewport}
+                    onChange={setScreenshotViewport}
+                  />
                   <Button
                     type="button"
                     variant="ghost"
@@ -1132,7 +1205,11 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
 
               {screenshotUrl ? (
                 <div className="space-y-2">
-                  <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-slate-900 shadow-inner group">
+                  <div
+                    className={`relative ${
+                      screenshotViewport === 'mobile' ? 'aspect-[4/5] max-w-[360px]' : 'aspect-video'
+                    } rounded-md overflow-hidden border border-border bg-slate-900 shadow-inner group`}
+                  >
                     {/* Loading & Rendering Overlay */}
                     {(!imgLoaded || screenshotLoading || refreshingHeroShot) && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/80 backdrop-blur-xs z-10 text-center p-3 text-slate-200">
@@ -1503,9 +1580,10 @@ function OutreachQueueTab({
     setBlitzLoadingId(lead.id);
 
     try {
-      // 1. Copy screenshot PNG to OS clipboard if available
+      // 1. Copy screenshot PNG to OS clipboard if available (portrait card, so the
+      //    prospect reads it full-width on their phone)
       try {
-        const imgUrl = getScreenshotImageUrl(lead);
+        const imgUrl = getScreenshotImageUrl(lead, false, 'mobile');
         const pngBlob = await renderUrlToPngBlob(imgUrl);
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': pngBlob }),
