@@ -172,6 +172,14 @@ class DemoDataStore {
     this.blueprints.set(BLUEPRINT_LEDGER_KEY, [...withoutKey, record]);
   }
 
+  removeBlueprint(key: string): void {
+    const rows = this.blueprints.get(BLUEPRINT_LEDGER_KEY) || [];
+    this.blueprints.set(
+      BLUEPRINT_LEDGER_KEY,
+      rows.filter((row) => row.key !== key)
+    );
+  }
+
   getDemosMap(): Map<string, WebsiteDemoData[]> {
     return this.demos;
   }
@@ -2516,6 +2524,29 @@ export class IndustryBlueprintRepository {
       }
       throw error;
     }
+  }
+  /**
+   * Forgets an industry's authored design so it can be authored again (e.g.
+   * after configuring the AI provider, or to replace a design authored by an
+   * older rule set). Owner-triggered only.
+   */
+  static async deleteIndustryBlueprint(key: string): Promise<boolean> {
+    const cleanKey = key ? key.trim() : '';
+    if (!cleanKey) return false;
+    await ensureDatabaseMode();
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const existing = demoStore.getBlueprint(cleanKey);
+      if (!existing) return false;
+      demoStore.removeBlueprint(cleanKey);
+      demoStore.saveToDisk();
+      return true;
+    }
+
+    const { prisma } = await import('./prisma');
+    const result = await prisma.industryBlueprint.deleteMany({ where: { key: cleanKey } });
+    return result.count > 0;
   }
 }
 

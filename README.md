@@ -254,9 +254,11 @@ of reference sites in that sector — and applies it to layout, theme and copy:
   industry key (`Car Detailing & Automobile Workshop` → `car-detailing`), so related naming shares
   one design.
 - **Re-authoring an industry** — each stored row records how it was authored (`source`: `ai`
-  when the model authored it, `deterministic` when the curated rule table did). Delete that row
-  (`DELETE FROM industry_blueprints WHERE key = 'car-detailing';`) to author it again — useful
-  after configuring `GEMINI_API_KEY`, since the first authored design is the one that sticks.
+  when the model authored it, `deterministic` when the curated rule table did). To see the design a
+  trade will get, call `GET /api/demos/industry-blueprint?profession=Printing%20%26%20Packaging`
+  (owner session required); to replace a design that was cached by older rules, or to pick up the
+  AI-authored design after configuring `GEMINI_API_KEY`, call the same URL with `POST` — the first
+  authored design is otherwise the one that sticks.
 - **Safe by construction** — the blueprint can only *select* from allow-lists: an archetype id, one
   of the curated palette/typography systems (`industry-palettes.ts`), allow-listed section ids and
   one optional hex accent. It can never emit markup, CSS, fonts or arbitrary colours; invalid

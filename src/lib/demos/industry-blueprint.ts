@@ -860,6 +860,27 @@ export function clearIndustryBlueprintCache(): void {
 }
 
 /**
+ * Forgets an industry's stored design and authors it again (owner-triggered).
+ *
+ * Used to pick up a better design than the one that was cached first — e.g.
+ * after configuring the AI provider, or after the curated rules for a trade
+ * improved. Returns the newly authored blueprint.
+ */
+export async function reauthorIndustryDesignBlueprint(
+  input: GetIndustryBlueprintInput,
+  deps: IndustryBlueprintDeps = {}
+): Promise<IndustryDesignBlueprint> {
+  const key = buildIndustryKey(input.profession, input.businessName);
+  blueprintCache.delete(key);
+  try {
+    await IndustryBlueprintRepository.deleteIndustryBlueprint(key);
+  } catch {
+    // Even if the old row could not be removed, author a fresh one below.
+  }
+  return getIndustryDesignBlueprint(input, deps);
+}
+
+/**
  * Compact brief handed to the copy writer so headlines, trust signals and CTAs
  * read the way the industry's best websites do.
  */

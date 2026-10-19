@@ -6,6 +6,7 @@ import {
   getIndustryDesignBlueprint,
   clearIndustryBlueprintCache,
   buildBlueprintIndustryBrief,
+  reauthorIndustryDesignBlueprint,
 } from '@/lib/demos/industry-blueprint';
 import {
   PROFESSION_ARCHETYPE_IDS,
@@ -251,6 +252,30 @@ describe('industry design blueprints', () => {
     });
     expect(html).toContain('#0d0e11'); // Midnight Garage page background
     expect(html).toContain('gv-hero--fullbleed');
+  });
+
+  it('re-authors an industry so a stale stored design can be replaced', async () => {
+    clearIndustryBlueprintCache();
+    // A stored design that predates an improved curated rule (the printing rule
+    // was added later, so an old row would still be the generic default).
+    await IndustryBlueprintRepository.saveIndustryBlueprint({
+      key: 'printing-press',
+      industry: 'Printing Press',
+      blueprint: buildDeterministicBlueprint('Underwater Basket Weaver', 'Deep Blue Studio'),
+      source: 'deterministic',
+      version: 1,
+      createdAt: new Date().toISOString(),
+    });
+    const cached = await getIndustryDesignBlueprint({ profession: 'Printing Press' });
+    expect(cached.paletteId).toBe('corporate-navy');
+
+    const refreshed = await reauthorIndustryDesignBlueprint({ profession: 'Printing Press' });
+    expect(refreshed.paletteId).toBe('clean-industrial');
+
+    // The refreshed design is what later leads in the industry get.
+    clearIndustryBlueprintCache();
+    const later = await getIndustryDesignBlueprint({ profession: 'Printing Press' });
+    expect(later.paletteId).toBe('clean-industrial');
   });
 
   it('builds a copy brief with the city substituted', () => {    const blueprint = buildDeterministicBlueprint(
