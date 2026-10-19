@@ -86,10 +86,10 @@ describe('AI diagnostics', () => {
     const diag = getIndustryBlueprintAiDiagnostics();
     expect(diag.keyResolved).toBe(true);
     expect(diag.authored).toBe(false);
-    // Discovery was refused too, so only the known names remain.
-    expect(diag.availableModels).toEqual(GEMINI_FALLBACK_MODELS);
-    expect(diag.attempts).toHaveLength(3);
-    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-2.5-flash', status: 403 });
+    // Discovery was refused too, so the chosen model leads the known names.
+    expect(diag.availableModels).toEqual(['gemini-3.5-flash-lite', ...GEMINI_FALLBACK_MODELS]);
+    expect(diag.attempts).toHaveLength(4);
+    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-3.5-flash-lite', status: 403 });
     expect(JSON.stringify(diag)).not.toContain('AIza-secret-value');
 
     vi.unstubAllGlobals();
@@ -122,7 +122,7 @@ describe('AI diagnostics', () => {
 
     const diag = getIndustryBlueprintAiDiagnostics();
     expect(diag.authored).toBe(true);
-    expect(diag.model).toBe('gemini-2.5-flash');
+    expect(diag.model).toBe('gemini-3.5-flash-lite');
     expect(diag.at).toBeTruthy();
 
     vi.unstubAllGlobals();
@@ -150,6 +150,8 @@ describe('AI diagnostics', () => {
                 { name: 'models/gemini-3-pro', supportedGenerationMethods: ['generateContent'] },
                 { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
                 { name: 'models/gemini-3.8-flash-lite', supportedGenerationMethods: ['generateContent'] },
+                // An image model: generateContent yes, text answers no.
+                { name: 'models/gemini-3.1-flash-lite-image', supportedGenerationMethods: ['generateContent'] },
                 // Newest name, but an unknown family: answering a JSON prompt is
                 // not what it is for, so it must not be tried first.
                 { name: 'models/gemini-4-argon', supportedGenerationMethods: ['generateContent'] },
@@ -175,6 +177,8 @@ describe('AI diagnostics', () => {
       'gemini-3-pro',
       'gemini-4-argon',
     ]);
+    // An image model must never be treated as a candidate for text.
+    expect(models).not.toContain('gemini-3.1-flash-lite-image');
 
     resetGeminiModelCache();
     vi.unstubAllGlobals();
@@ -190,14 +194,49 @@ describe('AI diagnostics', () => {
     );
 
     expect(await listGeminiModels('AIza-unreachable-key')).toEqual([]);
-    // Discovery failed, so only the known last-resort names remain.
-    expect(await resolveGeminiModels('AIza-unreachable-key')).toEqual(GEMINI_FALLBACK_MODELS);
+    // Discovery failed, so the chosen model is tried, then the known names.
+    expect(await resolveGeminiModels('AIza-unreachable-key')).toEqual([
+      'gemini-3.5-flash-lite',
+      ...GEMINI_FALLBACK_MODELS,
+    ]);
 
     resetGeminiModelCache();
     vi.unstubAllGlobals();
   });
 
-  it('tries the lightest model first when the API offers one', async () => {
+  it('puts the chosen model first when the API confirms it exists', async () => {
+    resetGeminiModelCache();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              models: [
+                { name: 'models/gemini-3.5-flash-lite', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3.9-flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3.8-flash-lite', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-4-argon', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+              ],
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    expect(await resolveGeminiModels('AIza-chosen-key')).toEqual([
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash-lite',
+      'gemini-3.9-flash',
+      'gemini-3.8-flash',
+    ]);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back to the lightest ranking when the chosen model is gone', async () => {
     resetGeminiModelCache();
     vi.stubGlobal(
       'fetch',

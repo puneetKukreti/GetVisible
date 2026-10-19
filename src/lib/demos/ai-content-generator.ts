@@ -144,8 +144,9 @@ export const GEMINI_FALLBACK_MODELS = [
   'gemini-1.5-flash',
 ];
 
-/** Names that technically support generateContent but are never what we want. */
-const GEMINI_UNWANTED_MODEL = /embedding|aqa|imagen|veo|tts|audio|live|image-generation/i;
+/** Capable of generateContent, but not of answering a text prompt. */
+const GEMINI_UNWANTED_MODEL =
+  /embedding|aqa|imagen|veo|tts|audio|image|transcribe|computer-use|robotics|nano-banana|live/i;
 
 /**
  * How willing we are to use a model *family*: lightest first, because the
@@ -295,14 +296,24 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
 }
 
 /**
- * The ordered models to try: whatever the API offers, lightest first, else the
- * fallback names. Ranking already puts the lightest family ahead, so no model
- * needs hardcoding.
+ * The model we want. Chosen explicitly rather than inferred, because it answers
+ * a blueprint prompt in about a second. Ranking still applies behind it, so if
+ * it ever disappears the next best model is used instead of failing.
+ */
+const GEMINI_PREFERRED_MODELS = ['gemini-3.5-flash-lite'];
+
+/**
+ * The ordered models to try: the chosen model first when the API confirms it
+ * exists, then the rest lightest-first, else the known last-resort names.
  */
 export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
   const discovered = await listGeminiModels(apiKey);
-  if (discovered.length > 0) return discovered.slice(0, 4);
-  return [...GEMINI_FALLBACK_MODELS];
+  if (discovered.length > 0) {
+    const preferred = GEMINI_PREFERRED_MODELS.filter((name) => discovered.includes(name));
+    const rest = discovered.filter((name) => !preferred.includes(name));
+    return [...preferred, ...rest].slice(0, 4);
+  }
+  return Array.from(new Set([...GEMINI_PREFERRED_MODELS, ...GEMINI_FALLBACK_MODELS]));
 }
 
 /** Test seam: forget the discovered model list. */
