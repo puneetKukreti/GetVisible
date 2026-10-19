@@ -51,6 +51,11 @@ function present(
       checkedThisRequest,
       disabledByEnv: process.env.DISABLE_INDUSTRY_BLUEPRINT_AI === 'true',
       runtime: process.env.NODE_ENV || null,
+      // Lets a probe distinguish "the new deploy is live" from "the old one is
+      // still answering", which matters because Vercel bakes env vars into the
+      // deployment rather than reading them per request.
+      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) || null,
+      deployment: process.env.VERCEL_DEPLOYMENT_ID || null,
       key: describeGeminiKeyState(),
       authoring: getIndustryBlueprintAiDiagnostics(),
     },
