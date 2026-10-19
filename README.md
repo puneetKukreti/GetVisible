@@ -245,13 +245,18 @@ of reference sites in that sector — and applies it to layout, theme and copy:
 - **Where it comes from** — `src/lib/demos/ai-content-generator.ts`
   (`generateIndustryBlueprintJson`) asks the model to describe the blueprint that leading reference
   websites in that industry share — so the design reflects real industry conventions, not random
-  choice. If no key is configured or the call fails, a curated deterministic rule table
-  (`industry-blueprint.ts`) supplies the same shape of answer.
+  choice. That step (and the copywriter briefing that follows) needs `GEMINI_API_KEY` configured;
+  without it the curated deterministic rule table in `industry-blueprint.ts` supplies the same shape
+  of answer, so the feature works either way.
 - **Authored once per industry** — the result is validated, persisted (`industry_blueprints` table
   in Postgres, `industry-blueprints` ledger key in demo mode) and reused: every car-detailing lead
   gets the identical design, across restarts and serverless instances. Keyed by a normalised
   industry key (`Car Detailing & Automobile Workshop` → `car-detailing`), so related naming shares
   one design.
+- **Re-authoring an industry** — each stored row records how it was authored (`source`: `ai`
+  when the model authored it, `deterministic` when the curated rule table did). Delete that row
+  (`DELETE FROM industry_blueprints WHERE key = 'car-detailing';`) to author it again — useful
+  after configuring `GEMINI_API_KEY`, since the first authored design is the one that sticks.
 - **Safe by construction** — the blueprint can only *select* from allow-lists: an archetype id, one
   of the curated palette/typography systems (`industry-palettes.ts`), allow-listed section ids and
   one optional hex accent. It can never emit markup, CSS, fonts or arbitrary colours; invalid

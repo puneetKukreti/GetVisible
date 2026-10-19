@@ -125,6 +125,35 @@ describe('industry design blueprints', () => {
     expect(repaired.paletteId).toBe('clean-industrial');
   });
 
+  it('covers common generic trades with an industry-apt design', () => {
+    const cases: Array<[string, string, string]> = [
+      ['Travel Agency', 'design-photo-editorial', 'warm-artisan'],
+      ['Printing & Packaging', 'design-classic-professional', 'clean-industrial'],
+      ['Agri Seeds & Fertilizers', 'design-classic-professional', 'organic-care'],
+      ['Appliance Repair Services', 'design-classic-professional', 'electric-blueprint'],
+      ['House Cleaning Services', 'design-classic-professional', 'organic-care'],
+      ['Pet Grooming Studio', 'design-classic-professional', 'organic-care'],
+      ['Pest Control Services', 'design-classic-professional', 'organic-care'],
+      ['Packers and Movers', 'design-classic-professional', 'clean-industrial'],
+      ['Yoga & Fitness Studio', 'design-bold-energetic', 'vivid-sport'],
+      ['Modular Furniture Works', 'design-classic-professional', 'clean-industrial'],
+      ['Solar Panel Installation', 'design-bold-energetic', 'electric-blueprint'],
+      ['CCTV & Security Systems', 'design-classic-professional', 'electric-blueprint'],
+    ];
+
+    for (const [profession, archetype, paletteId] of cases) {
+      const blueprint = buildDeterministicBlueprint(profession, `${profession} Studio`);
+      expect({ profession, archetype: blueprint.archetype, paletteId: blueprint.paletteId }).toEqual({
+        profession,
+        archetype,
+        paletteId,
+      });
+      expect(blueprint.sectionOrder[0]).toBe('HERO');
+      expect(blueprint.imagery.keywords.length).toBeGreaterThan(0);
+      expect(blueprint.copy.primaryCta.length).toBeGreaterThan(2);
+    }
+  });
+
   it('rejects a payload that is not a blueprint at all', () => {    const seed = buildDeterministicBlueprint('Plumber', 'FlowFix Plumbing Co');
     expect(validateIndustryBlueprint('nonsense', seed)).toBeNull();
     expect(validateIndustryBlueprint(null, seed)).toBeNull();
