@@ -191,43 +191,6 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
     const hasLocalBrowser = Boolean(findSystemBrowser());
 
-    // 3a. Serverless host without Chrome: the wide variant can still come out as
-    // a genuine capture by sending the personalized page to Microlink (zero
-    // config, public URL required). Anything unusable falls through to the
-    // designed SVG card. The portrait variant stays the designed card, since a
-    // chat bubble needs the oversized prospect name, not a shrunken real page.
-    if (!hasLocalBrowser && !isMobileViewport) {
-      const publicAccessToken = demo?.publicToken || actualLeadId;
-      const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
-        publicAccessToken
-      )}/html`;
-      const cloudBytes = await captureCloudHeroScreenshot(livePageUrl, 1280, 800);
-      if (cloudBytes) {
-        // DOM BodyInit needs a snapshot BufferSource; hand over a plain copy.
-        const cloudBody = new Uint8Array(cloudBytes.byteLength);
-        cloudBody.set(cloudBytes);
-        try {
-          fs.writeFileSync(heroDiskPath, cloudBytes);
-        } catch {}
-        if (isImageFormat) {
-          return new NextResponse(cloudBody, {
-            headers: {
-              'Content-Type': 'image/png',
-              'Cache-Control': 'public, max-age=86400',
-              'Access-Control-Allow-Origin': '*',
-              'Content-Disposition': `inline; filename="hero_preview.png"`,
-            },
-          });
-        }
-        return NextResponse.json({
-          success: true,
-          screenshotUrl: dynamicImageUrl,
-          cached: false,
-          source: 'microlink',
-        });
-      }
-    }
-
     if (!hasLocalBrowser && isImageFormat) {
       // No headless browser on this host (e.g. Vercel serverless), so the static
       // template art cannot be personalized per prospect. Return a self-contained
@@ -328,7 +291,55 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }
     }
 
-    // 4. Zero-fail instant SVG Hero Mockup (Works 100% on Vercel Serverless / Cloud without Chrome)
+    // 4. Wide variant: try a genuine cloud render. Reaching this point means no
+    // local browser bytes came back (no Chrome on host, or a phantom browser
+    // binary in the env), so instead of resigning to the mock card we send the
+    // *public* personalized page to Microlink — zero config, no API key. If that
+    // is unavailable, fail through to the designed SVG card. The portrait
+    // variant always keeps the designed card: a chat bubble needs the oversized
+    // prospect name far more than a shrunken real page.
+    if (!isMobileViewport) {
+      const publicAccessToken = demo?.publicToken || actualLeadId;
+      const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
+        publicAccessToken
+      )}/html`;
+      const cloudBytes = await captureCloudHeroScreenshot(livePageUrl, 1280, 800);
+      if (cloudBytes) {
+        // DOM BodyInit needs a snapshot BufferSource; hand over a plain copy.
+        const cloudBody = new Uint8Array(cloudBytes.byteLength);
+        cloudBody.set(cloudBytes);
+        try {
+          fs.writeFileSync(heroDiskPath, cloudBytes);
+        } catch {}
+        if (demo) {
+          demo.screenshotUrl = dynamicImageUrl;
+          await WebsiteDemoRepository.updateDemo(
+            demo.organizationId || orgId,
+            demo.id,
+            { ...demo } as any,
+            'system'
+          ).catch(() => {});
+        }
+        if (isImageFormat) {
+          return new NextResponse(cloudBody, {
+            headers: {
+              'Content-Type': 'image/png',
+              'Cache-Control': 'public, max-age=86400',
+              'Access-Control-Allow-Origin': '*',
+              'Content-Disposition': `inline; filename="hero_preview.png"`,
+            },
+          });
+        }
+        return NextResponse.json({
+          success: true,
+          screenshotUrl: dynamicImageUrl,
+          cached: false,
+          source: 'microlink',
+        });
+      }
+    }
+
+    // 5. Zero-fail instant SVG Hero Mockup (Works 100% on Vercel Serverless / Cloud without Chrome)
     const heroHeadline = content?.hero?.headline;
     const heroSubheadline = content?.hero?.subheadline;
     const svgContent = generateHeroMockupSvg(brandName, city, profession, heroHeadline, heroSubheadline, {
