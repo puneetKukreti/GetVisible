@@ -161,7 +161,9 @@ interface IndustryBlueprintRule {
  */
 const INDUSTRY_RULES: IndustryBlueprintRule[] = [
   {
-    match: /car|auto|automobile|vehicle|motor|bike|tyre|tire|garage|detailing|denting|car wash|bodyshop|body shop|wheel|workshop/i,
+    // Word-bounded on purpose: "Carton", "Pet Care", "Carpet", "Bookkeeping"
+    // and "Textile" must never match the trade rules they merely contain.
+    match: /\b(cars?|automobiles?|automotive|vehicles?|bikes?|motorcycles?|motorbikes?|tyres?|tires?|motors?|wheels?|garages?|detailing|denting|bodyshops?)\b|car wash|body shop|auto (?:service|repair|works|care|detailing|spa|solutions)|\bauto\b|spare parts/i,
     archetype: 'design-bold-energetic',
     paletteId: 'midnight-garage',
     sectionOrder: SERVICE_FLOW,
@@ -179,7 +181,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['car detailing', 'ceramic coating', 'car interior cleaning', 'car polishing'],
   },
   {
-    match: /solar|panel|inverter|renewable|ev charg|electric vehicle|energy/i,
+    match: /\b(solar|photovoltaic|inverters?|renewables?|rooftop)\b|ev charg|electric vehicle|\benergy\b/i,
     archetype: 'design-bold-energetic',
     paletteId: 'electric-blueprint',
     sectionOrder: EXPERT_FLOW,
@@ -197,7 +199,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['solar panel installation', 'rooftop solar', 'solar inverter', 'solar energy'],
   },
   {
-    match: /electric|wiring|hvac|air condition|ac repair|security|cctv|camera|surveillance|intercom|networking|computer repair|laptop repair|technician|water purifier|ro service|appliance|refriger|washing machine|microwave|lift|elevator|fire safety|fire fighting/i,
+    match: /\b(?:electric(?:al|s|ian|ians)?|wiring|hvac|security|cctv|cameras?|surveillance|intercom|networking|technicians?|appliances?|refrigerators?|fridges?|microwaves?|lifts?|elevators?|electronics?)\b|air condition|ac repair|computer repair|laptop repair|ro service|water purifier|water purifiers|washing machine|fire safety|fire fighting/i,
     archetype: 'design-classic-professional',
     paletteId: 'electric-blueprint',
     sectionOrder: SERVICE_FLOW,
@@ -215,7 +217,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['electrician working', 'security camera installation', 'air conditioner service', 'electrical panel'],
   },
   {
-    match: /plumb|pipe|contractor|carpent|painting|painter|weld|fabricat|mason|tile|waterproof|borewell|bore well|glass|aluminium|furniture|renovat|interior work/i,
+    match: /\b(?:plumb(?:ing|er|ers)?|pipes?|contractors?|carpent(?:er|ers|ry)?|paint(?:ing|er|ers)?|welding|fabrication|masons?|masonry|tiles?|waterproofing|borewell|glass|aluminium|aluminum|furniture|renovation|manufactur\w*)\b|bore well|interior work/i,
     archetype: 'design-classic-professional',
     paletteId: 'clean-industrial',
     sectionOrder: SERVICE_FLOW,
@@ -233,7 +235,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['plumber working', 'carpenter furniture', 'house painting work', 'fabrication workshop'],
   },
   {
-    match: /pest|fumigat|termite|rodent|mosquito/i,
+    match: /\b(?:pests?|fumigation|termites?|rodents?|mosquitoes?|mosquito|bedbugs?|cockroach\w*|disinfection|disinfestation)\b/i,
     archetype: 'design-classic-professional',
     paletteId: 'organic-care',
     sectionOrder: ['HERO', 'TRUST', 'SERVICES', 'PROCESS', 'WHY_CHOOSE_US', 'FAQ', 'GALLERY', 'CTA', 'CONTACT', 'LOCATION'],
@@ -251,7 +253,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['pest control', 'home pest treatment', 'fumigation service', 'termite treatment'],
   },
   {
-    match: /clean|housekeep|maid|laundry|dry clean|sanitiz|deep clean|car wash|janitor/i,
+    match: /\b(?:cleaning|cleaners?|cleans?|housekeeping|maids?|laundry|janitorial|sanitization|sanitisation|sanitizing)\b|dry clean|deep clean|car wash/i,
     archetype: 'design-classic-professional',
     paletteId: 'organic-care',
     sectionOrder: ['HERO', 'TRUST', 'SERVICES', 'PROCESS', 'GALLERY', 'WHY_CHOOSE_US', 'FAQ', 'CTA', 'CONTACT', 'LOCATION'],
@@ -269,7 +271,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['house cleaning', 'deep cleaning service', 'clean living room', 'laundry service'],
   },
   {
-    match: /pet|dog|cat|grooming|boarding|kennel|vet/i,
+    match: /\b(?:pets?|dogs?|cats?|grooming|boarding|kennels?|vets?|veterinary|pupp(?:y|ies)|kittens?|aquarium|pet shop)\b/i,
     archetype: 'design-classic-professional',
     paletteId: 'organic-care',
     sectionOrder: ['HERO', 'TRUST', 'SERVICES', 'GALLERY', 'PROCESS', 'WHY_CHOOSE_US', 'FAQ', 'CTA', 'CONTACT', 'LOCATION'],
@@ -287,7 +289,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['pet grooming', 'dog boarding', 'pet care', 'grooming salon'],
   },
   {
-    match: /logistic|transport|courier|packers|movers|moving|cargo|freight|warehouse|taxi|cab|rental|car hire/i,
+    match: /\b(?:logistics?|transport|transporters?|courier|couriers?|packers|movers|moving|cargo|freight|warehouse|taxi|taxis|cabs?|rentals?|hire)\b|car hire|packers and movers/i,
     archetype: 'design-classic-professional',
     paletteId: 'clean-industrial',
     sectionOrder: SERVICE_FLOW,
@@ -305,7 +307,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['packers movers', 'cargo logistics', 'delivery van', 'warehouse operations'],
   },
   {
-    match: /event|wedding|planner|decor|banquet|catering|photograph|caterer|dj|celebrat/i,
+    match: /\b(?:events?|weddings?|planners?|decor|decorations?|decorators?|banquets?|catering|caterers?|photography|photographers?|dj|celebrations?)\b/i,
     archetype: 'design-photo-editorial',
     paletteId: 'warm-artisan',
     sectionOrder: VISUAL_FLOW,
@@ -323,7 +325,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['wedding decoration', 'event setup', 'catering buffet', 'celebration lights'],
   },
   {
-    match: /travel|tour|hotel|resort|homestay|guest house|banquet hall|holiday|trip|visa/i,
+    match: /\b(?:travels?|tours?|tourism|hotels?|resorts?|homestays?|holidays?|trips?|visas?|itinerary|itineraries)\b|guest house|banquet hall/i,
     archetype: 'design-photo-editorial',
     paletteId: 'warm-artisan',
     sectionOrder: VISUAL_FLOW,
@@ -341,7 +343,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['travel destination', 'hotel resort', 'sightseeing tour', 'holiday vacation'],
   },
   {
-    match: /printing|packaging|signage|flex|graphic design|label|carton|stationery/i,
+    match: /\b(?:printing|printers?|packaging|signage|flex|labels?|cartons?|stationery|offset)\b|graphic design/i,
     archetype: 'design-classic-professional',
     paletteId: 'clean-industrial',
     sectionOrder: PRODUCT_FLOW,
@@ -359,7 +361,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['printing press', 'packaging boxes', 'signage board', 'business cards print'],
   },
   {
-    match: /agri|farm|nursery|seed|fertiliz|pesticide|irrigation|dairy|poultry|tractor|horticultur/i,
+    match: /\b(?:agri\w*|farming|farmers?|farms?|nurser(?:y|ies)|seeds?|fertilizers?|pesticides?|irrigation|dairy|poultry|tractors?|horticulture|kisan)\b/i,
     archetype: 'design-classic-professional',
     paletteId: 'organic-care',
     sectionOrder: SERVICE_FLOW,
@@ -377,7 +379,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['indian farmer field', 'agriculture crops', 'irrigation farm', 'nursery plants'],
   },
   {
-    match: /salon|spa|beauty|makeup|parlour|parlor|nail|hair|tattoo|bridal/i,
+    match: /\b(?:salons?|spas?|beauty|makeup|parlours?|parlors?|nails?|hair|tattoos?|bridal|stylists?|barbers?)\b/i,
     archetype: 'design-beauty-elegant',
     paletteId: 'soft-blush',
     sectionOrder: VISUAL_FLOW,
@@ -395,7 +397,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['beauty salon interior', 'hair styling salon', 'spa treatment', 'makeup artist'],
   },
   {
-    match: /gym|fitness|yoga|zumba|crossfit|sport|martial|dance|swim|trainer/i,
+    match: /\b(?:gyms?|fitness|yoga|zumba|crossfit|sports?|martial|dance|dancing|swimming|trainers?|athletics?)\b/i,
     archetype: 'design-bold-energetic',
     paletteId: 'vivid-sport',
     sectionOrder: VISUAL_FLOW,
@@ -413,7 +415,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['gym workout', 'personal trainer', 'yoga class', 'fitness equipment'],
   },
   {
-    match: /retail|boutique|store|shop|jewell|jewel|gift|garment|fashion|footwear|optic|mobile|laptop|book|kirana|supermarket/i,
+    match: /\b(?:retail|boutiques?|stores?|shops?|jewell?ers?|jewellery|gifts?|garments?|fashion|footwear|optical|opticians?|mobiles?|laptops?|books?|kirana|supermarkets?)\b/i,
     archetype: 'design-classic-professional',
     paletteId: 'premium-charcoal-gold',
     sectionOrder: PRODUCT_FLOW,
@@ -431,7 +433,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['retail store interior', 'product display shelf', 'jewellery display', 'shop counter'],
   },
   {
-    match: /coach|tuition|institute|academy|school|classes|training|exam|mentor|skill|learning/i,
+    match: /\b(?:coaching|coaches?|tuitions?|institutes?|academ(?:y|ies)|schools?|classes|training|exams?|mentors?|skills?|learning)\b/i,
     archetype: 'design-bold-energetic',
     paletteId: 'corporate-navy',
     sectionOrder: EXPERT_FLOW,
@@ -449,7 +451,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['classroom teaching', 'students studying', 'coaching class', 'teacher explaining'],
   },
   {
-    match: /clinic|doctor|dental|dentist|physio|hospital|diagnost|patholog|veterinar|health|skin|derma|ortho/i,
+    match: /\b(?:clinics?|doctors?|dentals?|dentists?|physiotherapy|physio|hospitals?|diagnostics?|pathology|veterinary|health|derma\w*|ortho\w*|ayurveda|homeopathy)\b/i,
     archetype: 'design-clinic-clean',
     paletteId: 'clinical-mint',
     sectionOrder: EXPERT_FLOW,
@@ -467,7 +469,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['clinic interior', 'doctor consultation', 'dental clinic', 'medical equipment'],
   },
   {
-    match: /lawyer|advocate|legal|chartered|accountant|tax|audit|finance|loan|insurance|consult|advisor|agency|software|marketing|it services|bpo|advisory/i,
+    match: /\b(?:lawyers?|advocates?|legal|chartered|accountants?|accounting|taxation|taxes?|tax|audits?|auditing|finance|financial|loans?|insurance|consult\w*|advisors?|agenc(?:y|ies)|software|marketing|bpo|advisory)\b|it services|it solutions|gst/i,
     archetype: 'design-classic-professional',
     paletteId: 'corporate-navy',
     sectionOrder: EXPERT_FLOW,
@@ -485,7 +487,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['business consulting', 'office meeting', 'professional workspace', 'financial advisor'],
   },
   {
-    match: /real estate|property|builder|realtor|apartment|plot|housing/i,
+    match: /\b(?:properties|property|builders?|realtors?|apartments?|plots?|housing)\b|real estate/i,
     archetype: 'design-realestate-premium',
     paletteId: 'premium-charcoal-gold',
     sectionOrder: VISUAL_FLOW,
@@ -503,7 +505,7 @@ const INDUSTRY_RULES: IndustryBlueprintRule[] = [
     imageryKeywords: ['modern apartment interior', 'building exterior', 'real estate property', 'home interior'],
   },
   {
-    match: /restaurant|cafe|bakery|cake|food|caterer|sweet|dhaba|kitchen|juice|ice cream|pizzeria/i,
+    match: /\b(?:restaurants?|cafes?|cafeteria|baker(?:y|ies)|cakes?|foods?|caterers?|sweets?|dhaba|kitchens?|juices?|pizza\w*)\b|ice cream/i,
     archetype: 'design-restaurant-warm',
     paletteId: 'warm-artisan',
     sectionOrder: PRODUCT_FLOW,

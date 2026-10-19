@@ -155,6 +155,30 @@ describe('industry design blueprints', () => {
     }
   });
 
+  it('does not let a trade match a rule it merely contains a word of', () => {
+    // Substring traps: "Carton" (car), "Pet Care" (car), "Carpet" (car),
+    // "Textile" (tile), "Bookkeeping" (book), "Art Workshop" (workshop).
+    const cases: Array<[string, string, string]> = [
+      ['Carton & Label Packaging', 'design-classic-professional', 'clean-industrial'],
+      ['Pet Care Services', 'design-classic-professional', 'organic-care'],
+      ['Carpet & Sofa Cleaning', 'design-classic-professional', 'organic-care'],
+      ['Spare Parts Shop', 'design-bold-energetic', 'midnight-garage'],
+      ['Art Workshop', 'design-classic-professional', 'corporate-navy'],
+      ['Textile Trading', 'design-classic-professional', 'corporate-navy'],
+      ['Automatic Door Systems', 'design-classic-professional', 'corporate-navy'],
+      ['Cabinet Manufacturing', 'design-classic-professional', 'clean-industrial'],
+    ];
+
+    for (const [profession, archetype, paletteId] of cases) {
+      const blueprint = buildDeterministicBlueprint(profession, `${profession} Co`);
+      expect({ profession, archetype: blueprint.archetype, paletteId: blueprint.paletteId }).toEqual({
+        profession,
+        archetype,
+        paletteId,
+      });
+    }
+  });
+
   it('rejects a payload that is not a blueprint at all', () => {    const seed = buildDeterministicBlueprint('Plumber', 'FlowFix Plumbing Co');
     expect(validateIndustryBlueprint('nonsense', seed)).toBeNull();
     expect(validateIndustryBlueprint(null, seed)).toBeNull();
