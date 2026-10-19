@@ -72,6 +72,7 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
         demoId={demo.publicToken || demo.id}
         leadId={demo.leadId}
         version={demo.version}
+        publicView
       />
 
       {/* Floating Conversion Bar: ONLY Claim on WhatsApp */}

@@ -34,6 +34,13 @@ interface DemoRendererProps {
   demoId?: string;
   leadId?: string;
   version?: number;
+  /**
+   * True when the viewer is anonymous (public prospect link). The Stitch iframe
+   * then serves the demo's OWN stored layout instead of requesting a `?layout=`
+   * override — the override endpoint is owner-only, and an anonymous request
+   * with it would 401 and blank the prospect's site.
+   */
+  publicView?: boolean;
 }
 
 const DEFAULT_SECTION_ORDER: WebsiteSectionType[] = [
@@ -74,6 +81,7 @@ export function DemoRenderer({
   demoId,
   leadId,
   version,
+  publicView = false,
 }: DemoRendererProps) {
   // Ensure content and theme are objects in case they were parsed from raw JSON
   const safeContent: WebsiteContent =
@@ -107,6 +115,7 @@ export function DemoRenderer({
         version={version}
         content={safeContent}
         design={activeDesign}
+        publicView={publicView}
       />
     );
   }

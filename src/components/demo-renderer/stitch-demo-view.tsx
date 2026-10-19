@@ -11,6 +11,11 @@ interface StitchDemoViewProps {
   version?: number;
   content?: WebsiteContent;
   design?: WebsiteDesign;
+  /**
+   * Anonymous (public prospect) view: omit the `?layout=` override param so the
+   * html endpoint serves the demo's own stored layout without an owner session.
+   */
+  publicView?: boolean;
   className?: string;
 }
 
@@ -20,6 +25,7 @@ export function StitchDemoView({
   layout = 'design-1-premium',
   version = 1,
   content,
+  publicView = false,
   className = '',
 }: StitchDemoViewProps) {
   const [loading, setLoading] = useState(true);
@@ -27,9 +33,13 @@ export function StitchDemoView({
   const [reloadKey, setReloadKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Determine iframe source URL
+  // Determine iframe source URL. The `?layout=` param is an owner-session-only
+  // override in the html endpoint, so the anonymous public view must not send
+  // it — the endpoint then renders the demo's own stored layout.
   const targetId = demoId || leadId || 'preview';
-  const iframeSrc = `/api/demos/${encodeURIComponent(targetId)}/html?layout=${encodeURIComponent(layout)}&v=${version}&k=${reloadKey}`;
+  const iframeSrc = publicView
+    ? `/api/demos/${encodeURIComponent(targetId)}/html?v=${version}&k=${reloadKey}`
+    : `/api/demos/${encodeURIComponent(targetId)}/html?layout=${encodeURIComponent(layout)}&v=${version}&k=${reloadKey}`;
 
   // Robust lifecycle listener: ensures loader is NEVER stuck on screen
   useEffect(() => {
