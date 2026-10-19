@@ -191,6 +191,114 @@ describe('AI diagnostics', () => {
     vi.unstubAllGlobals();
   });
 
+  it('retries a capacity error once and keeps the answer', async () => {
+    silent();
+    resetIndustryBlueprintAiDiagnostics();
+    resetGeminiModelCache();
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-retry-key');
+    let generateCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/models?')) {
+          return new Response(
+            JSON.stringify({
+              models: [
+                { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
+              ],
+            }),
+            { status: 200 }
+          );
+        }
+        generateCalls += 1;
+        if (generateCalls === 1) {
+          // 503 means "the request was fine, the provider is busy" — worth one retry.
+          return new Response(
+            JSON.stringify({
+              error: { code: 503, message: 'This model is currently experiencing high demand.' },
+            }),
+            { status: 503 }
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: JSON.stringify({ sectionOrder: ['HERO', 'SERVICES', 'CONTACT'] }) }],
+                },
+              },
+            ],
+          }),
+          { status: 200 }
+        );
+      })
+    );
+
+    const result = await generateIndustryBlueprintJson(facts);
+    expect(generateCalls).toBe(2);
+    expect(result).toBeTruthy();
+    expect(getIndustryBlueprintAiDiagnostics().authored).toBe(true);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('stops retrying an overloaded model and moves to the next one', async () => {
+    silent();
+    resetIndustryBlueprintAiDiagnostics();
+    resetGeminiModelCache();
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-capacity-key');
+    const called: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const href = String(url);
+        if (href.includes('/models?')) {
+          return new Response(
+            JSON.stringify({
+              models: [
+                { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+              ],
+            }),
+            { status: 200 }
+          );
+        }
+        const model = href.match(/models\/([^:]+):/)?.[1] || '?';
+        called.push(model);
+        if (model === 'gemini-3-flash') {
+          return new Response(JSON.stringify({ error: { message: 'high demand' } }), { status: 503 });
+        }
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              { content: { parts: [{ text: JSON.stringify({ sectionOrder: ['HERO', 'CONTACT'] }) }] } },
+            ],
+          }),
+          { status: 200 }
+        );
+      })
+    );
+
+    const result = await generateIndustryBlueprintJson(facts);
+    expect(result).toBeTruthy();
+    // Twice on the overloaded model, then on to the next.
+    expect(called).toEqual(['gemini-3-flash', 'gemini-3-flash', 'gemini-2.5-flash']);
+
+    const diag = getIndustryBlueprintAiDiagnostics();
+    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-3-flash', status: 503 });
+    expect(diag.model).toBe('gemini-2.5-flash');
+    expect(diag.authored).toBe(true);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
   it('reports the reason the API gave for a failed model call', async () => {
     silent();
     resetIndustryBlueprintAiDiagnostics();

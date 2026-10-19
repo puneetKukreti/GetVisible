@@ -172,10 +172,71 @@ function compareGeminiModels(a: string, b: string): number {
 }
 
 /**
- * Per-attempt ceiling. Three attempts at this length still fit inside the route
- * budget, and a model that needs longer would make demo generation slow anyway.
+ * Per-attempt ceiling. A model that needs longer than this would make demo
+ * generation slow even when it does work.
  */
 const GEMINI_ATTEMPT_TIMEOUT_MS = 12000;
+
+/**
+ * Transient conditions meaning "the request was fine, try again": capacity
+ * spikes and rate limits. A real answer or a real rejection (400/403/404) is
+ * returned immediately, because retrying those changes nothing.
+ */
+const GEMINI_TRANSIENT_STATUS = new Set([429, 500, 502, 503, 504]);
+
+/** One extra try per model, plus a ceiling for the whole authoring attempt. */
+const GEMINI_ATTEMPT_TRIES = 2;
+const GEMINI_RETRY_DELAY_MS = 600;
+const GEMINI_TOTAL_BUDGET_MS = 25000;
+
+function geminiGenerateUrl(model: string, apiKey: string): string {
+  return `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models/${model}:generateContent?key=${apiKey.trim()}`;
+}
+
+/** Wall-clock point past which no further model call is started. */
+export function geminiAuthoringDeadline(now: number = Date.now()): number {
+  return now + GEMINI_TOTAL_BUDGET_MS;
+}
+
+/**
+ * One model, one prompt. Retries only transient capacity/rate responses, and
+ * never starts a try it cannot finish before the deadline, so an overloaded
+ * provider cannot consume the request's whole budget. Returns null when there
+ * was no time even to try.
+ */
+async function callGeminiModel(params: {
+  model: string;
+  apiKey: string;
+  prompt: string;
+  temperature: number;
+  deadline: number;
+}): Promise<Response | null> {
+  const { model, apiKey, prompt, temperature, deadline } = params;
+  const url = geminiGenerateUrl(model, apiKey);
+  let res: Response | null = null;
+
+  for (let attempt = 0; attempt < GEMINI_ATTEMPT_TRIES; attempt++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { responseMimeType: 'application/json', temperature },
+      }),
+      signal: AbortSignal.timeout(Math.max(1500, Math.min(GEMINI_ATTEMPT_TIMEOUT_MS, remaining))),
+    });
+
+    if (!GEMINI_TRANSIENT_STATUS.has(res.status)) return res;
+
+    const wait = Math.min(GEMINI_RETRY_DELAY_MS * (attempt + 1), Math.max(0, deadline - Date.now()));
+    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+
+  return res;
+}
 
 let geminiModelCache: { key: string; models: string[] } | null = null;
 
@@ -1200,29 +1261,12 @@ ${options.industryBrief}
 }`;
 
   const candidateModels = await resolveGeminiModels(apiKey);
+  const deadline = geminiAuthoringDeadline();
 
   for (const model of candidateModels) {
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.3,
-          },
-        }),
-        signal: AbortSignal.timeout(GEMINI_ATTEMPT_TIMEOUT_MS),
-      });
+      const res = await callGeminiModel({ model, apiKey, prompt, temperature: 0.3, deadline });
+      if (!res) break;
 
       if (!res.ok) {
         console.warn(`[Gemini AI] Model ${model} failed: ${await describeGeminiFailure(res)}`);
@@ -1463,23 +1507,14 @@ LOCALISATION: assume Indian market context; keep wording professional Indian Eng
   const candidateModels = await resolveGeminiModels(apiKey);
   report({ availableModels: candidateModels });
 
+  const deadline = geminiAuthoringDeadline();
+
   for (const model of candidateModels) {
+    if (Date.now() >= deadline) break;
     const startedAt = Date.now();
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.4,
-          },
-        }),
-        signal: AbortSignal.timeout(GEMINI_ATTEMPT_TIMEOUT_MS),
-      });
+      const res = await callGeminiModel({ model, apiKey, prompt, temperature: 0.4, deadline });
+      if (!res) break;
 
       if (!res.ok) {
         const reason = await describeGeminiFailure(res);
@@ -1546,6 +1581,7 @@ export async function regenerateSectionContent(params: RegenerateSectionParams):
 
   if (apiKey) {
     const candidateModels = await resolveGeminiModels(apiKey);
+    const deadline = geminiAuthoringDeadline();
     const sectionPrompt = `You are an elite Indian B2B & SMB copywriter for:
 - Business: "${businessName}"
 - Profession: "${profession}"
@@ -1623,16 +1659,14 @@ ${
 
     for (const model of candidateModels) {
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: sectionPrompt }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0.5 },
-          }),
-          signal: AbortSignal.timeout(GEMINI_ATTEMPT_TIMEOUT_MS),
+        const res = await callGeminiModel({
+          model,
+          apiKey,
+          prompt: sectionPrompt,
+          temperature: 0.5,
+          deadline,
         });
+        if (!res) break;
 
         if (res.ok) {
           const data = await res.json();
