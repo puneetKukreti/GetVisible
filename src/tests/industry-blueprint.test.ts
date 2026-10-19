@@ -86,10 +86,10 @@ describe('AI diagnostics', () => {
     const diag = getIndustryBlueprintAiDiagnostics();
     expect(diag.keyResolved).toBe(true);
     expect(diag.authored).toBe(false);
-    // Discovery was refused too, so the preferred model leads the known names.
-    expect(diag.availableModels).toEqual(['gemini-3.8-flash', ...GEMINI_FALLBACK_MODELS]);
-    expect(diag.attempts).toHaveLength(4);
-    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-3.8-flash', status: 403 });
+    // Discovery was refused too, so only the known names remain.
+    expect(diag.availableModels).toEqual(GEMINI_FALLBACK_MODELS);
+    expect(diag.attempts).toHaveLength(3);
+    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-2.5-flash', status: 403 });
     expect(JSON.stringify(diag)).not.toContain('AIza-secret-value');
 
     vi.unstubAllGlobals();
@@ -122,7 +122,7 @@ describe('AI diagnostics', () => {
 
     const diag = getIndustryBlueprintAiDiagnostics();
     expect(diag.authored).toBe(true);
-    expect(diag.model).toBe('gemini-3.8-flash');
+    expect(diag.model).toBe('gemini-2.5-flash');
     expect(diag.at).toBeTruthy();
 
     vi.unstubAllGlobals();
@@ -137,7 +137,7 @@ describe('AI diagnostics', () => {
     expect(scrubSecretText('rejected AIzaSyABCDEFGHIJKLMNOP')).toBe('rejected AIza***');
   });
 
-  it('asks the API which models exist and prefers a proven family over a higher version', async () => {
+  it('asks the API which models exist and ranks the lightest family first', async () => {
     resetGeminiModelCache();
     vi.stubGlobal(
       'fetch',
@@ -149,6 +149,7 @@ describe('AI diagnostics', () => {
                 { name: 'models/gemini-2.0-flash', supportedGenerationMethods: ['generateContent'] },
                 { name: 'models/gemini-3-pro', supportedGenerationMethods: ['generateContent'] },
                 { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3.8-flash-lite', supportedGenerationMethods: ['generateContent'] },
                 // Newest name, but an unknown family: answering a JSON prompt is
                 // not what it is for, so it must not be tried first.
                 { name: 'models/gemini-4-argon', supportedGenerationMethods: ['generateContent'] },
@@ -167,6 +168,7 @@ describe('AI diagnostics', () => {
 
     const models = await listGeminiModels('AIza-model-list-key');
     expect(models).toEqual([
+      'gemini-3.8-flash-lite',
       'gemini-3-flash',
       'gemini-2.5-flash',
       'gemini-2.0-flash',
@@ -188,17 +190,14 @@ describe('AI diagnostics', () => {
     );
 
     expect(await listGeminiModels('AIza-unreachable-key')).toEqual([]);
-    // The preferred model is still worth trying, then the known names.
-    expect(await resolveGeminiModels('AIza-unreachable-key')).toEqual([
-      'gemini-3.8-flash',
-      ...GEMINI_FALLBACK_MODELS,
-    ]);
+    // Discovery failed, so only the known last-resort names remain.
+    expect(await resolveGeminiModels('AIza-unreachable-key')).toEqual(GEMINI_FALLBACK_MODELS);
 
     resetGeminiModelCache();
     vi.unstubAllGlobals();
   });
 
-  it('tries the preferred model first when the API offers it', async () => {
+  it('tries the lightest model first when the API offers one', async () => {
     resetGeminiModelCache();
     vi.stubGlobal(
       'fetch',
@@ -208,8 +207,9 @@ describe('AI diagnostics', () => {
             JSON.stringify({
               models: [
                 { name: 'models/gemini-3.9-flash', supportedGenerationMethods: ['generateContent'] },
-                { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3.8-flash-lite', supportedGenerationMethods: ['generateContent'] },
                 { name: 'models/gemini-4-argon', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
               ],
             }),
             { status: 200 }
@@ -217,10 +217,11 @@ describe('AI diagnostics', () => {
       )
     );
 
-    // Ranked purely, the newer "3.9" would lead; the preference overrides that.
-    expect(await resolveGeminiModels('AIza-preferred-key')).toEqual([
-      'gemini-3.8-flash',
+    // Ranked purely by version, "3.9-flash" would lead; lightest wins instead.
+    expect(await resolveGeminiModels('AIza-lightest-key')).toEqual([
+      'gemini-3.8-flash-lite',
       'gemini-3.9-flash',
+      'gemini-3.8-flash',
       'gemini-4-argon',
     ]);
 
@@ -461,6 +462,7 @@ describe('AI diagnostics', () => {
     const ping = await pingGeminiProvider();
     expect(ping.ok).toBe(true);
     expect(ping.keyResolved).toBe(true);
+    expect(ping.available).toEqual(['gemini-3.8-flash']);
     expect(ping.models).toEqual(['gemini-3.8-flash']);
     expect(ping.attempts[0]).toMatchObject({ model: 'gemini-3.8-flash', status: 200 });
 

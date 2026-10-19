@@ -148,14 +148,14 @@ export const GEMINI_FALLBACK_MODELS = [
 const GEMINI_UNWANTED_MODEL = /embedding|aqa|imagen|veo|tts|audio|live|image-generation/i;
 
 /**
- * How willing we are to use a model *family*: the ones that answer a JSON prompt
- * quickly come before anything exotic, and version only breaks ties within a
- * family. Version alone is not enough — a newer unknown name was tried first and
- * answered 429 while the flash models were fine.
+ * How willing we are to use a model *family*: lightest first, because the
+ * cheapest model answers fastest — which matters most when the provider is under
+ * load. Version only breaks ties within a family. Version alone is not enough: a
+ * newer unknown name was tried first once and answered 429 while flash was fine.
  */
 function geminiModelFamilyTier(name: string): number {
-  if (/flash-lite/.test(name)) return 3;
-  if (/flash/.test(name)) return 4;
+  if (/lite/.test(name)) return 4;
+  if (/flash/.test(name)) return 3;
   if (/pro/.test(name)) return 2;
   return 1;
 }
@@ -294,24 +294,15 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
   return models;
 }
 
-/** The model we want, tried first whenever the API confirms it exists. */
-const GEMINI_PREFERRED_MODELS = ['gemini-3.8-flash'];
-
-function dedupeModels(names: string[]): string[] {
-  return Array.from(new Set(names));
-}
-
-/** The ordered models to try: what the API offers, else the fallback names. */
+/**
+ * The ordered models to try: whatever the API offers, lightest first, else the
+ * fallback names. Ranking already puts the lightest family ahead, so no model
+ * needs hardcoding.
+ */
 export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
   const discovered = await listGeminiModels(apiKey);
-  if (discovered.length > 0) {
-    // The preferred model leads, so a newer name cannot displace it.
-    const preferred = GEMINI_PREFERRED_MODELS.filter((name) => discovered.includes(name));
-    const rest = discovered.filter((name) => !preferred.includes(name));
-    return [...preferred, ...rest].slice(0, 3);
-  }
-  // Discovery failed: still try the preferred model, then the known names.
-  return dedupeModels([...GEMINI_PREFERRED_MODELS, ...GEMINI_FALLBACK_MODELS]);
+  if (discovered.length > 0) return discovered.slice(0, 4);
+  return [...GEMINI_FALLBACK_MODELS];
 }
 
 /** Test seam: forget the discovered model list. */
@@ -1491,13 +1482,17 @@ export function blueprintAuthoringFailureIsTransient(): boolean {
  */
 export async function pingGeminiProvider(apiKey?: string): Promise<{
   keyResolved: boolean;
+  /** Every model the key can call, lightest first (not just the ones tried). */
+  available: string[];
+  /** The models this app would try, in order. */
   models: string[];
   ok: boolean;
   attempts: Array<{ model: string; status?: number; ms?: number; error?: string }>;
 }> {
   const key = apiKey || getGeminiApiKey();
-  if (!key) return { keyResolved: false, models: [], ok: false, attempts: [] };
+  if (!key) return { keyResolved: false, available: [], models: [], ok: false, attempts: [] };
 
+  const available = await listGeminiModels(key);
   const models = await resolveGeminiModels(key);
   const deadline = geminiAuthoringDeadline();
   const attempts: Array<{ model: string; status?: number; ms?: number; error?: string }> = [];
@@ -1517,7 +1512,7 @@ export async function pingGeminiProvider(apiKey?: string): Promise<{
 
       if (res.ok) {
         attempts.push({ model, status: res.status, ms: Date.now() - startedAt });
-        return { keyResolved: true, models, ok: true, attempts };
+        return { keyResolved: true, available, models, ok: true, attempts };
       }
       attempts.push({
         model,
@@ -1530,7 +1525,7 @@ export async function pingGeminiProvider(apiKey?: string): Promise<{
     }
   }
 
-  return { keyResolved: true, models, ok: false, attempts };
+  return { keyResolved: true, available, models, ok: false, attempts };
 }
 
 export interface IndustryBlueprintAiFacts {
