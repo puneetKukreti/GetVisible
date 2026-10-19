@@ -1,15 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { WebsiteDemoRepository, LeadRepository } from '@/lib/db/repository';
-import { getResolvedOrganizationId } from '@/lib/auth';
 import { requireOwnerSession } from '@/lib/owner-guard';
-import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
-import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
-import { personalizeStitchHtml, isStitchLayout } from '@/lib/demos/stitch-personalizer';
-import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
-import { isCaPracticeProfession, contentHasCaLeakageForProfession } from '@/lib/demos/profession-sections';
-import { getProfessionPreset } from '@/lib/demos/profession-config';
-import { getProfessionStitchLayout, isProfessionStitchLayout } from '@/lib/demos/profession-stitch';
-import { WebsiteContent } from '@/types';
+import { isStitchLayout } from '@/lib/demos/stitch-personalizer';
+import { resolveDemoSiteHtml } from '@/lib/demos/demo-html.server';
 
 export const dynamic = 'force-dynamic';
 // May generate a demo on the fly when a lead has none yet.
@@ -43,116 +35,14 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }
     }
 
-    // 1. Try public token lookup first
-    let demo = await WebsiteDemoRepository.getApprovedDemoByPublicToken(id);
-    let lead: any = null;
-
-    // 2. If not a public token, resolve organization and look up demo or lead
-    if (!demo) {
-      const orgId = (await getResolvedOrganizationId(request)) || DEMO_ORGANIZATION_ID;
-      const altOrgId = orgId === DEMO_ORGANIZATION_ID ? PILOT_ORGANIZATION_ID : DEMO_ORGANIZATION_ID;
-
-      // Check if id is a demo ID
-      demo = await WebsiteDemoRepository.getDemo(orgId, id);
-      if (!demo) {
-        demo = await WebsiteDemoRepository.getDemo(altOrgId, id);
-      }
-
-      // Check if id is a lead ID
-      if (!demo) {
-        lead = await LeadRepository.getLeadById(id, orgId);
-        if (!lead) {
-          lead = await LeadRepository.getLeadById(id, altOrgId);
-        }
-
-        if (lead) {
-          const demos = await WebsiteDemoRepository.listDemos(lead.organizationId || orgId, lead.id);
-          demo = demos[0] || null;
-        }
-      } else {
-        lead = await LeadRepository.getLeadById(demo.leadId, demo.organizationId || orgId);
-        if (!lead) {
-          lead = await LeadRepository.getLeadById(demo.leadId, altOrgId);
-        }
-      }
-    } else if (demo?.leadId) {
-      lead = await LeadRepository.getLeadById(demo.leadId, demo.organizationId || DEMO_ORGANIZATION_ID);
-      if (!lead) {
-        lead = await LeadRepository.getLeadById(demo.leadId, PILOT_ORGANIZATION_ID);
-      }
-    }
-
-    // Auto-regenerate if a non-CA lead has stale CA content or a missing demo
-    const effectiveOrgId = lead?.organizationId || demo?.organizationId || DEMO_ORGANIZATION_ID;
-    const isCaPractice = isCaPracticeProfession(lead?.profession, lead?.businessName);
-
-    if (lead && !isCaPractice) {
-      const hasStaleCaContent =
-        !demo ||
-        contentHasCaLeakageForProfession(demo.content, lead.profession, lead.businessName);
-
-      // A demo created before profession Stitch templates existed still points at
-      // its legacy archetype layout. Regenerate it so the iframe renders the
-      // profession-specific Stitch template instead of the older React theme.
-      // A non-CA lead with a known profession should render one of the
-      // profession Stitch archetypes. Legacy demos that still point at a React
-      // layout (or a CA template) are regenerated. We only require "a profession
-      // Stitch layout", not one specific id, so an AI-chosen archetype is valid
-      // and does not trigger a pointless regeneration loop.
-      const expectedStitchLayout = lead.profession
-        ? getProfessionStitchLayout(getProfessionPreset(lead.profession, lead.businessName).category)
-        : undefined;
-      const hasStaleLayout =
-        Boolean(expectedStitchLayout) &&
-        Boolean(demo) &&
-        !isProfessionStitchLayout(demo!.design?.layout);
-
-      if (hasStaleCaContent || hasStaleLayout) {
-        try {
-          const freshDemo = await WebsiteDemoGeneratorService.generateDemo(lead, {
-            useAiEnrichment: true,
-            organizationId: effectiveOrgId,
-          });
-          demo = await WebsiteDemoRepository.saveDemo(effectiveOrgId, freshDemo, 'system');
-        } catch (genErr) {
-          console.warn('Auto-regeneration of non-CA demo failed:', genErr);
-        }
-      }
-    }
-
-    // Prepare content object for personalization
-    let content: WebsiteContent | any = null;
-
-    if (demo?.content) {
-      content = typeof demo.content === 'string' ? JSON.parse(demo.content) : demo.content;
-    } else if (lead) {
-      content = {
-        brand: { businessName: lead.businessName },
-        location: { city: lead.city, address: lead.address },
-        contact: { publicPhone: lead.publicPhone, publicEmail: lead.publicEmail },
-        meta: { profession: lead.profession },
-      };
-    } else {
-      // Neutral fallback preview (used only when neither a demo nor a lead can be resolved)
-      content = {
-        brand: { businessName: 'Your Business' },
-        location: { city: 'Your City', address: 'Your City, India' },
-        contact: { publicPhone: '+91 00000 00000', publicEmail: 'hello@example.com' },
-        meta: { profession: 'Business' },
-      };
-    }
-
-    // Determine layout key
-    const chosenLayout =
-      layoutOverride ||
-      demo?.design?.layout ||
-      content?.design?.layout ||
-      demo?.templateId ||
-      'design-1-premium';
-
-    // Get Stitch HTML template and personalize
-    const rawHtml = getStitchRawHtml(chosenLayout);
-    const personalizedHtml = personalizeStitchHtml(rawHtml, content);
+    // Shared resolver (in-process): token/lead lookup, staleness repair and
+    // personalization. The /demo/[leadId] page renders this same document
+    // server-side so prospects never see a loading screen.
+    const personalizedHtml = await resolveDemoSiteHtml({
+      id,
+      request,
+      layoutOverride,
+    });
 
     return new NextResponse(personalizedHtml, {
       status: 200,

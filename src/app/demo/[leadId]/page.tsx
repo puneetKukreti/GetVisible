@@ -5,6 +5,7 @@ import { LeadRepository, WebsiteDemoRepository } from '@/lib/db/repository';
 import { getResolvedOrganizationId } from '@/lib/auth';
 import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import { isRealHumanVisit, generatePublicDemoToken } from '@/lib/demos/public';
+import { resolveDemoSiteHtml } from '@/lib/demos/demo-html.server';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { getProfessionPreset } from '@/lib/demos/profession-config';
 import { selectWebsiteDesign } from '@/lib/demos/personalization';
@@ -13,6 +14,8 @@ import { DemoViewWrapper } from './demo-view-wrapper';
 import { WebsiteDemoData, LeadData } from '@/types';
 
 export const dynamic = 'force-dynamic';
+// The in-process site render may auto-repair a stale demo (AI generation).
+export const maxDuration = 60;
 
 interface PageProps {
   params: {
@@ -89,30 +92,17 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
     }
   } catch {}
 
-  // 1b. Render the personalized site NOW, on the server, so the prospect's first
-  // paint IS the website — the iframe embeds this HTML via srcDoc and no
-  // loading screen is ever shown. If rendering fails (cold route, self-fetch
-  // hiccup), fall back to the previous client-side iframe load.
+  // 1b. Build the personalized site document in-process (no self-fetch) so the
+  // prospect's first paint IS the website — the iframe embeds it via srcDoc and
+  // no loading screen is ever shown. Any failure falls back to the previous
+  // client-side iframe load.
   let initialHtml: string | null = null;
   if (initialPublicDemo) {
     try {
-      const host =
-        headersList.get('x-forwarded-host') ||
-        headersList.get('host') ||
-        'localhost:3000';
-      const proto =
-        headersList.get('x-forwarded-proto') ||
-        (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
-      const htmlUrl = `${proto}://${host}/api/demos/${encodeURIComponent(
-        initialPublicDemo.publicToken || tokenOrId
-      )}/html`;
-      const res = await fetch(htmlUrl, {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(8000),
+      initialHtml = await resolveDemoSiteHtml({
+        id: tokenOrId,
+        demo: initialPublicDemo,
       });
-      if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) {
-        initialHtml = await res.text();
-      }
     } catch {
       // Client-side iframe fallback still works.
     }
