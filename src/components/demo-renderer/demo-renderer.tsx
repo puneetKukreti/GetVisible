@@ -41,6 +41,11 @@ interface DemoRendererProps {
    * with it would 401 and blank the prospect's site.
    */
   publicView?: boolean;
+  /**
+   * Server-rendered personalized HTML for the instant first paint (no loading
+   * screen on the public prospect link).
+   */
+  initialHtml?: string | null;
 }
 
 const DEFAULT_SECTION_ORDER: WebsiteSectionType[] = [
@@ -82,6 +87,7 @@ export function DemoRenderer({
   leadId,
   version,
   publicView = false,
+  initialHtml = null,
 }: DemoRendererProps) {
   // Ensure content and theme are objects in case they were parsed from raw JSON
   const safeContent: WebsiteContent =
@@ -116,6 +122,7 @@ export function DemoRenderer({
         content={safeContent}
         design={activeDesign}
         publicView={publicView}
+        initialHtml={initialHtml}
       />
     );
   }

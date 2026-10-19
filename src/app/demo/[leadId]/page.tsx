@@ -89,6 +89,35 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
     }
   } catch {}
 
+  // 1b. Render the personalized site NOW, on the server, so the prospect's first
+  // paint IS the website — the iframe embeds this HTML via srcDoc and no
+  // loading screen is ever shown. If rendering fails (cold route, self-fetch
+  // hiccup), fall back to the previous client-side iframe load.
+  let initialHtml: string | null = null;
+  if (initialPublicDemo) {
+    try {
+      const host =
+        headersList.get('x-forwarded-host') ||
+        headersList.get('host') ||
+        'localhost:3000';
+      const proto =
+        headersList.get('x-forwarded-proto') ||
+        (host.startsWith('localhost') || host.startsWith('127.0.0.1') ? 'http' : 'https');
+      const htmlUrl = `${proto}://${host}/api/demos/${encodeURIComponent(
+        initialPublicDemo.publicToken || tokenOrId
+      )}/html`;
+      const res = await fetch(htmlUrl, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) {
+        initialHtml = await res.text();
+      }
+    } catch {
+      // Client-side iframe fallback still works.
+    }
+  }
+
   // 2. Check if user is reviewing an internal lead in active organization or fallback org
   //
   // SECURITY: the internal branch renders the prospect CRM editor (lead data,
@@ -198,6 +227,7 @@ export default async function LeadDemoPage({ params, searchParams }: PageProps) 
       initialPublicDemo={initialPublicDemo}
       initialLead={initialLead}
       initialDemos={initialDemos}
+      initialHtml={initialHtml}
     />
   );
 }

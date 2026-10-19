@@ -9,6 +9,8 @@ import { FloatingClaimBar } from '@/components/demos/floating-claim-bar';
 
 interface PublicDemoViewProps {
   demo: WebsiteDemoData;
+  /** Server-rendered site HTML for an instant first paint (no loading screen). */
+  initialHtml?: string | null;
 }
 
 /**
@@ -21,7 +23,7 @@ interface PublicDemoViewProps {
  * 4. Only the structured, personalized website is rendered with full native smooth scrolling.
  * 5. High-conversion floating WhatsApp conversion bar ("Claim on WhatsApp").
  */
-export function PublicDemoView({ demo }: PublicDemoViewProps) {
+export function PublicDemoView({ demo, initialHtml = null }: PublicDemoViewProps) {
   const contentObj =
     typeof demo.content === 'string' ? JSON.parse(demo.content) : demo.content;
   const themeObj =
@@ -73,6 +75,7 @@ export function PublicDemoView({ demo }: PublicDemoViewProps) {
         leadId={demo.leadId}
         version={demo.version}
         publicView
+        initialHtml={initialHtml}
       />
 
       {/* Floating Conversion Bar: ONLY Claim on WhatsApp */}

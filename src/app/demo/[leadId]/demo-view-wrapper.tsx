@@ -14,6 +14,8 @@ interface DemoViewWrapperProps {
   initialPublicDemo?: WebsiteDemoData | null;
   initialLead?: LeadData | null;
   initialDemos?: WebsiteDemoData[];
+  /** Server-rendered site HTML for the prospect's instant first paint. */
+  initialHtml?: string | null;
 }
 
 export function DemoViewWrapper({
@@ -21,6 +23,7 @@ export function DemoViewWrapper({
   initialPublicDemo,
   initialLead,
   initialDemos = [],
+  initialHtml = null,
 }: DemoViewWrapperProps) {
   const [publicDemo, setPublicDemo] = useState<WebsiteDemoData | null>(initialPublicDemo ?? null);
   const [lead, setLead] = useState<LeadData | null>(initialLead ?? null);
@@ -166,7 +169,7 @@ export function DemoViewWrapper({
 
   // Prospect-Facing Public Demo
   if (publicDemo) {
-    return <PublicDemoView demo={publicDemo} />;
+    return <PublicDemoView demo={publicDemo} initialHtml={initialHtml} />;
   }
 
   // Internal Sales Specialist Preview & Editor

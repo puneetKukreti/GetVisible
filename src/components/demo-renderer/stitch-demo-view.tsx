@@ -16,6 +16,13 @@ interface StitchDemoViewProps {
    * html endpoint serves the demo's own stored layout without an owner session.
    */
   publicView?: boolean;
+  /**
+   * Server-side-rendered personalized HTML for the initial paint. When present
+   * the iframe embeds it via `srcDoc`, so the prospect's site is visible on the
+   * very first paint and NO loading screen is ever shown. The refresh button
+   * switches to the regular URL-based load.
+   */
+  initialHtml?: string | null;
   className?: string;
 }
 
@@ -26,12 +33,17 @@ export function StitchDemoView({
   version = 1,
   content,
   publicView = false,
+  initialHtml = null,
   className = '',
 }: StitchDemoViewProps) {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Instant-paint document, if the server handed one over. Any manual reload
+  // drops back to the URL-based load.
+  const [showDoc, setShowDoc] = useState<boolean>(Boolean(initialHtml));
 
   // Determine iframe source URL. The `?layout=` param is an owner-session-only
   // override in the html endpoint, so the anonymous public view must not send
@@ -43,6 +55,13 @@ export function StitchDemoView({
 
   // Robust lifecycle listener: ensures loader is NEVER stuck on screen
   useEffect(() => {
+    if (showDoc) {
+      // Inline document: the site is already here — never show a loading screen.
+      setLoading(false);
+      setLoadError(false);
+      return;
+    }
+
     setLoading(true);
     setLoadError(false);
 
@@ -86,7 +105,12 @@ export function StitchDemoView({
       iframe.removeEventListener('error', handleError);
       clearTimeout(safetyTimer);
     };
-  }, [iframeSrc, reloadKey]);
+  }, [iframeSrc, reloadKey, showDoc]);
+
+  const handleReload = () => {
+    setShowDoc(false);
+    setReloadKey((k) => k + 1);
+  };
 
   return (
     <div
@@ -97,8 +121,8 @@ export function StitchDemoView({
         } catch {}
       }}
     >
-      {/* Loading Overlay with graceful auto-fade */}
-      {loading && (
+      {/* Loading Overlay with graceful auto-fade — only during URL-based loads */}
+      {(!showDoc && loading) && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/70 backdrop-blur-xs z-10 transition-opacity duration-300">
           <div className="w-9 h-9 rounded-full border-3 border-amber-500/30 border-t-amber-500 animate-spin mb-3 shadow-lg" />
           <p className="text-xs text-amber-200/90 font-medium tracking-wide">
@@ -118,7 +142,7 @@ export function StitchDemoView({
             <div className="flex items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={() => setReloadKey((k) => k + 1)}
+                onClick={handleReload}
                 className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 shadow"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
@@ -141,7 +165,8 @@ export function StitchDemoView({
       <iframe
         ref={iframeRef}
         key={reloadKey}
-        src={iframeSrc}
+        src={showDoc ? undefined : iframeSrc}
+        srcDoc={showDoc ? initialHtml || undefined : undefined}
         title={content?.brand?.businessName || 'Website Demo'}
         className="w-full h-full min-h-screen border-0 block bg-white"
         style={{
