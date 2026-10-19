@@ -1,5 +1,6 @@
 import type { ProfessionCategory } from './profession-config';
 import type { WebsiteSectionType } from '@/types';
+import { getIndustryPalette } from './industry-palettes';
 
 /**
  * Profession-specific Stitch template sets.
@@ -503,20 +504,50 @@ export interface StitchDirective {
   archetype?: string;
   /** Optional profession-tuned accent colour (validated hex). */
   accentColor?: string;
+  /**
+   * Allow-listed industry palette/typography system (see `industry-palettes.ts`)
+   * selected by the per-industry design blueprint. Never arbitrary CSS.
+   */
+  paletteId?: string;
+  /** Allow-listed hero treatment chosen by the industry blueprint. */
+  heroStyle?: 'fullbleed' | 'split' | 'centered';
 }
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+const HERO_STYLES = ['fullbleed', 'split', 'centered'] as const;
 
 /**
- * Applies a validated per-lead directive (e.g. an AI-suggested accent) on top of
- * a base archetype. Only allow-listed, safe values are applied; anything else is
- * ignored, so the AI can never inject arbitrary CSS.
+ * Applies a validated per-lead directive (an AI-suggested accent and/or a
+ * per-industry palette system) on top of a base archetype. Only allow-listed,
+ * safe values are applied; anything else is ignored, so nothing can ever inject
+ * arbitrary CSS.
  */
 export function applyStitchOverrides(
   design: ProfessionStitchDesign,
   directive?: StitchDirective
 ): ProfessionStitchDesign {
+  let next = design;
+
+  const palette = getIndustryPalette(directive?.paletteId);
+  if (palette) {
+    next = {
+      ...next,
+      palette: { ...palette.palette },
+      fontDisplay: palette.typography.fontDisplay,
+      fontBody: palette.typography.fontBody,
+      fontsHref: palette.typography.href,
+    };
+  }
+
   const accent = directive?.accentColor;
-  if (!accent || !HEX_COLOR.test(accent)) return design;
-  return { ...design, palette: { ...design.palette, accent: accent.toLowerCase() } };
+  if (accent && HEX_COLOR.test(accent)) {
+    next = { ...next, palette: { ...next.palette, accent: accent.toLowerCase() } };
+  }
+
+  const heroStyle = directive?.heroStyle;
+  if (heroStyle && (HERO_STYLES as readonly string[]).includes(heroStyle)) {
+    next = { ...next, heroStyle };
+  }
+
+  return next;
 }

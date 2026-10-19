@@ -181,16 +181,32 @@ describe('Generalized profession Stitch design system', () => {
     expect(html).toContain('--gv-accent: #0d9488');
   });
 
-  it('lets the AI pick the archetype and accent, persisted for deterministic re-render', async () => {
-    const { demo } = await generate('Plumber', 'FlowFix Plumbing Co', 'Noida', /* useAi */ true);
+  it('lets the AI pick the archetype for curated professions, persisted for deterministic re-render', async () => {
+    // Interior/architecture is a curated category, so it keeps the AI-driven
+    // archetype choice (the industry blueprint only governs generic trades).
+    const { demo } = await generate('Interior Designer', 'Studio Light Interiors', 'Pune', /* useAi */ true);
 
-    // The AI chose design-bold-energetic even though GENERAL_SMB defaults to
-    // design-classic-professional, proving the override is honored.
     expect(demo.design!.layout).toBe('design-bold-energetic');
     expect(demo.design!.stitch?.archetype).toBe('design-bold-energetic');
     expect(demo.design!.stitch?.accentColor).toBe('#0d9488');
     // The directive is persisted on the validated content for server rendering.
     expect(demo.content.design?.stitch?.accentColor).toBe('#0d9488');
+    expect(WebsiteDesignSchema.safeParse(demo.design).success).toBe(true);
+  });
+
+  it('gives a generic trade its industry blueprint design, outranking the AI suggestion', async () => {
+    // Plumbing falls into the generic SMB bucket, which has no curated design,
+    // so the per-industry blueprint (authored from how leading sites in that
+    // trade are built) is the final authority — deterministic per industry.
+    const { demo } = await generate('Plumber', 'FlowFix Plumbing Co', 'Noida', /* useAi */ true);
+
+    expect(demo.design!.layout).toBe('design-classic-professional');
+    expect(demo.design!.stitch?.archetype).toBe('design-classic-professional');
+    expect(demo.design!.stitch?.paletteId).toBe('clean-industrial');
+    expect(demo.design!.sectionOrder!.includes('SERVICES')).toBe(true);
+    // Persisted on the validated content for deterministic server rendering.
+    expect(demo.content.design?.stitch?.paletteId).toBe('clean-industrial');
+    expect(demo.content.design?.sectionOrder).toEqual(demo.design!.sectionOrder);
     expect(WebsiteDesignSchema.safeParse(demo.design).success).toBe(true);
   });
 

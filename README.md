@@ -229,6 +229,41 @@ them, and self-hosts them in the demo:
 - **Opt-out / tests** — generation-time sourcing is skipped when `NODE_ENV=test` or
   `DISABLE_LIVE_IMAGES=true`.
 
+### Industry design: reference-informed blueprints for uncovered trades
+
+Photos were only half the story. When a trade has no curated design of its own, the demo used to
+get a generic layout (the `GENERAL_SMB` default archetype) even though images matched the trade.
+
+Now the demo is *designed the way the best-performing websites in that industry are built*. For
+every generic trade the generator resolves an **industry design blueprint** — the shared patterns
+of reference sites in that sector — and applies it to layout, theme and copy:
+
+- **What the blueprint captures** — the section flow (which sections lead, what closes), the hero
+  treatment (`fullbleed` / `split` / `centered`), the layout archetype, the palette + typography
+  system, the imagery treatment and search phrases, plus copy framing: voice, headline pattern,
+  trust signals, service-naming style and primary CTA wording.
+- **Where it comes from** — `src/lib/demos/ai-content-generator.ts`
+  (`generateIndustryBlueprintJson`) asks the model to describe the blueprint that leading reference
+  websites in that industry share — so the design reflects real industry conventions, not random
+  choice. If no key is configured or the call fails, a curated deterministic rule table
+  (`industry-blueprint.ts`) supplies the same shape of answer.
+- **Authored once per industry** — the result is validated, persisted (`industry_blueprints` table
+  in Postgres, `industry-blueprints` ledger key in demo mode) and reused: every car-detailing lead
+  gets the identical design, across restarts and serverless instances. Keyed by a normalised
+  industry key (`Car Detailing & Automobile Workshop` → `car-detailing`), so related naming shares
+  one design.
+- **Safe by construction** — the blueprint can only *select* from allow-lists: an archetype id, one
+  of the curated palette/typography systems (`industry-palettes.ts`), allow-listed section ids and
+  one optional hex accent. It can never emit markup, CSS, fonts or arbitrary colours; invalid
+  values fall back per-field to the curated design.
+- **Copy follows the design** — the blueprint brief is passed to the copy writer so the headlines,
+  trust signals, service names and CTA read the way that industry's leaders write.
+- **Imagery follows the design** — the blueprint's search phrases lead the live image sourcing, so
+  the photos match the styling the industry actually uses.
+- **Untouched** — CA practices keep their three curated Stitch templates, and every curated
+  profession keeps its tuned design (this only runs for the generic bucket). Opt-out with
+  `DISABLE_INDUSTRY_BLUEPRINT_AI=true` (keeps the curated deterministic blueprints, no model call).
+
 ### 5. Running the Application
 ```bash
 npm run dev

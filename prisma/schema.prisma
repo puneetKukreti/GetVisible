@@ -357,4 +357,22 @@ model DemoMedia {
   @@map("demo_media")
 }
 
+// Per-industry design blueprints: how the best-performing websites in a trade
+// are built (section flow, layout archetype, palette system, copy framing,
+// imagery treatment). Authored once per industry key, then reused by every
+// demo in that trade so designs stay deterministic. Globally scoped like
+// DemoMedia — not tied to an organization.
+model IndustryBlueprint {
+  key        String   @id
+  industry   String
+  blueprint  Json
+  source     String   @default("deterministic")
+  version    Int      @default(1)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("industry_blueprints")
+}
+
 

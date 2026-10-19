@@ -26,6 +26,11 @@ import {
   ProfessionContentPlan,
 } from './profession-sections';
 import { isProfessionArchetypeId } from './profession-stitch';
+import {
+  getIndustryDesignBlueprint,
+  buildBlueprintIndustryBrief,
+  IndustryDesignBlueprint,
+} from './industry-blueprint';
 
 export interface GenerateDemoOptions {
   templateId?: string;
@@ -118,6 +123,30 @@ export class WebsiteDemoGeneratorService {
     const plan = getProfessionContentPlan(lead.profession, lead.businessName);
     const isCaPractice = plan.isCaPractice;
 
+    // -------------------------------------------------------------------
+    // Per-industry design blueprint: for trades that have no curated design
+    // of their own, resolve how the best-performing websites in *this*
+    // industry are built — section flow, layout archetype, palette system,
+    // copy framing and imagery treatment — once per industry, then reuse it
+    // for every lead in that trade. CA practices and professions with their
+    // own curated design systems are untouched. Never throws.
+    // -------------------------------------------------------------------
+    const isGenericTrade =
+      !isCaPractice &&
+      detectProfessionCategory(lead.profession, lead.businessName) === 'GENERAL_SMB';
+    let industryBlueprint: IndustryDesignBlueprint | null = null;
+    if (isGenericTrade) {
+      try {
+        industryBlueprint = await getIndustryDesignBlueprint({
+          profession: lead.profession,
+          businessName: lead.businessName,
+          city: lead.city,
+        });
+      } catch {
+        industryBlueprint = null;
+      }
+    }
+
     // Structured AI Enrichment via Gemini Flash or profession-tailored engine
     const liveApiKey = getGeminiApiKey();
     const hasGeminiKey = Boolean(liveApiKey);
@@ -127,12 +156,17 @@ export class WebsiteDemoGeneratorService {
     if (shouldEnrichWithAi) {
       if (hasGeminiKey) {
         try {
-          aiProfile = await generateAiBusinessContent({
-            businessName: lead.businessName,
-            profession: lead.profession,
-            city: lead.city,
-            address: lead.address,
-          });
+          aiProfile = await generateAiBusinessContent(
+            {
+              businessName: lead.businessName,
+              profession: lead.profession,
+              city: lead.city,
+              address: lead.address,
+            },
+            industryBlueprint
+              ? { industryBrief: buildBlueprintIndustryBrief(industryBlueprint, lead.city) }
+              : undefined
+          );
         } catch (aiErr) {
           console.warn('Gemini Flash content generation skipped/failed:', aiErr);
         }
@@ -321,11 +355,22 @@ export class WebsiteDemoGeneratorService {
           businessName: lead.businessName,
         });
         const firstGalleryBrief =
-          aiProfile?.gallery?.items?.[0]?.imageQuery || registryProfile.imageKeywords.hero;
+          aiProfile?.gallery?.items?.[0]?.imageQuery ||
+          industryBlueprint?.imagery.keywords?.[2] ||
+          registryProfile.imageKeywords.hero;
+        // The industry blueprint knows the photography this trade's best sites
+        // use, so its phrases lead the search (profession nouns stay as anchors).
+        const blueprintKeywords = industryBlueprint?.imagery.keywords || [];
         sourcedImages = await sourceIndustryImages({
           keywords: {
-            HERO: buildIndustrySearchKeyword(lead.profession, registryProfile.imageKeywords.hero),
-            ABOUT: buildIndustrySearchKeyword(lead.profession, registryProfile.imageKeywords.about),
+            HERO: buildIndustrySearchKeyword(
+              lead.profession,
+              blueprintKeywords[0] || registryProfile.imageKeywords.hero
+            ),
+            ABOUT: buildIndustrySearchKeyword(
+              lead.profession,
+              blueprintKeywords[1] || registryProfile.imageKeywords.about
+            ),
             GALLERY: buildIndustrySearchKeyword(lead.profession, firstGalleryBrief),
           },
           maxImages: 6,
@@ -407,6 +452,30 @@ export class WebsiteDemoGeneratorService {
         servicesLayout: design.servicesLayout,
         features: design.features,
         contentDensity: design.contentDensity,
+        stitch: design.stitch,
+      } as WebsiteDesign;
+    }
+
+    // -------------------------------------------------------------------
+    // The industry blueprint is the final authority for generic trades: the
+    // demo is laid out and themed the way the leading websites in this exact
+    // trade are built, and the same design is reused for every lead in the
+    // industry (deterministic, no per-lead randomness).
+    // -------------------------------------------------------------------
+    if (!isCaPractice && industryBlueprint) {
+      sectionOrder = industryBlueprint.sectionOrder;
+      design.layout = industryBlueprint.archetype as WebsiteLayout;
+      design.sectionOrder = sectionOrder;
+      design.stitch = {
+        archetype: industryBlueprint.archetype,
+        accentColor: industryBlueprint.accentColor,
+        paletteId: industryBlueprint.paletteId,
+        heroStyle: industryBlueprint.heroStyle,
+      };
+      content.design = {
+        ...(content.design || ({} as WebsiteDesign)),
+        layout: design.layout,
+        sectionOrder: design.sectionOrder,
         stitch: design.stitch,
       } as WebsiteDesign;
     }

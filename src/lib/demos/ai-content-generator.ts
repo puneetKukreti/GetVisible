@@ -931,7 +931,15 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
  * allowing the caller to seamlessly fall back to getDeterministicProfessionProfile.
  */
 export async function generateAiBusinessContent(
-  facts: GenerateAiContentFacts
+  facts: GenerateAiContentFacts,
+  options?: {
+    /**
+     * Design-brief text derived from the per-industry blueprint (tone, headline
+     * pattern, trust signals, service naming, imagery treatment). Steers the copy
+     * so the wording matches how the industry's best websites read.
+     */
+    industryBrief?: string;
+  }
 ): Promise<AiBusinessContent | null> {
   const apiKey = getGeminiApiKey();
 
@@ -1055,7 +1063,14 @@ TRUTHFULNESS RULES (mandatory):
 - General industry statements are fine; business-specific facts must NOT be fabricated.
 
 LOCALISATION: Write in professional Indian English and reference "${city}" naturally.
-`;
+${
+  options?.industryBrief
+    ? `
+INDUSTRY DESIGN BLUEPRINT (derived from how the best-performing reference websites in "${profession}" are built). Align the copy style with it — this is style guidance only, so never invent facts to match it:
+${options.industryBrief}
+`
+    : ''
+}`;
 
   const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
@@ -1110,6 +1125,117 @@ LOCALISATION: Write in professional Indian English and reference "${city}" natur
       }
     } catch (err) {
       console.warn(`[Gemini AI] Failed calling ${model}:`, err);
+    }
+  }
+
+  return null;
+}
+
+export interface IndustryBlueprintAiFacts {
+  profession: string;
+  city?: string;
+  /** Allow-listed archetype ids the model may choose from. */
+  archetypeIds: string[];
+  /** Allow-listed palette system ids the model may choose from. */
+  paletteIds: string[];
+  /** Section types the renderer can actually render, in any order. */
+  sectionIds: string[];
+}
+
+/**
+ * Asks the model for the design blueprint that the best-performing websites in
+ * an industry share (section order/emphasis, layout archetype, palette system,
+ * copy framing, imagery treatment).
+ *
+ * The model only ever *selects* from the allow-lists passed in — it can never
+ * invent markup, CSS, fonts or colours. The caller validates the result again
+ * before it is persisted. Returns null when no API key is configured or the
+ * call fails, so callers fall back to the deterministic blueprint.
+ */
+export async function generateIndustryBlueprintJson(
+  facts: IndustryBlueprintAiFacts
+): Promise<unknown | null> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey || apiKey.trim().length === 0) return null;
+
+  const profession = facts.profession?.trim() || 'Local Business';
+  const city = facts.city?.trim() || 'India';
+
+  const prompt = `You are a senior web designer who has audited thousands of top-ranking local-business websites (India and global), and you know exactly what the highest-converting sites in each industry do.
+
+INDUSTRY: "${profession}" (operating in ${city}, India)
+
+Task: describe the DESIGN BLUEPRINT that the best-performing reference websites in this exact industry share. Reason from how those reference sites are built: which sections they lead with, whether the hero is a full-bleed visual or a split text/visual, the colour mood and typography mood, the trust signals they surface, how services are named, and the kind of photography used.
+
+Return ONLY a single valid JSON object (no markdown fences, no commentary):
+{
+  "archetype": "EXACTLY ONE of: ${facts.archetypeIds.join(' | ')}",
+  "paletteId": "EXACTLY ONE of: ${facts.paletteIds.join(' | ')}",
+  "accentColor": "#RRGGBB or omit (optional refinement of the palette accent)",
+  "heroStyle": "fullbleed | split | centered",
+  "sectionOrder": ["ORDERED subset of: ${facts.sectionIds.join(' | ')} — must start with HERO, 7-11 items, industry-appropriate flow"],
+  "copy": {
+    "tone": "3-8 words describing the voice used by leaders in this industry (e.g. 'confident, results-first, showroom-shine')",
+    "heroPattern": "the headline pattern top sites use, with {city} as a placeholder (e.g. 'Showroom-shine car care {city} drivers trust')",
+    "trustSignals": ["4 short trust signals this industry's best sites emphasise (warranty, turnaround, equipment, materials...)"],
+    "serviceNamingStyle": "how services are named in this industry (e.g. 'outcome-first package names: Ceramic Coating, Paint Correction')",
+    "primaryCta": "the primary call-to-action wording this industry's top sites use"
+  },
+  "imagery": {
+    "treatment": "1 sentence describing the photography style: framing, lighting, mood",
+    "keywords": ["4-6 short stock-photo search phrases, 1-3 words each, e.g. 'ceramic coating', 'car interior detailing'"]
+  }
+}
+
+RULES:
+- Select values ONLY from the provided lists for archetype, paletteId and sectionOrder. Never invent ids.
+- Never write markup, CSS, HTML, font names or colour values other than the optional accentColor hex.
+- The sectionOrder must reflect how reference sites in this industry actually flow (what they put early vs late).
+- Strong visual/portfolio industries should not open with a wall of text; service industries should not bury the services.
+- Truthfulness: this is design guidance only. Never invent awards, certifications, years, staff counts, clients or prices.
+
+LOCALISATION: assume Indian market context; keep wording professional Indian English.`;
+
+  const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+
+  for (const model of candidateModels) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.4,
+          },
+        }),
+        signal: AbortSignal.timeout(9000),
+      });
+
+      if (!res.ok) {
+        console.warn(`[Gemini AI] Blueprint model ${model} returned (${res.status}): ${res.statusText}`);
+        continue;
+      }
+
+      const data = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) continue;
+
+      const cleaned = rawText
+        .replace(/^```json\s*/i, '')
+        .replace(/```\s*$/i, '')
+        .trim();
+
+      const parsed = JSON.parse(cleaned);
+      if (parsed && typeof parsed === 'object' && Array.isArray(parsed.sectionOrder)) {
+        console.log(`[Gemini AI] Industry blueprint authored with ${model} for "${profession}"`);
+        return parsed;
+      }
+    } catch (err) {
+      console.warn(`[Gemini AI] Blueprint call failed on ${model}:`, err);
     }
   }
 

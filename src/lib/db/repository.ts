@@ -17,6 +17,7 @@ import {
   LeadNoteData,
   ActivityData,
 } from '@/types';
+import type { IndustryDesignBlueprint } from '@/lib/demos/industry-blueprint';
 import {
   INITIAL_DEMO_LEADS,
   INITIAL_DEMO_JOBS,
@@ -58,6 +59,9 @@ const DEMO_STORE_FILE = getStoreFilePath();
  *  under a single ledger key instead of per-organization arrays. */
 const MEDIA_LEDGER_KEY = 'media-assets';
 
+/** Design blueprints for every covered industry live under one ledger key. */
+const BLUEPRINT_LEDGER_KEY = 'industry-blueprints';
+
 /**
  * Bumped whenever DemoDataStore gains fields/methods. In dev, Next caches the
  * store instance on globalThis across hot reloads; an instance built by an
@@ -65,7 +69,19 @@ const MEDIA_LEDGER_KEY = 'media-assets';
  * `getMediaBySourceUrl is not a function` and disabled image dedupe). A stale
  * instance is discarded and rebuilt from the .data ledger instead.
  */
-const DEMO_STORE_SCHEMA_VERSION = 2;
+const DEMO_STORE_SCHEMA_VERSION = 3;
+
+/** Per-industry design blueprint authored once and reused (see industry-blueprint.ts). */
+export interface DemoBlueprintRecord {
+  key: string;
+  industry: string;
+  /** The full IndustryDesignBlueprint payload. */
+  blueprint: Record<string, unknown>;
+  source: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
 
 /** A downloaded image persisted by the app (base64 payload in demo mode). */
 export interface DemoMediaRecord {
@@ -96,6 +112,12 @@ class DemoDataStore {
    * semantics identical to demos (survives restarts in demo mode).
    */
   private media: Map<string, DemoMediaRecord[]> = new Map();
+  /**
+   * Per-industry design blueprints (one row per industry key), so the same trade
+   * always renders the same reference-informed design — in demo mode they live
+   * in the ledger alongside media.
+   */
+  private blueprints: Map<string, DemoBlueprintRecord[]> = new Map();
   private lastLoadedMtime = 0;
 
   constructor() {
@@ -139,6 +161,17 @@ class DemoDataStore {
     this.media.set(MEDIA_LEDGER_KEY, [...existing, ...records]);
   }
 
+  getBlueprint(key: string): DemoBlueprintRecord | null {
+    const rows = this.blueprints.get(BLUEPRINT_LEDGER_KEY) || [];
+    return rows.find((row) => row.key === key) || null;
+  }
+
+  putBlueprint(record: DemoBlueprintRecord): void {
+    const rows = this.blueprints.get(BLUEPRINT_LEDGER_KEY) || [];
+    const withoutKey = rows.filter((row) => row.key !== record.key);
+    this.blueprints.set(BLUEPRINT_LEDGER_KEY, [...withoutKey, record]);
+  }
+
   getDemosMap(): Map<string, WebsiteDemoData[]> {
     return this.demos;
   }
@@ -163,6 +196,7 @@ class DemoDataStore {
             if (Array.isArray(data.consentRecords)) this.consentRecords = new Map(data.consentRecords);
             if (Array.isArray(data.demos)) this.demos = new Map(data.demos);
             if (Array.isArray(data.media)) this.media = new Map(data.media);
+            if (Array.isArray(data.blueprints)) this.blueprints = new Map(data.blueprints);
             this.lastLoadedMtime = stat.mtimeMs;
             return true;
           }
@@ -187,6 +221,7 @@ class DemoDataStore {
         consentRecords: Array.from(this.consentRecords.entries()),
         demos: Array.from(this.demos.entries()),
         media: Array.from(this.media.entries()),
+        blueprints: Array.from(this.blueprints.entries()),
       };
       fs.writeFileSync(DEMO_STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
       const stat = fs.statSync(DEMO_STORE_FILE);
@@ -2355,6 +2390,145 @@ function randomMediaId(): string {
   // Publicly served asset ids: cryptographically random so the namespace cannot
   // be walked or guessed.
   return `media-${crypto.randomUUID()}`;
+}
+
+export interface SaveIndustryBlueprintInput {
+  key: string;
+  industry: string;
+  blueprint: IndustryDesignBlueprint;
+  source: string;
+  version: number;
+  createdAt: string;
+}
+
+export interface IndustryBlueprintSummary {
+  key: string;
+  industry: string;
+  blueprint: IndustryDesignBlueprint;
+  source: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Persisted per-industry design blueprints (see `industry-blueprint.ts`).
+ *
+ * - Demo mode: in-memory store mirrored to `.data/`.
+ * - Production: `industry_blueprints` table in PostgreSQL/Neon.
+ *
+ * Keyed by the normalised industry key so the *first* authored design wins and
+ * every later lead in that trade (on any serverless instance) reuses it.
+ */
+export class IndustryBlueprintRepository {
+  static async getIndustryBlueprint(key: string): Promise<IndustryBlueprintSummary | null> {
+    const cleanKey = key ? key.trim() : '';
+    if (!cleanKey) return null;
+    await ensureDatabaseMode();
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const row = demoStore.getBlueprint(cleanKey);
+      return row ? toBlueprintSummary(row) : null;
+    }
+
+    const { prisma } = await import('./prisma');
+    const row = await prisma.industryBlueprint.findUnique({ where: { key: cleanKey } });
+    if (!row) return null;
+    return {
+      key: row.key,
+      industry: row.industry,
+      blueprint: row.blueprint as unknown as IndustryDesignBlueprint,
+      source: row.source,
+      version: row.version,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  /**
+   * Saves an authored blueprint. Returns the canonical row — on a concurrent
+   * race the first writer's design is returned so all leads stay consistent.
+   */
+  static async saveIndustryBlueprint(
+    input: SaveIndustryBlueprintInput
+  ): Promise<IndustryBlueprintSummary | null> {
+    const cleanKey = input.key ? input.key.trim() : '';
+    if (!cleanKey) return null;
+    await ensureDatabaseMode();
+
+    const now = new Date().toISOString();
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const existing = demoStore.getBlueprint(cleanKey);
+      if (existing) return toBlueprintSummary(existing);
+      const record: DemoBlueprintRecord = {
+        key: cleanKey,
+        industry: input.industry,
+        blueprint: input.blueprint as unknown as Record<string, unknown>,
+        source: input.source,
+        version: input.version,
+        createdAt: input.createdAt || now,
+        updatedAt: now,
+      };
+      demoStore.putBlueprint(record);
+      demoStore.saveToDisk();
+      return toBlueprintSummary(record);
+    }
+
+    const { prisma } = await import('./prisma');
+    try {
+      const created = await prisma.industryBlueprint.create({
+        data: {
+          key: cleanKey,
+          industry: input.industry,
+          blueprint: input.blueprint as unknown as object,
+          source: input.source,
+          version: input.version,
+        },
+      });
+      return {
+        key: created.key,
+        industry: created.industry,
+        blueprint: created.blueprint as unknown as IndustryDesignBlueprint,
+        source: created.source,
+        version: created.version,
+        createdAt: created.createdAt.toISOString(),
+        updatedAt: created.updatedAt.toISOString(),
+      };
+    } catch (error: unknown) {
+      // Another instance authored this industry first (unique key) — adopt theirs.
+      const code = (error as { code?: string } | null)?.code;
+      if (code === 'P2002') {
+        const winner = await prisma.industryBlueprint.findUnique({ where: { key: cleanKey } });
+        if (winner) {
+          return {
+            key: winner.key,
+            industry: winner.industry,
+            blueprint: winner.blueprint as unknown as IndustryDesignBlueprint,
+            source: winner.source,
+            version: winner.version,
+            createdAt: winner.createdAt.toISOString(),
+            updatedAt: winner.updatedAt.toISOString(),
+          };
+        }
+      }
+      throw error;
+    }
+  }
+}
+
+function toBlueprintSummary(row: DemoBlueprintRecord): IndustryBlueprintSummary {
+  return {
+    key: row.key,
+    industry: row.industry,
+    blueprint: row.blueprint as unknown as IndustryDesignBlueprint,
+    source: row.source,
+    version: row.version,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
 }
 
 

@@ -218,13 +218,17 @@ export interface WebsiteDesign {
   };
   contentDensity?: 'compact' | 'comfortable' | 'spacious';
   /**
-   * Profession Stitch directive: the resolved archetype and an optional
-   * validated accent colour chosen for this lead. Persisted so re-renders are
-   * fully deterministic.
+   * Profession Stitch directive: the resolved archetype, an optional validated
+   * accent colour and the per-industry palette system chosen for this lead.
+   * Persisted so re-renders are fully deterministic.
    */
   stitch?: {
     archetype?: string;
     accentColor?: string;
+    /** Allow-listed industry palette/typography system id. */
+    paletteId?: string;
+    /** Allow-listed hero treatment. */
+    heroStyle?: 'fullbleed' | 'split' | 'centered';
   };
 }
 

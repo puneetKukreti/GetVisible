@@ -84,6 +84,10 @@ export const WebsiteDesignSchema = z.object({
     .object({
       archetype: z.string().max(60).optional(),
       accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a valid hex color code').optional(),
+      /** Allow-listed industry palette/typography system id. */
+      paletteId: z.string().max(60).optional(),
+      /** Allow-listed hero treatment. */
+      heroStyle: z.enum(['fullbleed', 'split', 'centered']).optional(),
     })
     .optional(),
 });
