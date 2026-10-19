@@ -134,7 +134,7 @@ describe('AI diagnostics', () => {
     expect(scrubSecretText('rejected AIzaSyABCDEFGHIJKLMNOP')).toBe('rejected AIza***');
   });
 
-  it('asks the API which models exist and prefers the newest flash', async () => {
+  it('asks the API which models exist and prefers a proven family over a higher version', async () => {
     resetGeminiModelCache();
     vi.stubGlobal(
       'fetch',
@@ -146,6 +146,9 @@ describe('AI diagnostics', () => {
                 { name: 'models/gemini-2.0-flash', supportedGenerationMethods: ['generateContent'] },
                 { name: 'models/gemini-3-pro', supportedGenerationMethods: ['generateContent'] },
                 { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
+                // Newest name, but an unknown family: answering a JSON prompt is
+                // not what it is for, so it must not be tried first.
+                { name: 'models/gemini-4-argon', supportedGenerationMethods: ['generateContent'] },
                 // Supports generateContent but is not a chat model.
                 { name: 'models/imagen-3', supportedGenerationMethods: ['generateContent'] },
                 // Right name shape, wrong capability.
@@ -160,7 +163,13 @@ describe('AI diagnostics', () => {
     );
 
     const models = await listGeminiModels('AIza-model-list-key');
-    expect(models).toEqual(['gemini-3-flash', 'gemini-3-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
+    expect(models).toEqual([
+      'gemini-3-flash',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-3-pro',
+      'gemini-4-argon',
+    ]);
 
     resetGeminiModelCache();
     vi.unstubAllGlobals();

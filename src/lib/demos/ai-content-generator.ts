@@ -148,18 +148,34 @@ export const GEMINI_FALLBACK_MODELS = [
 const GEMINI_UNWANTED_MODEL = /embedding|aqa|imagen|veo|tts|audio|live|image-generation/i;
 
 /**
- * Newest version first; within a version prefer flash (fast and capable) over
- * pro (slower, dearer), with flash-lite ahead of both.
+ * How willing we are to use a model *family*: the ones that answer a JSON prompt
+ * quickly come before anything exotic, and version only breaks ties within a
+ * family. Version alone is not enough — a newer unknown name was tried first and
+ * answered 429 while the flash models were fine.
  */
-function rankGeminiModel(name: string): number {
-  const match = name.match(/^gemini-(\d+)(?:\.(\d+))?/);
-  const version = (match ? Number(match[1]) : 0) * 100 + (match && match[2] ? Number(match[2]) : 0);
-  let family = 0;
-  if (/flash-lite/.test(name)) family = 100;
-  else if (/flash/.test(name)) family = 300;
-  else if (/pro/.test(name)) family = 200;
-  return version * 1000 + family;
+function geminiModelFamilyTier(name: string): number {
+  if (/flash-lite/.test(name)) return 3;
+  if (/flash/.test(name)) return 4;
+  if (/pro/.test(name)) return 2;
+  return 1;
 }
+
+function geminiModelVersion(name: string): number {
+  const match = name.match(/^gemini-(\d+)(?:\.(\d+))?/);
+  return (match ? Number(match[1]) : 0) * 100 + (match && match[2] ? Number(match[2]) : 0);
+}
+
+function compareGeminiModels(a: string, b: string): number {
+  const tier = geminiModelFamilyTier(b) - geminiModelFamilyTier(a);
+  if (tier !== 0) return tier;
+  return geminiModelVersion(b) - geminiModelVersion(a);
+}
+
+/**
+ * Per-attempt ceiling. Three attempts at this length still fit inside the route
+ * budget, and a model that needs longer would make demo generation slow anyway.
+ */
+const GEMINI_ATTEMPT_TIMEOUT_MS = 12000;
 
 let geminiModelCache: { key: string; models: string[] } | null = null;
 
@@ -188,7 +204,7 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
         )
         .map((m): string => String(m.name).replace(/^models\//, ''))
         .filter((name) => name.startsWith('gemini-') && !GEMINI_UNWANTED_MODEL.test(name))
-        .sort((a, b) => rankGeminiModel(b) - rankGeminiModel(a));
+        .sort(compareGeminiModels);
     }
   } catch {
     models = [];
@@ -1205,7 +1221,7 @@ ${options.industryBrief}
             temperature: 0.3,
           },
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(GEMINI_ATTEMPT_TIMEOUT_MS),
       });
 
       if (!res.ok) {
@@ -1332,7 +1348,7 @@ export interface IndustryBlueprintAiDiagnostics {
   /** Models actually tried, after asking the API what it offers. */
   availableModels: string[];
   /** Outcome of each model attempt, in order. */
-  attempts: Array<{ model: string; status?: number; error?: string }>;
+  attempts: Array<{ model: string; status?: number; error?: string; ms?: number }>;
   /** A usable blueprint came back. */
   authored: boolean;
   /** Which model authored it. */
@@ -1389,7 +1405,7 @@ export interface IndustryBlueprintAiFacts {
 export async function generateIndustryBlueprintJson(
   facts: IndustryBlueprintAiFacts
 ): Promise<unknown | null> {
-  const attempts: Array<{ model: string; status?: number; error?: string }> = [];
+  const attempts: IndustryBlueprintAiDiagnostics['attempts'] = [];
   const report = (patch: Partial<IndustryBlueprintAiDiagnostics>) => {
     lastBlueprintAiDiagnostics = {
       ...lastBlueprintAiDiagnostics,
@@ -1448,6 +1464,7 @@ LOCALISATION: assume Indian market context; keep wording professional Indian Eng
   report({ availableModels: candidateModels });
 
   for (const model of candidateModels) {
+    const startedAt = Date.now();
     try {
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
 
@@ -1461,12 +1478,12 @@ LOCALISATION: assume Indian market context; keep wording professional Indian Eng
             temperature: 0.4,
           },
         }),
-        signal: AbortSignal.timeout(9000),
+        signal: AbortSignal.timeout(GEMINI_ATTEMPT_TIMEOUT_MS),
       });
 
       if (!res.ok) {
         const reason = await describeGeminiFailure(res);
-        attempts.push({ model, status: res.status, error: reason });
+        attempts.push({ model, status: res.status, error: reason, ms: Date.now() - startedAt });
         console.warn(`[Gemini AI] Blueprint model ${model} failed: ${reason}`);
         continue;
       }
@@ -1485,14 +1502,14 @@ LOCALISATION: assume Indian market context; keep wording professional Indian Eng
 
       const parsed = JSON.parse(cleaned);
       if (parsed && typeof parsed === 'object' && Array.isArray(parsed.sectionOrder)) {
-        attempts.push({ model, status: 200 });
+        attempts.push({ model, status: 200, ms: Date.now() - startedAt });
         report({ authored: true, model });
         console.log(`[Gemini AI] Industry blueprint authored with ${model} for "${profession}"`);
         return parsed;
       }
       attempts.push({ model, error: 'unusable payload (no sectionOrder)' });
     } catch (err) {
-      attempts.push({ model, error: scrubSecretText(err) });
+      attempts.push({ model, error: scrubSecretText(err), ms: Date.now() - startedAt });
       console.warn(`[Gemini AI] Blueprint call failed on ${model}: ${scrubSecretText(err)}`);
     }
   }
@@ -1614,7 +1631,7 @@ ${
             contents: [{ parts: [{ text: sectionPrompt }] }],
             generationConfig: { responseMimeType: 'application/json', temperature: 0.5 },
           }),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(GEMINI_ATTEMPT_TIMEOUT_MS),
         });
 
         if (res.ok) {
