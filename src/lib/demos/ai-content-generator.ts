@@ -1,5 +1,5 @@
 /**
- * Gemini AI Website Content Generator (gemini-1.5-flash / gemini-2.0-flash)
+ * Gemini AI Website Content Generator (models discovered at runtime)
  *
  * Dynamically synthesizes 100% authentic, profession-specific website copy
  * (Headlines, 4 Services, 4 Why-Choose-Us trust points, 4 Process steps, 3 FAQs)
@@ -123,6 +123,116 @@ export function getGeminiApiKey(): string | null {
     }
   } catch {}
   return null;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Gemini model selection                                                    */
+/* -------------------------------------------------------------------------- */
+
+const GEMINI_API_VERSION = 'v1beta';
+const GEMINI_MODELS_URL = `https://generativelanguage.googleapis.com/${GEMINI_API_VERSION}/models`;
+
+/**
+ * Last resort only. Model names are retired without notice, and a retired name
+ * answers 404 — which looks exactly like an invalid key unless you read the
+ * response body. Asking the API what it offers is therefore the primary path,
+ * and these names are used only when that question itself cannot be answered.
+ */
+export const GEMINI_FALLBACK_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+];
+
+/** Names that technically support generateContent but are never what we want. */
+const GEMINI_UNWANTED_MODEL = /embedding|aqa|imagen|veo|tts|audio|live|image-generation/i;
+
+/**
+ * Newest version first; within a version prefer flash (fast and capable) over
+ * pro (slower, dearer), with flash-lite ahead of both.
+ */
+function rankGeminiModel(name: string): number {
+  const match = name.match(/^gemini-(\d+)(?:\.(\d+))?/);
+  const version = (match ? Number(match[1]) : 0) * 100 + (match && match[2] ? Number(match[2]) : 0);
+  let family = 0;
+  if (/flash-lite/.test(name)) family = 100;
+  else if (/flash/.test(name)) family = 300;
+  else if (/pro/.test(name)) family = 200;
+  return version * 1000 + family;
+}
+
+let geminiModelCache: { key: string; models: string[] } | null = null;
+
+/**
+ * Asks the API which models this key may call, most suitable first. Cached for
+ * the life of the process and never throws: an empty list means "fall back".
+ */
+export async function listGeminiModels(apiKey: string): Promise<string[]> {
+  const key = apiKey.trim();
+  if (geminiModelCache && geminiModelCache.key === key) return geminiModelCache.models;
+
+  let models: string[] = [];
+  try {
+    const res = await fetch(`${GEMINI_MODELS_URL}?key=${key}&pageSize=200`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const all: any[] = Array.isArray(data?.models) ? data.models : [];
+      models = all
+        .filter(
+          (m) =>
+            typeof m?.name === 'string' &&
+            Array.isArray(m?.supportedGenerationMethods) &&
+            m.supportedGenerationMethods.includes('generateContent')
+        )
+        .map((m): string => String(m.name).replace(/^models\//, ''))
+        .filter((name) => name.startsWith('gemini-') && !GEMINI_UNWANTED_MODEL.test(name))
+        .sort((a, b) => rankGeminiModel(b) - rankGeminiModel(a));
+    }
+  } catch {
+    models = [];
+  }
+
+  geminiModelCache = { key, models };
+  return models;
+}
+
+/** The ordered models to try: what the API offers, else the fallback names. */
+export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
+  const discovered = await listGeminiModels(apiKey);
+  if (discovered.length > 0) return discovered.slice(0, 3);
+  return [...GEMINI_FALLBACK_MODELS];
+}
+
+/** Test seam: forget the discovered model list. */
+export function resetGeminiModelCache(): void {
+  geminiModelCache = null;
+}
+
+/**
+ * Google's actual reason lives in the body ("models/x is not found for API
+ * version v1beta"), while statusText is only a generic "Not Found". Reading the
+ * body is what makes a 404 diagnosable. Scrubbed, because the request URL
+ * carries the key.
+ */
+async function describeGeminiFailure(res: Response): Promise<string> {
+  const fallback = `${res.status} ${res.statusText}`.trim();
+  try {
+    const raw = await res.text();
+    if (!raw) return fallback;
+    let message = raw;
+    try {
+      const parsed = JSON.parse(raw);
+      const fromApi = parsed?.error?.message;
+      if (typeof fromApi === 'string' && fromApi.trim()) message = fromApi;
+    } catch {
+      // Not JSON — the raw text is the best description available.
+    }
+    return `${res.status} ${scrubSecretText(message)}`;
+  } catch {
+    return fallback;
+  }
 }
 
 /**
@@ -925,8 +1035,9 @@ function sanitizeAiContent(parsed: any, facts: GenerateAiContentFacts): AiBusine
 }
 
 /**
- * Calls Gemini Flash via REST API with a structured JSON schema prompt.
- * Tries gemini-2.5-flash, gemini-1.5-flash, and gemini-2.0-flash.
+ * Calls Gemini via REST API with a structured JSON schema prompt.
+ * The models to try are discovered from the API (see resolveGeminiModels), so a
+ * retired model name cannot silently turn every request into a 404.
  * Gracefully returns null if no API key is configured or upon error,
  * allowing the caller to seamlessly fall back to getDeterministicProfessionProfile.
  */
@@ -1072,7 +1183,7 @@ ${options.industryBrief}
     : ''
 }`;
 
-  const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+  const candidateModels = await resolveGeminiModels(apiKey);
 
   for (const model of candidateModels) {
     try {
@@ -1098,7 +1209,7 @@ ${options.industryBrief}
       });
 
       if (!res.ok) {
-        console.warn(`[Gemini AI] Model ${model} returned (${res.status}): ${res.statusText}`);
+        console.warn(`[Gemini AI] Model ${model} failed: ${await describeGeminiFailure(res)}`);
         continue;
       }
 
@@ -1218,6 +1329,8 @@ export function scrubSecretText(input: unknown): string {
 export interface IndustryBlueprintAiDiagnostics {
   /** The key resolved, so a call was actually attempted. */
   keyResolved: boolean;
+  /** Models actually tried, after asking the API what it offers. */
+  availableModels: string[];
   /** Outcome of each model attempt, in order. */
   attempts: Array<{ model: string; status?: number; error?: string }>;
   /** A usable blueprint came back. */
@@ -1229,6 +1342,7 @@ export interface IndustryBlueprintAiDiagnostics {
 
 let lastBlueprintAiDiagnostics: IndustryBlueprintAiDiagnostics = {
   keyResolved: false,
+  availableModels: [],
   attempts: [],
   authored: false,
   model: null,
@@ -1243,6 +1357,7 @@ export function getIndustryBlueprintAiDiagnostics(): IndustryBlueprintAiDiagnost
 export function resetIndustryBlueprintAiDiagnostics(): void {
   lastBlueprintAiDiagnostics = {
     keyResolved: false,
+    availableModels: [],
     attempts: [],
     authored: false,
     model: null,
@@ -1329,7 +1444,8 @@ RULES:
 
 LOCALISATION: assume Indian market context; keep wording professional Indian English.`;
 
-  const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+  const candidateModels = await resolveGeminiModels(apiKey);
+  report({ availableModels: candidateModels });
 
   for (const model of candidateModels) {
     try {
@@ -1349,10 +1465,9 @@ LOCALISATION: assume Indian market context; keep wording professional Indian Eng
       });
 
       if (!res.ok) {
-        attempts.push({ model, status: res.status, error: scrubSecretText(res.statusText) });
-        console.warn(
-          `[Gemini AI] Blueprint model ${model} returned (${res.status}): ${scrubSecretText(res.statusText)}`
-        );
+        const reason = await describeGeminiFailure(res);
+        attempts.push({ model, status: res.status, error: reason });
+        console.warn(`[Gemini AI] Blueprint model ${model} failed: ${reason}`);
         continue;
       }
 
@@ -1413,7 +1528,7 @@ export async function regenerateSectionContent(params: RegenerateSectionParams):
   const city = facts.city?.trim() || 'Delhi NCR';
 
   if (apiKey) {
-    const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash'];
+    const candidateModels = await resolveGeminiModels(apiKey);
     const sectionPrompt = `You are an elite Indian B2B & SMB copywriter for:
 - Business: "${businessName}"
 - Profession: "${profession}"
@@ -1512,6 +1627,10 @@ ${
               return parsed;
             }
           }
+        } else {
+          console.warn(
+            `[Gemini AI] Section ${sectionType} model ${model} failed: ${await describeGeminiFailure(res)}`
+          );
         }
       } catch (err) {
         console.warn(`[Gemini AI] Failed regenerating ${sectionType} with ${model}:`, err);

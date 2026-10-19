@@ -20,6 +20,10 @@ import {
   getIndustryBlueprintAiDiagnostics,
   resetIndustryBlueprintAiDiagnostics,
   scrubSecretText,
+  listGeminiModels,
+  resolveGeminiModels,
+  resetGeminiModelCache,
+  GEMINI_FALLBACK_MODELS,
 } from '@/lib/demos/ai-content-generator';
 import { personalizeStitchHtml } from '@/lib/demos/stitch-personalizer';
 import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
@@ -68,6 +72,7 @@ describe('AI diagnostics', () => {
   it('records every model attempt when the key is rejected', async () => {
     silent();
     resetIndustryBlueprintAiDiagnostics();
+    resetGeminiModelCache();
     vi.stubEnv('GEMINI_API_KEY', 'AIza-secret-value-123456');
     vi.stubGlobal(
       'fetch',
@@ -92,6 +97,7 @@ describe('AI diagnostics', () => {
   it('records success and the model that authored it', async () => {
     silent();
     resetIndustryBlueprintAiDiagnostics();
+    resetGeminiModelCache();
     vi.stubEnv('GEMINI_API_KEY', 'AIza-ok-value-123456');
     vi.stubGlobal(
       'fetch',
@@ -126,6 +132,100 @@ describe('AI diagnostics', () => {
       'GET https://x/y?key=***&a=1 failed'
     );
     expect(scrubSecretText('rejected AIzaSyABCDEFGHIJKLMNOP')).toBe('rejected AIza***');
+  });
+
+  it('asks the API which models exist and prefers the newest flash', async () => {
+    resetGeminiModelCache();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              models: [
+                { name: 'models/gemini-2.0-flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3-pro', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3-flash', supportedGenerationMethods: ['generateContent'] },
+                // Supports generateContent but is not a chat model.
+                { name: 'models/imagen-3', supportedGenerationMethods: ['generateContent'] },
+                // Right name shape, wrong capability.
+                { name: 'models/gemini-embedding-001', supportedGenerationMethods: ['embedContent'] },
+                { name: 'models/text-embedding-004', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
+              ],
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    const models = await listGeminiModels('AIza-model-list-key');
+    expect(models).toEqual(['gemini-3-flash', 'gemini-3-pro', 'gemini-2.5-flash', 'gemini-2.0-flash']);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back to known names when the model list cannot be read', async () => {
+    resetGeminiModelCache();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('network down');
+      })
+    );
+
+    expect(await listGeminiModels('AIza-unreachable-key')).toEqual([]);
+    expect(await resolveGeminiModels('AIza-unreachable-key')).toEqual(GEMINI_FALLBACK_MODELS);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+  });
+
+  it('reports the reason the API gave for a failed model call', async () => {
+    silent();
+    resetIndustryBlueprintAiDiagnostics();
+    resetGeminiModelCache();
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-body-reporting-key');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/models?')
+          ? new Response(
+              JSON.stringify({
+                models: [
+                  { name: 'models/gemini-9-flash', supportedGenerationMethods: ['generateContent'] },
+                ],
+              }),
+              { status: 200 }
+            )
+          : new Response(
+              JSON.stringify({
+                error: {
+                  code: 404,
+                  message: 'models/gemini-9-flash is not found for API version v1beta',
+                },
+              }),
+              { status: 404, statusText: 'Not Found' }
+            )
+      )
+    );
+
+    const result = await generateIndustryBlueprintJson(facts);
+    expect(result).toBeNull();
+
+    const diag = getIndustryBlueprintAiDiagnostics();
+    expect(diag.availableModels).toEqual(['gemini-9-flash']);
+    expect(diag.attempts).toHaveLength(1);
+    expect(diag.attempts[0].status).toBe(404);
+    // The generic statusText ("Not Found") would not have explained anything.
+    expect(diag.attempts[0].error).toContain('is not found for API version v1beta');
+    expect(diag.authored).toBe(false);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 });
 
