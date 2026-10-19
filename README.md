@@ -143,6 +143,7 @@ Did you know that having a professional website can help potential clients find 
 ✅ Help more people discover your business online
 
 👀 *See what your website could look like!*
+🖼️ *(preview image attached above 👆)*
 
 👉 *View Your Website Demo:*
 https://get-visible-web.vercel.app/demo/{token}
@@ -171,9 +172,11 @@ Two attachment shapes are available and can be toggled in the campaigns panel:
 - `viewport=mobile` (default) — a tall **1080×1350 portrait card** that looks like a phone
   screen. Type is sized so the firm name, headline and CTA stay legible once WhatsApp scales
   the image down to a chat bubble (a landscape card renders most of its copy illegibly).
-- `viewport=desktop` — a wide browser-window card. When a local Chrome is available (local
-  dev / VPS) this one is a real pixel capture of the personalized page at 1280×800; otherwise
-  it is a 1024×640 mock card.
+- `viewport=desktop` — a wide browser-window card. On hosts with a local Chrome (local dev /
+  VPS) this is a real pixel capture of the personalized page at 1280×800; on serverless the
+  route first sends the public personalized page to **Microlink** (no API key) so the wide
+  attachment is a genuine render, and when that service is unavailable it falls back to a
+  1024×640 mock card. Both are cached under `os.tmpdir()/getvisible-screenshots`.
 
 The portrait variant is always the designed card, never a live capture: headless Chrome
 enforces a ~500px minimum window width, so a `--window-size=390` capture is laid out wide and

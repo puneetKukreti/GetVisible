@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { generateAiBusinessContent } from '@/lib/demos/ai-content-generator';
-import { generateHeroMockupSvg, generateMobileHeroMockupSvg } from '@/lib/providers/screenshot.provider';
+import {
+  generateHeroMockupSvg,
+  generateMobileHeroMockupSvg,
+  captureCloudHeroScreenshot,
+} from '@/lib/providers/screenshot.provider';
 import { WebsiteDemoGeneratorService } from '@/lib/demos/generator';
 import { LeadData } from '@/types';
 
@@ -123,6 +127,52 @@ describe('Gemini AI Content Generator & Multi-Profession Generalization', () => 
     expect(hostile).not.toContain('<script>');
     expect(hostile).toContain('Sharma &amp; Sons');
     expect(hostile).toContain('&lt;script&gt;');
+  });
+
+  it('offers a cloud real-render source for the wide card and refuses unusable responses', async () => {
+    // Local and non-HTTPS URLs can never be reached by a cloud renderer.
+    const neverFetch: typeof fetch = async () => {
+      throw new Error('must not be called');
+    };
+    await expect(
+      captureCloudHeroScreenshot('http://localhost:3000/x', 1280, 800, neverFetch)
+    ).resolves.toBeNull();
+    await expect(
+      captureCloudHeroScreenshot('/api/demos/x/html', 1280, 800, neverFetch)
+    ).resolves.toBeNull();
+
+    // A happy Microlink response (image bytes) comes back as PNG bytes.
+    const png = Buffer.alloc(20000, 7);
+    let requested: string | null = null;
+    const good: typeof fetch = async (input, init) => {
+      requested = String(input);
+      expect(init?.signal).toBeDefined();
+      return new Response(png, { status: 200, headers: { 'Content-Type': 'image/jpeg' } });
+    };
+    const bytes = await captureCloudHeroScreenshot(
+      'https://get-visible-web.vercel.app/api/demos/lead-1/html',
+      1280,
+      800,
+      good
+    );
+    expect(bytes).not.toBeNull();
+    expect(bytes!.equals(png)).toBe(true);
+    expect(requested).toContain('https://api.microlink.io?url=https%3A%2F%2Fget-visible-web.vercel.app%2Fapi%2Fdemos%2Flead-1%2Fhtml');
+    expect(requested).toContain('screenshot=true');
+    expect(requested).toContain('viewport.width=1280');
+    expect(requested).toContain('viewport.height=800');
+
+    // JSON errors, tiny placeholders and rate-limit responses fall back to null…
+    const bad: typeof fetch = async () =>
+      new Response('{"status":"error"}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+    await expect(captureCloudHeroScreenshot('https://example.com/demo/1', 1280, 800, bad)).resolves.toBeNull();
+
+    const small: typeof fetch = async () =>
+      new Response(Buffer.alloc(2048, 9), { status: 200, headers: { 'Content-Type': 'image/png' } });
+    await expect(captureCloudHeroScreenshot('https://example.com/demo/1', 1280, 800, small)).resolves.toBeNull();
+
+    const limited: typeof fetch = async () => new Response(null, { status: 429 });
+    await expect(captureCloudHeroScreenshot('https://example.com/demo/1', 1280, 800, limited)).resolves.toBeNull();
   });
 
   it('3. generateDemo integrates AI content and marks provenance as AI_SYNTHESIZED when available', async () => {

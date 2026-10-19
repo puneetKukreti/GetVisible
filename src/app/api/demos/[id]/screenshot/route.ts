@@ -9,8 +9,10 @@ import { DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID } from '@/lib/workspace';
 import {
   findSystemBrowser,
   captureLocalHeroScreenshot,
+  captureCloudHeroScreenshot,
   generateHeroMockupSvg,
 } from '@/lib/providers/screenshot.provider';
+import { getAppBaseUrl } from '@/lib/demos/public';
 import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { personalizeStitchHtml } from '@/lib/demos/stitch-personalizer';
 import { selectWebsiteDesign } from '@/lib/demos/personalization';
@@ -188,6 +190,43 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     const templatePreviewPath = getTemplateScreenshotPath(layout);
 
     const hasLocalBrowser = Boolean(findSystemBrowser());
+
+    // 3a. Serverless host without Chrome: the wide variant can still come out as
+    // a genuine capture by sending the personalized page to Microlink (zero
+    // config, public URL required). Anything unusable falls through to the
+    // designed SVG card. The portrait variant stays the designed card, since a
+    // chat bubble needs the oversized prospect name, not a shrunken real page.
+    if (!hasLocalBrowser && !isMobileViewport) {
+      const publicAccessToken = demo?.publicToken || actualLeadId;
+      const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
+        publicAccessToken
+      )}/html`;
+      const cloudBytes = await captureCloudHeroScreenshot(livePageUrl, 1280, 800);
+      if (cloudBytes) {
+        // DOM BodyInit needs a snapshot BufferSource; hand over a plain copy.
+        const cloudBody = new Uint8Array(cloudBytes.byteLength);
+        cloudBody.set(cloudBytes);
+        try {
+          fs.writeFileSync(heroDiskPath, cloudBytes);
+        } catch {}
+        if (isImageFormat) {
+          return new NextResponse(cloudBody, {
+            headers: {
+              'Content-Type': 'image/png',
+              'Cache-Control': 'public, max-age=86400',
+              'Access-Control-Allow-Origin': '*',
+              'Content-Disposition': `inline; filename="hero_preview.png"`,
+            },
+          });
+        }
+        return NextResponse.json({
+          success: true,
+          screenshotUrl: dynamicImageUrl,
+          cached: false,
+          source: 'microlink',
+        });
+      }
+    }
 
     if (!hasLocalBrowser && isImageFormat) {
       // No headless browser on this host (e.g. Vercel serverless), so the static

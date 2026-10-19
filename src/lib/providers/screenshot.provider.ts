@@ -102,6 +102,43 @@ export async function captureLocalHeroScreenshot(
 }
 
 /**
+ * Cloud "real render" source for hosts without headless Chrome (e.g. Vercel
+ * serverless). Sends the personalized page to Microlink's screenshot API — which
+ * needs no API key — and returns the rasterized image bytes, or null when the
+ * service is unavailable / rate limited / returns nothing usable. Callers then
+ * fall back to the designed SVG concept card.
+ */
+export async function captureCloudHeroScreenshot(
+  targetUrl: string,
+  width = 1280,
+  height = 800,
+  fetcher: typeof fetch = fetch
+): Promise<Buffer | null> {
+  if (!/^https:\/\//i.test(targetUrl)) return null;
+
+  const microlinkUrl = `https://api.microlink.io?url=${encodeURIComponent(
+    targetUrl
+  )}&screenshot=true&meta=false&embed=screenshot.url&viewport.width=${width}&viewport.height=${height}&viewport.deviceScaleFactor=2`;
+
+  try {
+    const res = await fetcher(microlinkUrl, {
+      signal: AbortSignal.timeout(25000),
+      redirect: 'follow',
+    });
+    if (!res.ok) return null;
+
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.startsWith('image/')) return null;
+
+    const bytes = Buffer.from(await res.arrayBuffer());
+    // A tiny payload is almost always an error placeholder, not a real capture.
+    return bytes.length > 10_000 ? bytes : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Escapes the five XML special characters for safe SVG text/attribute output.
  */
 export function escapeSvgXml(value: string): string {

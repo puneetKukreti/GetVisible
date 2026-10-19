@@ -306,6 +306,7 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(wa).toContain('✅ Build trust and stand out from competitors');
       expect(wa).toContain('✅ Help more people discover your business online');
       expect(wa).toContain('👀 *See what your website could look like!*');
+      expect(wa).toContain('🖼️ *(preview image attached above 👆)*');
       expect(wa).toContain('👉 *View Your Website Demo:*');
 
       // The demo link must stay in the first-touch message.

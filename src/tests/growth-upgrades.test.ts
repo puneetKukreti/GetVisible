@@ -51,6 +51,7 @@ describe('Growth & Workflow Upgrades', () => {
 
       // Demo link travels in the first-touch message
       expect(touch1).toContain('👀 *See what your website could look like!*');
+      expect(touch1).toContain('🖼️ *(preview image attached above 👆)*');
       expect(touch1).toContain('👉 *View Your Website Demo:*');
       expect(touch1).toContain('https://getvisible.in/demo/sharma-ca');
       expect(touch1).toContain('📩 Interested? Click the link above to explore your demo and learn more.');

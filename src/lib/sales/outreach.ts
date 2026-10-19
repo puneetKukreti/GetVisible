@@ -261,6 +261,7 @@ Did you know that having a professional website can help potential clients find 
 ✅ Help more people discover your business online
 
 👀 *See what your website could look like!*
+🖼️ *(preview image attached above 👆)*
 
 👉 *View Your Website Demo:*
 ${demoUrl}
