@@ -204,6 +204,31 @@ two places:
 - `src/lib/demos/profession-stitch-renderer.ts` — non-CA profession templates get the same
   treatment below 620px in `buildStyles()`.
 
+### Industry imagery: live web sourcing for uncovered trades
+
+Curated photo pools (`image-engine.ts`, `industry-images.ts`, `profession-config.ts`) cover
+~12 professions. Anything else — e.g. "Car Detailing & Automobile Workshop" — used to fall
+back to generic office photography, so the hero/about/gallery placeholders did not match the
+prospect's trade.
+
+Now, when a profession lands in the generic bucket (`GENERAL_SMB`) and it is not a CA practice,
+`src/lib/demos/live-image-sourcing.ts` searches the web for real photos of that trade, downloads
+them, and self-hosts them in the demo:
+
+- **Source** — Openverse (`api.openverse.org`, CC-licensed photo index, **no API key**), queried
+  with short trade-noun phrases refined longest-first until results appear.
+- **Storage** — `MediaRepository` (`demo_media` table in Postgres; base64 inside the `.data`
+  ledger in demo mode), served publicly at `GET /api/media/<id>` with one-year immutable
+  caching. Photos are addressed by unguessable ids, so nothing is leaked.
+- **Dedupe** — a photo is downloaded at most once ever: assets are looked up by origin URL
+  (unique index on `sourceUrl`) and reused across generations, serverless instances and
+  restarts. HERO/ABOUT each take one dedicated photo and the gallery takes the rest, so no
+  placeholder repeats the same image.
+- **Fallback** — any failure (offline, rate limit, no results) is swallowed: the demo keeps the
+  curated/default imagery, and images are never broken.
+- **Opt-out / tests** — generation-time sourcing is skipped when `NODE_ENV=test` or
+  `DISABLE_LIVE_IMAGES=true`.
+
 ### 5. Running the Application
 ```bash
 npm run dev

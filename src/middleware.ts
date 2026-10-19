@@ -69,6 +69,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // 7b. Public demo imagery: read-only GETs of self-hosted industry photos.
+  // Asset ids are unguessable random tokens, never user data.
+  if (method === 'GET' && pathname.startsWith('/api/media/')) {
+    return NextResponse.next();
+  }
+
   // 8. Verify the signed owner session token for all other routes.
   const authCookie = request.cookies.get(OWNER_AUTH_COOKIE)?.value;
   const isAuthenticated = await verifyOwnerSessionToken(authCookie);

@@ -339,4 +339,22 @@ model WebsiteDemo {
   @@map("website_demos")
 }
 
+// Downloaded industry imagery for website demos (searched live from the web).
+// Interned by random unguessable id — served publicly at /api/media/<id> — so
+// no organization scoping or FK is needed. Purpose/attribution document where
+// the image came from (Openverse creator + source) for licence transparency.
+model DemoMedia {
+  id          String   @id @default(cuid())
+  mime        String
+  data        Bytes
+  byteSize    Int
+  sourceUrl   String?  @unique
+  attribution String?
+  purpose     String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("demo_media")
+}
+
 

@@ -12,7 +12,13 @@ import {
 } from './ai-content-generator';
 import { buildWebsiteImagesObject, getContextualImageUrl } from './image-engine';
 import { getIndustryImages } from './industry-images';
-import { getProfessionPreset, ProfessionCategory, ProfessionDesignPreset } from './profession-config';
+import { classifyProfession } from './profession-engine';
+import {
+  sourceIndustryImages,
+  buildIndustrySearchKeyword,
+  SourcedImage,
+} from './live-image-sourcing';
+import { getProfessionPreset, detectProfessionCategory, ProfessionCategory, ProfessionDesignPreset } from './profession-config';
 import {
   getProfessionContentPlan,
   normalizeSectionOrder,
@@ -286,9 +292,50 @@ export class WebsiteDemoGeneratorService {
     const preset = getProfessionPreset(lead.profession, lead.businessName);
     const imageSet = buildWebsiteImagesObject(lead.profession, lead.businessName);
 
-    // Prefer the profession-categorised preset imagery, then the industry engine.
-    const heroImgUrl = preset.heroImage || industryImgs.heroImage || imageSet.heroImage?.url;
-    const aboutImgUrl = preset.aboutImage || industryImgs.aboutImage || imageSet.aboutImage?.url;
+    // -------------------------------------------------------------------
+    // Live industry image sourcing: when this profession has no curated
+    // photo pool (i.e. it falls into the generic SMB fallback), search the
+    // web for real photos of the actual trade (Openverse, CC-licensed, no
+    // API key), download them and self-host them so the placeholder slots
+    // match the prospect's industry. Never throws — falls back silently.
+    // Disabled in test mode to keep unit suites deterministic (the sourcing
+    // engine itself has its own injected-fetcher tests). Can be force-disabled
+    // outside tests with DISABLE_LIVE_IMAGES=true.
+    // -------------------------------------------------------------------
+    const liveImagesEnabled =
+      process.env.NODE_ENV !== 'test' && process.env.DISABLE_LIVE_IMAGES !== 'true';
+    let sourcedImages: SourcedImage[] = [];
+    if (
+      liveImagesEnabled &&
+      !isCaPractice &&
+      detectProfessionCategory(lead.profession, lead.businessName) === 'GENERAL_SMB'
+    ) {
+      try {
+        const registryProfile = classifyProfession({
+          profession: lead.profession,
+          businessName: lead.businessName,
+        });
+        const firstGalleryBrief =
+          aiProfile?.gallery?.items?.[0]?.imageQuery || registryProfile.imageKeywords.hero;
+        sourcedImages = await sourceIndustryImages({
+          keywords: {
+            HERO: buildIndustrySearchKeyword(lead.profession, registryProfile.imageKeywords.hero),
+            ABOUT: buildIndustrySearchKeyword(lead.profession, registryProfile.imageKeywords.about),
+            GALLERY: buildIndustrySearchKeyword(lead.profession, firstGalleryBrief),
+          },
+          maxImages: 6,
+        });
+      } catch {
+        // Keep curated/default imagery on any sourcing failure.
+      }
+    }
+    const sourcedHero = sourcedImages.find((s) => s.purpose === 'HERO' && s.url)?.url;
+    const sourcedAbout = sourcedImages.find((s) => s.purpose === 'ABOUT' && s.url)?.url;
+
+    // Live-sourced web photos are industry-accurate, so they outrank the generic
+    // SMB preset (which is only reached for professions without curated art).
+    const heroImgUrl = sourcedHero || preset.heroImage || industryImgs.heroImage || imageSet.heroImage?.url;
+    const aboutImgUrl = sourcedAbout || preset.aboutImage || industryImgs.aboutImage || imageSet.aboutImage?.url;
 
     if (heroImgUrl) {
       content.hero.imageUrl = heroImgUrl;
@@ -402,7 +449,11 @@ export class WebsiteDemoGeneratorService {
 
     // Gallery for visually-led professions and AI-requested galleries.
     if (sectionOrder.includes('GALLERY')) {
-      const galleryItems = buildProfessionGallery(lead, plan, preset, aiProfile);
+      // Live-sourced photos first (extras beyond HERO/ABOUT), then curated.
+      const sourcedGalleryUrls = sourcedImages
+        .filter((s) => s.url && s.purpose !== 'HERO' && s.purpose !== 'ABOUT')
+        .map((s) => s.url);
+      const galleryItems = buildProfessionGallery(lead, plan, preset, aiProfile, sourcedGalleryUrls);
       if (galleryItems.length > 0) {
         content.gallery = {
           sectionTitle: aiProfile?.gallery?.sectionTitle || plan.content.galleryTitle,
@@ -605,13 +656,16 @@ export class WebsiteDemoGeneratorService {
 /**
  * Builds a profession-appropriate gallery. Prefers Gemini-authored gallery
  * items (each mapped to a matching image), then curated preset collections,
- * then the profession image engine.
+ * then the profession image engine. `sourcedGalleryUrls` (live web-sourced,
+ * self-hosted photos for the prospect's industry) override the pool mapping
+ * for as many items as are available.
  */
 function buildProfessionGallery(
   lead: LeadData,
   plan: ProfessionContentPlan,
   preset: ProfessionDesignPreset,
-  aiProfile: AiBusinessContent | null
+  aiProfile: AiBusinessContent | null,
+  sourcedGalleryUrls: string[] = []
 ): WebsiteGalleryItem[] {
   const briefs = plan.content.galleryBriefs.length > 0 ? plan.content.galleryBriefs : ['Our work'];
   const maxItems = 8;
@@ -621,18 +675,19 @@ function buildProfessionGallery(
       id: `gal-${i + 1}`,
       title: g.title,
       category: g.category || plan.content.galleryTitle,
-      imageUrl: getContextualImageUrl({
-        profession: lead.profession,
-        businessName: lead.businessName,
-        purpose: 'GALLERY',
-        serviceIndex: i,
-        customKeyword: g.imageQuery,
-      }),
+      imageUrl: sourcedGalleryUrls[i] ||
+        getContextualImageUrl({
+          profession: lead.profession,
+          businessName: lead.businessName,
+          purpose: 'GALLERY',
+          serviceIndex: i,
+          customKeyword: g.imageQuery,
+        }),
       description: g.description || briefs[i % briefs.length],
     }));
   }
 
-  if (preset.galleryImages && preset.galleryImages.length > 0) {
+  if (preset.galleryImages && preset.galleryImages.length > 0 && sourcedGalleryUrls.length === 0) {
     return preset.galleryImages.slice(0, maxItems).map((g, i) => ({
       id: `gal-${i + 1}`,
       title: g.caption || briefs[i % briefs.length],
@@ -647,12 +702,14 @@ function buildProfessionGallery(
     id: `gal-${i + 1}`,
     title: briefs[i % briefs.length],
     category: plan.content.galleryTitle,
-    imageUrl: getContextualImageUrl({
-      profession: lead.profession,
-      businessName: lead.businessName,
-      purpose: 'GALLERY',
-      serviceIndex: i,
-    }),
+    imageUrl:
+      sourcedGalleryUrls[i] ||
+      getContextualImageUrl({
+        profession: lead.profession,
+        businessName: lead.businessName,
+        purpose: 'GALLERY',
+        serviceIndex: i,
+      }),
     description: plan.content.gallerySubtitle,
   }));
 }

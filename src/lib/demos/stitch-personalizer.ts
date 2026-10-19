@@ -215,7 +215,11 @@ export function personalizeStitchHtml(
   const industryImgs = getIndustryImages(profession, brandName);
   const heroImgUrl = contentOrFacts?.images?.heroImage?.url || industryImgs.heroImage;
   const aboutImgUrl = contentOrFacts?.images?.aboutImage?.url || industryImgs.aboutImage;
-  const secondaryImgUrl = industryImgs.secondaryImage;
+  // Profile/founder photography: prefer the demo's own (possibly live-sourced)
+  // about image for non-CA professions so "car detailing" etc. never shows a
+  // generic office photo in the founder slot.
+  const secondaryImgUrl =
+    (!isCaPractice && contentOrFacts?.images?.aboutImage?.url) || industryImgs.secondaryImage;
 
   let html = rawHtml;
 

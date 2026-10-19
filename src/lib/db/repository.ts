@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import {
   LeadData,
   LeadFilterParams,
@@ -53,14 +54,48 @@ function getStoreFilePath(): string {
 }
 const DEMO_STORE_FILE = getStoreFilePath();
 
+/** Media assets are global (served publicly by unguessable id), so they live
+ *  under a single ledger key instead of per-organization arrays. */
+const MEDIA_LEDGER_KEY = 'media-assets';
+
+/**
+ * Bumped whenever DemoDataStore gains fields/methods. In dev, Next caches the
+ * store instance on globalThis across hot reloads; an instance built by an
+ * older class shape would silently lack new methods (e.g. a media lookup threw
+ * `getMediaBySourceUrl is not a function` and disabled image dedupe). A stale
+ * instance is discarded and rebuilt from the .data ledger instead.
+ */
+const DEMO_STORE_SCHEMA_VERSION = 2;
+
+/** A downloaded image persisted by the app (base64 payload in demo mode). */
+export interface DemoMediaRecord {
+  id: string;
+  mime: string;
+  /** base64 of the image bytes (demo/in-memory mode only). */
+  dataBase64: string;
+  byteSize: number;
+  sourceUrl?: string | null;
+  attribution?: string | null;
+  purpose?: string | null;
+  createdAt: string;
+}
+
 // In-memory demo store scoped strictly per organization when DEMO_MODE=true
 class DemoDataStore {
+  /** See DEMO_STORE_SCHEMA_VERSION — stale cached instances are rejected. */
+  readonly schemaVersion = DEMO_STORE_SCHEMA_VERSION;
   private leads: Map<string, LeadData[]> = new Map();
   private jobs: Map<string, JobData[]> = new Map();
   private auditLogs: Map<string, AuditLogData[]> = new Map();
   private suppressionRecords: Map<string, SuppressionRecordData[]> = new Map();
   private consentRecords: Map<string, ConsentRecordData[]> = new Map();
   private demos: Map<string, WebsiteDemoData[]> = new Map();
+  /**
+   * Downloaded industry imagery, persisted as base64 inside the ledger so both
+   * the in-memory store and the .data/ JSON mirror stay in sync with storage
+   * semantics identical to demos (survives restarts in demo mode).
+   */
+  private media: Map<string, DemoMediaRecord[]> = new Map();
   private lastLoadedMtime = 0;
 
   constructor() {
@@ -77,6 +112,31 @@ class DemoDataStore {
 
   setOrgLeads(orgId: string, leads: LeadData[]): void {
     this.leads.set(orgId, leads);
+  }
+
+  getMediaMap(): Map<string, DemoMediaRecord[]> {
+    return this.media;
+  }
+
+  getMediaById(id: string): DemoMediaRecord | null {
+    for (const rows of Array.from(this.media.values())) {
+      const hit = rows.find((row) => row.id === id);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  getMediaBySourceUrl(sourceUrl: string): DemoMediaRecord | null {
+    for (const rows of Array.from(this.media.values())) {
+      const hit = rows.find((row) => row.sourceUrl === sourceUrl);
+      if (hit) return hit;
+    }
+    return null;
+  }
+
+  putMedia(records: DemoMediaRecord[]): void {
+    const existing = this.media.get(MEDIA_LEDGER_KEY) || [];
+    this.media.set(MEDIA_LEDGER_KEY, [...existing, ...records]);
   }
 
   getDemosMap(): Map<string, WebsiteDemoData[]> {
@@ -102,6 +162,7 @@ class DemoDataStore {
             if (Array.isArray(data.suppressionRecords)) this.suppressionRecords = new Map(data.suppressionRecords);
             if (Array.isArray(data.consentRecords)) this.consentRecords = new Map(data.consentRecords);
             if (Array.isArray(data.demos)) this.demos = new Map(data.demos);
+            if (Array.isArray(data.media)) this.media = new Map(data.media);
             this.lastLoadedMtime = stat.mtimeMs;
             return true;
           }
@@ -125,6 +186,7 @@ class DemoDataStore {
         suppressionRecords: Array.from(this.suppressionRecords.entries()),
         consentRecords: Array.from(this.consentRecords.entries()),
         demos: Array.from(this.demos.entries()),
+        media: Array.from(this.media.entries()),
       };
       fs.writeFileSync(DEMO_STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
       const stat = fs.statSync(DEMO_STORE_FILE);
@@ -422,9 +484,11 @@ const globalForDemoStore = globalThis as unknown as {
 };
 
 export const demoStore: DemoDataStore =
-  globalForDemoStore.__getvisible_demo_store__ ??
-  globalForDemoStore.__leadforge_demo_store__ ??
-  new DemoDataStore();
+  (globalForDemoStore.__getvisible_demo_store__ ?? globalForDemoStore.__leadforge_demo_store__)
+    ?.schemaVersion === DEMO_STORE_SCHEMA_VERSION
+    ? (globalForDemoStore.__getvisible_demo_store__ ??
+        globalForDemoStore.__leadforge_demo_store__)!
+    : new DemoDataStore();
 
 if (process.env.NODE_ENV !== 'production' || isExplicitDemoMode()) {
   globalForDemoStore.__getvisible_demo_store__ = demoStore;
@@ -2010,4 +2074,213 @@ export class WebsiteDemoRepository {
     }
   }
 }
+
+export interface SaveDemoMediaInput {
+  mime: string;
+  data: Buffer;
+  sourceUrl?: string | null;
+  attribution?: string | null;
+  purpose?: string | null;
+}
+
+export interface DemoMediaSummary {
+  id: string;
+  mime: string;
+  byteSize: number;
+  sourceUrl?: string | null;
+  attribution?: string | null;
+  purpose?: string | null;
+  createdAt: string;
+}
+
+/**
+ * Persisted storage for demo imagery downloaded from the live web (Openverse).
+ *
+ * - Demo mode: in-memory store mirrored to `.data/` (base64 payloads).
+ * - Production: `demo_media` table (BYTEA) in PostgreSQL/Neon.
+ *
+ * Assets are addressable by unguessable random ids and intentionally NOT bound
+ * to an organization — the public demo sites embed `/api/media/<id>` URLs.
+ */
+export class MediaRepository {
+  static async saveDemoMediaAsset(input: SaveDemoMediaInput): Promise<DemoMediaSummary> {
+    await ensureDatabaseMode();
+
+    const mime = (input.mime || '').trim() || 'application/octet-stream';
+    const data = input.data;
+    const byteSize = data.byteLength;
+    const createdAt = new Date().toISOString();
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      if (input.sourceUrl) {
+        const existing = demoStore.getMediaBySourceUrl(input.sourceUrl);
+        if (existing) {
+          return {
+            id: existing.id,
+            mime: existing.mime,
+            byteSize: existing.byteSize,
+            sourceUrl: existing.sourceUrl,
+            attribution: existing.attribution,
+            purpose: existing.purpose,
+            createdAt: existing.createdAt,
+          };
+        }
+      }
+      const record: DemoMediaRecord = {
+        id: randomMediaId(),
+        mime,
+        dataBase64: data.toString('base64'),
+        byteSize,
+        sourceUrl: input.sourceUrl ?? null,
+        attribution: input.attribution ?? null,
+        purpose: input.purpose ?? null,
+        createdAt,
+      };
+      demoStore.putMedia([record]);
+      demoStore.saveToDisk();
+      return {
+        id: record.id,
+        mime,
+        byteSize,
+        sourceUrl: record.sourceUrl,
+        attribution: record.attribution,
+        purpose: record.purpose,
+        createdAt,
+      };
+    }
+
+    const { prisma } = await import('./prisma');
+    if (input.sourceUrl) {
+      const existing = await prisma.demoMedia.findFirst({
+        where: { sourceUrl: input.sourceUrl },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (existing) {
+        return {
+          id: existing.id,
+          mime: existing.mime,
+          byteSize: existing.byteSize,
+          sourceUrl: existing.sourceUrl,
+          attribution: existing.attribution,
+          purpose: existing.purpose,
+          createdAt: existing.createdAt.toISOString(),
+        };
+      }
+    }
+
+    let created;
+    try {
+      created = await prisma.demoMedia.create({
+        data: {
+          id: randomMediaId(),
+          mime,
+          data,
+          byteSize,
+          sourceUrl: input.sourceUrl || undefined,
+          attribution: input.attribution || undefined,
+          purpose: input.purpose || undefined,
+        },
+      });
+    } catch (error: unknown) {
+      // Concurrent generation of the same industry raced us to the same photo
+      // (unique index on sourceUrl) — reuse the winner instead of failing.
+      const code = (error as { code?: string } | null)?.code;
+      if (code === 'P2002' && input.sourceUrl) {
+        const winner = await prisma.demoMedia.findFirst({
+          where: { sourceUrl: input.sourceUrl },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (winner) {
+          return {
+            id: winner.id,
+            mime: winner.mime,
+            byteSize: winner.byteSize,
+            sourceUrl: winner.sourceUrl,
+            attribution: winner.attribution,
+            purpose: winner.purpose,
+            createdAt: winner.createdAt.toISOString(),
+          };
+        }
+      }
+      throw error;
+    }
+
+    return {
+      id: created.id,
+      mime: created.mime,
+      byteSize: created.byteSize,
+      sourceUrl: created.sourceUrl,
+      attribution: created.attribution,
+      purpose: created.purpose,
+      createdAt: created.createdAt.toISOString(),
+    };
+  }
+
+  /**
+   * Finds an already-hosted asset for an origin image URL so the same photo is
+   * never downloaded/stored twice (across serverless instances and restarts).
+   */
+  static async findDemoMediaBySourceUrl(sourceUrl: string): Promise<DemoMediaSummary | null> {
+    const cleanUrl = sourceUrl ? sourceUrl.trim() : '';
+    if (!cleanUrl) return null;
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const record = demoStore.getMediaBySourceUrl(cleanUrl);
+      if (!record) return null;
+      return {
+        id: record.id,
+        mime: record.mime,
+        byteSize: record.byteSize,
+        sourceUrl: record.sourceUrl,
+        attribution: record.attribution,
+        purpose: record.purpose,
+        createdAt: record.createdAt,
+      };
+    }
+
+    const { prisma } = await import('./prisma');
+    const row = await prisma.demoMedia.findFirst({
+      where: { sourceUrl: cleanUrl },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      mime: row.mime,
+      byteSize: row.byteSize,
+      sourceUrl: row.sourceUrl,
+      attribution: row.attribution,
+      purpose: row.purpose,
+      createdAt: row.createdAt.toISOString(),
+    };
+  }
+
+  static async getDemoMediaAsset(
+    id: string
+  ): Promise<{ mime: string; bytes: Uint8Array } | null> {
+    const cleanId = id ? id.trim() : '';
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const record = demoStore.getMediaById(cleanId);
+      if (!record) return null;
+      return { mime: record.mime, bytes: Buffer.from(record.dataBase64, 'base64') };
+    }
+
+    const { prisma } = await import('./prisma');
+    const row = await prisma.demoMedia.findUnique({ where: { id: cleanId } });
+    if (!row) return null;
+    const buffer = Buffer.isBuffer(row.data) ? row.data : Buffer.from(row.data);
+    return { mime: row.mime, bytes: buffer };
+  }
+}
+
+function randomMediaId(): string {
+  // Publicly served asset ids: cryptographically random so the namespace cannot
+  // be walked or guessed.
+  return `media-${crypto.randomUUID()}`;
+}
+
 
