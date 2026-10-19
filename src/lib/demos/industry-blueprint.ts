@@ -10,7 +10,10 @@ import {
   getIndustryPalette,
   isIndustryPaletteId,
 } from './industry-palettes';
-import { generateIndustryBlueprintJson } from './ai-content-generator';
+import {
+  blueprintAuthoringFailureIsTransient,
+  generateIndustryBlueprintJson,
+} from './ai-content-generator';
 import { IndustryBlueprintRepository } from '@/lib/db/repository';
 
 /**
@@ -94,6 +97,12 @@ export interface IndustryBlueprintDeps {
   }) => Promise<unknown | null>;
   /** Injected clock (determinism in tests). */
   now?: () => Date;
+  /**
+   * Whether the just-failed authoring attempt is worth retrying later. Only
+   * consulted when `aiAuthor` is injected; otherwise the real author's
+   * diagnostics are read.
+   */
+  aiFailureIsTransient?: () => boolean;
 }
 
 /** Section types the Profession Stitch renderer can actually render. */
@@ -547,6 +556,14 @@ const DEFAULT_RULE: IndustryBlueprintRule = {
 const blueprintCache = new Map<string, IndustryDesignBlueprint>();
 
 /**
+ * When an industry's design is only a placeholder because the AI provider was
+ * temporarily unavailable, this is when authoring may be attempted again.
+ * Without it, one provider outage would freeze the fallback design forever.
+ */
+const blueprintRetryAfter = new Map<string, number>();
+const PROVISIONAL_RETRY_MS = 10 * 60 * 1000;
+
+/**
  * Normalises a profession/business into a stable industry cache key, e.g.
  * "Car Detailing & Automobile Workshop" -> "car-detailing" so every lead in the
  * same trade shares one authored design.
@@ -765,13 +782,17 @@ export async function getIndustryDesignBlueprint(
   const seed = buildDeterministicBlueprint(input.profession, input.businessName, now);
 
   const cached = blueprintCache.get(key);
-  if (cached) return cached;
+  const retryAt = blueprintRetryAfter.get(key);
+  // A placeholder may be re-authored once its cooldown has passed.
+  if (cached && !(retryAt !== undefined && Date.now() >= retryAt)) return cached;
 
   try {
     const persisted = await IndustryBlueprintRepository.getIndustryBlueprint(key);
     if (persisted && persisted.blueprint && persisted.blueprint.archetype) {
       const revived = revivePersistedBlueprint(persisted.blueprint, key, seed);
       blueprintCache.set(key, revived);
+      // A design is persisted: there is nothing left to re-author.
+      blueprintRetryAfter.delete(key);
       return revived;
     }
   } catch {
@@ -779,11 +800,13 @@ export async function getIndustryDesignBlueprint(
   }
 
   let authored: IndustryDesignBlueprint | null = null;
+  let aiAttempted = false;
   const aiAllowed =
     process.env.NODE_ENV !== 'test' && process.env.DISABLE_INDUSTRY_BLUEPRINT_AI !== 'true';
   const aiAuthor = deps.aiAuthor ?? generateIndustryBlueprintJson;
 
   if (aiAllowed || deps.aiAuthor) {
+    aiAttempted = true;
     try {
       const raw = await aiAuthor({
         profession: seed.industry,
@@ -800,6 +823,20 @@ export async function getIndustryDesignBlueprint(
 
   const blueprint = authored || seed;
   blueprintCache.set(key, blueprint);
+
+  // A failure that may pass on its own must not be frozen into the design. Keep
+  // the fallback for now, remember when to try again, and skip persistence so a
+  // later attempt — here or in another instance — can still improve it.
+  const failureIsTransient = deps.aiAuthor
+    ? Boolean(deps.aiFailureIsTransient?.())
+    : blueprintAuthoringFailureIsTransient();
+
+  if (aiAttempted && !authored && failureIsTransient) {
+    blueprintRetryAfter.set(key, Date.now() + PROVISIONAL_RETRY_MS);
+    return blueprint;
+  }
+
+  blueprintRetryAfter.delete(key);
 
   try {
     // Persist so every later lead in this industry (and every serverless
@@ -859,6 +896,7 @@ function revivePersistedBlueprint(
 /** Tests only: clears the in-process blueprint cache. */
 export function clearIndustryBlueprintCache(): void {
   blueprintCache.clear();
+  blueprintRetryAfter.clear();
 }
 
 /**
@@ -874,6 +912,7 @@ export async function reauthorIndustryDesignBlueprint(
 ): Promise<IndustryDesignBlueprint> {
   const key = buildIndustryKey(input.profession, input.businessName);
   blueprintCache.delete(key);
+  blueprintRetryAfter.delete(key);
   try {
     await IndustryBlueprintRepository.deleteIndustryBlueprint(key);
   } catch {

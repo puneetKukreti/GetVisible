@@ -85,8 +85,10 @@ describe('AI diagnostics', () => {
     const diag = getIndustryBlueprintAiDiagnostics();
     expect(diag.keyResolved).toBe(true);
     expect(diag.authored).toBe(false);
-    expect(diag.attempts).toHaveLength(3);
-    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-2.5-flash', status: 403 });
+    // Discovery was refused too, so the preferred model leads the known names.
+    expect(diag.availableModels).toEqual(['gemini-3.8-flash', ...GEMINI_FALLBACK_MODELS]);
+    expect(diag.attempts).toHaveLength(4);
+    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-3.8-flash', status: 403 });
     expect(JSON.stringify(diag)).not.toContain('AIza-secret-value');
 
     vi.unstubAllGlobals();
@@ -119,7 +121,7 @@ describe('AI diagnostics', () => {
 
     const diag = getIndustryBlueprintAiDiagnostics();
     expect(diag.authored).toBe(true);
-    expect(diag.model).toBe('gemini-2.5-flash');
+    expect(diag.model).toBe('gemini-3.8-flash');
     expect(diag.at).toBeTruthy();
 
     vi.unstubAllGlobals();
@@ -185,10 +187,97 @@ describe('AI diagnostics', () => {
     );
 
     expect(await listGeminiModels('AIza-unreachable-key')).toEqual([]);
-    expect(await resolveGeminiModels('AIza-unreachable-key')).toEqual(GEMINI_FALLBACK_MODELS);
+    // The preferred model is still worth trying, then the known names.
+    expect(await resolveGeminiModels('AIza-unreachable-key')).toEqual([
+      'gemini-3.8-flash',
+      ...GEMINI_FALLBACK_MODELS,
+    ]);
 
     resetGeminiModelCache();
     vi.unstubAllGlobals();
+  });
+
+  it('tries the preferred model first when the API offers it', async () => {
+    resetGeminiModelCache();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              models: [
+                { name: 'models/gemini-3.9-flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-4-argon', supportedGenerationMethods: ['generateContent'] },
+              ],
+            }),
+            { status: 200 }
+          )
+      )
+    );
+
+    // Ranked purely, the newer "3.9" would lead; the preference overrides that.
+    expect(await resolveGeminiModels('AIza-preferred-key')).toEqual([
+      'gemini-3.8-flash',
+      'gemini-3.9-flash',
+      'gemini-4-argon',
+    ]);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+  });
+
+  it('retries a call that stalls instead of moving to another model', async () => {
+    silent();
+    resetIndustryBlueprintAiDiagnostics();
+    resetGeminiModelCache();
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-stall-key');
+    let generateCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (String(url).includes('/models?')) {
+          return new Response(
+            JSON.stringify({
+              models: [
+                { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+              ],
+            }),
+            { status: 200 }
+          );
+        }
+        generateCalls += 1;
+        if (generateCalls === 1) {
+          // A stall answers nothing at all: retry the same model.
+          throw new Error('The operation was aborted due to timeout');
+        }
+        return new Response(
+          JSON.stringify({
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: JSON.stringify({ sectionOrder: ['HERO', 'SERVICES', 'CONTACT'] }) }],
+                },
+              },
+            ],
+          }),
+          { status: 200 }
+        );
+      })
+    );
+
+    const result = await generateIndustryBlueprintJson(facts);
+    expect(generateCalls).toBe(2);
+    expect(result).toBeTruthy();
+
+    const diag = getIndustryBlueprintAiDiagnostics();
+    expect(diag.authored).toBe(true);
+    expect(diag.attempts[0]).toMatchObject({ model: 'gemini-3.8-flash', status: 200 });
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it('retries a capacity error once and keeps the answer', async () => {
@@ -343,6 +432,75 @@ describe('AI diagnostics', () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+  });
+});
+
+describe('provisional fallback designs', () => {
+  const profession = 'Provisional Design Probe Trade';
+  const key = buildIndustryKey(profession, null);
+
+  const reset = async () => {
+    clearIndustryBlueprintCache();
+    await IndustryBlueprintRepository.deleteIndustryBlueprint(key);
+  };
+
+  it('does not freeze a design that failed only because the provider was unavailable', async () => {
+    await reset();
+    let authorCalls = 0;
+    const deps = {
+      aiAuthor: async () => {
+        authorCalls += 1;
+        return null; // busy, rate limited, or stalled
+      },
+      aiFailureIsTransient: () => true,
+    };
+
+    const first = await getIndustryDesignBlueprint({ profession }, deps);
+    expect(first.source).toBe('deterministic');
+    expect(authorCalls).toBe(1);
+    // Nothing was stored, so a later attempt can still replace the fallback.
+    expect(await IndustryBlueprintRepository.getIndustryBlueprint(key)).toBeNull();
+
+    // Within the cooldown the placeholder is reused rather than re-authored.
+    await getIndustryDesignBlueprint({ profession }, deps);
+    expect(authorCalls).toBe(1);
+
+    // Past the cooldown it tries again instead of staying frozen.
+    const realNow = Date.now;
+    let clock = realNow();
+    const spy = vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    try {
+      clock += 11 * 60 * 1000;
+      await getIndustryDesignBlueprint({ profession }, deps);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(authorCalls).toBe(2);
+
+    await reset();
+  });
+
+  it('stores the fallback when the provider gave a settled no', async () => {
+    await reset();
+    let authorCalls = 0;
+    const deps = {
+      aiAuthor: async () => {
+        authorCalls += 1;
+        return null; // e.g. the key was rejected: retrying changes nothing
+      },
+      aiFailureIsTransient: () => false,
+    };
+
+    const first = await getIndustryDesignBlueprint({ profession }, deps);
+    expect(first.source).toBe('deterministic');
+    expect(await IndustryBlueprintRepository.getIndustryBlueprint(key)).toBeTruthy();
+
+    // A stored design is reused without asking the provider again.
+    clearIndustryBlueprintCache();
+    await getIndustryDesignBlueprint({ profession }, deps);
+    expect(authorCalls).toBe(1);
+
+    await reset();
   });
 });
 

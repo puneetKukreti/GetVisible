@@ -172,10 +172,10 @@ function compareGeminiModels(a: string, b: string): number {
 }
 
 /**
- * Per-attempt ceiling. A model that needs longer than this would make demo
- * generation slow even when it does work.
+ * Per-attempt ceiling. Generous enough for the preferred model to answer when
+ * it is merely slow, while still leaving room for a retry inside the budget.
  */
-const GEMINI_ATTEMPT_TIMEOUT_MS = 12000;
+const GEMINI_ATTEMPT_TIMEOUT_MS = 15000;
 
 /**
  * Transient conditions meaning "the request was fine, try again": capacity
@@ -199,10 +199,11 @@ export function geminiAuthoringDeadline(now: number = Date.now()): number {
 }
 
 /**
- * One model, one prompt. Retries only transient capacity/rate responses, and
- * never starts a try it cannot finish before the deadline, so an overloaded
- * provider cannot consume the request's whole budget. Returns null when there
- * was no time even to try.
+ * One model, one prompt. Retries what may pass — a busy provider, a rate limit,
+ * or a call that stalled — and never starts a try it cannot finish before the
+ * deadline, so an overloaded provider cannot consume the request's whole budget.
+ * Returns null when there was no time even to try, and throws the last
+ * transport error when every try failed to get a response at all.
  */
 async function callGeminiModel(params: {
   model: string;
@@ -214,28 +215,46 @@ async function callGeminiModel(params: {
   const { model, apiKey, prompt, temperature, deadline } = params;
   const url = geminiGenerateUrl(model, apiKey);
   let res: Response | null = null;
+  let lastError: unknown = null;
 
   for (let attempt = 0; attempt < GEMINI_ATTEMPT_TRIES; attempt++) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
 
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature },
-      }),
-      signal: AbortSignal.timeout(Math.max(1500, Math.min(GEMINI_ATTEMPT_TIMEOUT_MS, remaining))),
-    });
+    const wait = () => {
+      const ms = Math.min(
+        GEMINI_RETRY_DELAY_MS * (attempt + 1),
+        Math.max(0, deadline - Date.now())
+      );
+      return ms > 0 ? new Promise((resolve) => setTimeout(resolve, ms)) : Promise.resolve();
+    };
+
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature },
+        }),
+        signal: AbortSignal.timeout(Math.max(1500, Math.min(GEMINI_ATTEMPT_TIMEOUT_MS, remaining))),
+      });
+      lastError = null;
+    } catch (err) {
+      // Stalled or unreachable: no response to judge, so try again.
+      lastError = err;
+      res = null;
+      await wait();
+      continue;
+    }
 
     if (!GEMINI_TRANSIENT_STATUS.has(res.status)) return res;
-
-    const wait = Math.min(GEMINI_RETRY_DELAY_MS * (attempt + 1), Math.max(0, deadline - Date.now()));
-    if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    await wait();
   }
 
-  return res;
+  if (res) return res;
+  if (lastError) throw lastError;
+  return null;
 }
 
 let geminiModelCache: { key: string; models: string[] } | null = null;
@@ -275,11 +294,24 @@ export async function listGeminiModels(apiKey: string): Promise<string[]> {
   return models;
 }
 
+/** The model we want, tried first whenever the API confirms it exists. */
+const GEMINI_PREFERRED_MODELS = ['gemini-3.8-flash'];
+
+function dedupeModels(names: string[]): string[] {
+  return Array.from(new Set(names));
+}
+
 /** The ordered models to try: what the API offers, else the fallback names. */
 export async function resolveGeminiModels(apiKey: string): Promise<string[]> {
   const discovered = await listGeminiModels(apiKey);
-  if (discovered.length > 0) return discovered.slice(0, 3);
-  return [...GEMINI_FALLBACK_MODELS];
+  if (discovered.length > 0) {
+    // The preferred model leads, so a newer name cannot displace it.
+    const preferred = GEMINI_PREFERRED_MODELS.filter((name) => discovered.includes(name));
+    const rest = discovered.filter((name) => !preferred.includes(name));
+    return [...preferred, ...rest].slice(0, 3);
+  }
+  // Discovery failed: still try the preferred model, then the known names.
+  return dedupeModels([...GEMINI_PREFERRED_MODELS, ...GEMINI_FALLBACK_MODELS]);
 }
 
 /** Test seam: forget the discovered model list. */
@@ -1423,6 +1455,33 @@ export function resetIndustryBlueprintAiDiagnostics(): void {
     model: null,
     at: null,
   };
+}
+
+/**
+ * Hints for an attempt that never got an HTTP status. A timeout or a dropped
+ * connection is not the provider saying "no" — it is the provider being
+ * unreachable, which is worth trying again later.
+ */
+const GEMINI_TRANSIENT_HINT =
+  /timeout|timed out|abort|ECONNRESET|ENOTFOUND|EAI_AGAIN|fetch failed|socket|network|high demand/i;
+
+function attemptLooksTransient(attempt: { status?: number; error?: string }): boolean {
+  if (typeof attempt.status === 'number') return GEMINI_TRANSIENT_STATUS.has(attempt.status);
+  return GEMINI_TRANSIENT_HINT.test(attempt.error || '');
+}
+
+/**
+ * True when the last blueprint attempt failed for a reason that may pass on its
+ * own (provider busy, rate limited, unreachable) rather than a settled "no"
+ * (no key, retired model, refused access).
+ *
+ * Callers use this to decide whether the deterministic fallback is a placeholder
+ * — a design authored during an outage must not be frozen permanently.
+ */
+export function blueprintAuthoringFailureIsTransient(): boolean {
+  const record = lastBlueprintAiDiagnostics;
+  if (record.authored || !record.keyResolved) return false;
+  return record.attempts.length > 0 && record.attempts.some(attemptLooksTransient);
 }
 
 export interface IndustryBlueprintAiFacts {
