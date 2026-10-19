@@ -9,6 +9,7 @@ import { getIndustryPalette } from '@/lib/demos/industry-palettes';
 import {
   describeGeminiKeyState,
   getIndustryBlueprintAiDiagnostics,
+  pingGeminiProvider,
   resetIndustryBlueprintAiDiagnostics,
 } from '@/lib/demos/ai-content-generator';
 
@@ -71,6 +72,13 @@ export async function GET(request: NextRequest) {
   if (unauthorized) return unauthorized;
 
   const { searchParams } = new URL(request.url);
+
+  // Diagnostics: asks the provider a one-line question, so "the provider is
+  // unreachable" can be told apart from "something about our request is wrong".
+  if (searchParams.get('ping') === '1') {
+    return NextResponse.json({ success: true, ping: await pingGeminiProvider() });
+  }
+
   const parsed = BlueprintQuerySchema.safeParse({
     profession: searchParams.get('profession') || '',
     businessName: searchParams.get('businessName') || undefined,

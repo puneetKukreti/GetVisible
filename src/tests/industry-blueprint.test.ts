@@ -23,6 +23,7 @@ import {
   listGeminiModels,
   resolveGeminiModels,
   resetGeminiModelCache,
+  pingGeminiProvider,
   GEMINI_FALLBACK_MODELS,
 } from '@/lib/demos/ai-content-generator';
 import { personalizeStitchHtml } from '@/lib/demos/stitch-personalizer';
@@ -427,6 +428,41 @@ describe('AI diagnostics', () => {
     // The generic statusText ("Not Found") would not have explained anything.
     expect(diag.attempts[0].error).toContain('is not found for API version v1beta');
     expect(diag.authored).toBe(false);
+
+    resetGeminiModelCache();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('pings the provider with a one-line prompt', async () => {
+    silent();
+    resetGeminiModelCache();
+    vi.stubEnv('GEMINI_API_KEY', 'AIza-ping-key');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        String(url).includes('/models?')
+          ? new Response(
+              JSON.stringify({
+                models: [
+                  { name: 'models/gemini-3.8-flash', supportedGenerationMethods: ['generateContent'] },
+                ],
+              }),
+              { status: 200 }
+            )
+          : new Response(
+              JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }),
+              { status: 200 }
+            )
+      )
+    );
+
+    const ping = await pingGeminiProvider();
+    expect(ping.ok).toBe(true);
+    expect(ping.keyResolved).toBe(true);
+    expect(ping.models).toEqual(['gemini-3.8-flash']);
+    expect(ping.attempts[0]).toMatchObject({ model: 'gemini-3.8-flash', status: 200 });
 
     resetGeminiModelCache();
     vi.unstubAllGlobals();

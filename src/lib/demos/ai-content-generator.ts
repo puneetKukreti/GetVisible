@@ -1484,6 +1484,55 @@ export function blueprintAuthoringFailureIsTransient(): boolean {
   return record.attempts.length > 0 && record.attempts.some(attemptLooksTransient);
 }
 
+/**
+ * Owner diagnostics: asks the provider the smallest question possible, so a
+ * failure can be attributed to the provider itself rather than to the size of
+ * our prompt, our parsing, or our request shape.
+ */
+export async function pingGeminiProvider(apiKey?: string): Promise<{
+  keyResolved: boolean;
+  models: string[];
+  ok: boolean;
+  attempts: Array<{ model: string; status?: number; ms?: number; error?: string }>;
+}> {
+  const key = apiKey || getGeminiApiKey();
+  if (!key) return { keyResolved: false, models: [], ok: false, attempts: [] };
+
+  const models = await resolveGeminiModels(key);
+  const deadline = geminiAuthoringDeadline();
+  const attempts: Array<{ model: string; status?: number; ms?: number; error?: string }> = [];
+
+  for (const model of models) {
+    if (Date.now() >= deadline) break;
+    const startedAt = Date.now();
+    try {
+      const res = await callGeminiModel({
+        model,
+        apiKey: key,
+        prompt: 'Reply with this JSON and nothing else: {"ok":true}',
+        temperature: 0,
+        deadline,
+      });
+      if (!res) break;
+
+      if (res.ok) {
+        attempts.push({ model, status: res.status, ms: Date.now() - startedAt });
+        return { keyResolved: true, models, ok: true, attempts };
+      }
+      attempts.push({
+        model,
+        status: res.status,
+        ms: Date.now() - startedAt,
+        error: await describeGeminiFailure(res),
+      });
+    } catch (err) {
+      attempts.push({ model, ms: Date.now() - startedAt, error: scrubSecretText(err) });
+    }
+  }
+
+  return { keyResolved: true, models, ok: false, attempts };
+}
+
 export interface IndustryBlueprintAiFacts {
   profession: string;
   city?: string;
