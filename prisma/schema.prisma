@@ -90,6 +90,7 @@ model Organization {
   suppressionRecords SuppressionRecord[]
   jobs               Job[]
   websiteDemos       WebsiteDemo[]
+  outreachQueue      OutreachQueueItem[]
 
   @@map("organizations")
 }
@@ -140,6 +141,7 @@ model Lead {
   suppressionRecords SuppressionRecord[]
   jobs               Job[]
   websiteDemos       WebsiteDemo[]
+  outreachQueue      OutreachQueueItem[]
 
   @@index([organizationId])
   @@index([leadStatus])
@@ -357,7 +359,35 @@ model DemoMedia {
   @@map("demo_media")
 }
 
-// Per-industry design blueprints: how the best-performing websites in a trade
+model OutreachQueueItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  leadId         String
+  demoId         String?
+  channel        Channel      @default(WHATSAPP)
+  status         String       @default("DRAFT")
+  mode           String       @default("MANUAL")
+  message        String
+  screenshotUrl  String?
+  scheduledAt    DateTime?
+  attempts       Int          @default(0)
+  lastError      String?
+  sentAt         DateTime?
+  approvedBy     String?
+  approvedAt     DateTime?
+  createdBy      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([leadId])
+  @@map("outreach_queue")
+}
 // are built (section flow, layout archetype, palette system, copy framing,
 // imagery treatment). Authored once per industry key, then reused by every
 // demo in that trade so designs stay deterministic. Globally scoped like

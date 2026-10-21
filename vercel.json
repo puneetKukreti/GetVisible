@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/prune-demos",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/outreach-flush",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

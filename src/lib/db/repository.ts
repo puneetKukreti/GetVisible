@@ -14,6 +14,8 @@ import {
   ConsentRecordData,
   Channel,
   WebsiteDemoData,
+  OutreachQueueItemData,
+  OutreachQueueStatus,
   LeadNoteData,
   ActivityData,
 } from '@/types';
@@ -118,6 +120,7 @@ class DemoDataStore {
    * in the ledger alongside media.
    */
   private blueprints: Map<string, DemoBlueprintRecord[]> = new Map();
+  private outreachQueue: Map<string, OutreachQueueItemData[]> = new Map();
   private lastLoadedMtime = 0;
 
   constructor() {
@@ -184,6 +187,14 @@ class DemoDataStore {
     return this.demos;
   }
 
+  getOrgOutreachQueue(orgId: string): OutreachQueueItemData[] {
+    return this.outreachQueue.get(orgId) || [];
+  }
+
+  setOrgOutreachQueue(orgId: string, items: OutreachQueueItemData[]): void {
+    this.outreachQueue.set(orgId, items);
+  }
+
   setOrgDemos(orgId: string, demos: WebsiteDemoData[]): void {
     this.demos.set(orgId, demos);
   }
@@ -203,6 +214,7 @@ class DemoDataStore {
             if (Array.isArray(data.suppressionRecords)) this.suppressionRecords = new Map(data.suppressionRecords);
             if (Array.isArray(data.consentRecords)) this.consentRecords = new Map(data.consentRecords);
             if (Array.isArray(data.demos)) this.demos = new Map(data.demos);
+            if (Array.isArray(data.outreachQueue)) this.outreachQueue = new Map(data.outreachQueue);
             if (Array.isArray(data.media)) this.media = new Map(data.media);
             if (Array.isArray(data.blueprints)) this.blueprints = new Map(data.blueprints);
             this.lastLoadedMtime = stat.mtimeMs;
@@ -228,6 +240,7 @@ class DemoDataStore {
         suppressionRecords: Array.from(this.suppressionRecords.entries()),
         consentRecords: Array.from(this.consentRecords.entries()),
         demos: Array.from(this.demos.entries()),
+        outreachQueue: Array.from(this.outreachQueue.entries()),
         media: Array.from(this.media.entries()),
         blueprints: Array.from(this.blueprints.entries()),
       };
@@ -2633,4 +2646,324 @@ function toBlueprintSummary(row: DemoBlueprintRecord): IndustryBlueprintSummary 
   };
 }
 
+
+
+export interface EnqueueOutreachInput {
+  leadId: string;
+  demoId?: string | null;
+  channel?: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'VOICE';
+  mode?: 'MANUAL' | 'AUTO';
+  message: string;
+  screenshotUrl?: string | null;
+  scheduledAt?: string | null;
+  createdBy?: string | null;
+}
+
+export class OutreachQueueRepository {
+  static async enqueue(organizationId: string, input: EnqueueOutreachInput): Promise<OutreachQueueItemData> {
+    await ensureDatabaseMode();
+    if (!organizationId) throw new Error('organizationId is required');
+
+    const now = new Date().toISOString();
+    const status: OutreachQueueStatus = input.mode === 'AUTO' ? 'READY' : 'DRAFT';
+    const item: OutreachQueueItemData = {
+      id: `oq-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      organizationId,
+      leadId: input.leadId,
+      demoId: input.demoId ?? null,
+      channel: input.channel || 'WHATSAPP',
+      status,
+      mode: input.mode || 'MANUAL',
+      message: input.message,
+      screenshotUrl: input.screenshotUrl ?? null,
+      scheduledAt: input.scheduledAt ?? (status === 'READY' ? now : null),
+      attempts: 0,
+      lastError: null,
+      sentAt: null,
+      approvedBy: null,
+      approvedAt: null,
+      createdBy: input.createdBy ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const list = demoStore.getOrgOutreachQueue(organizationId);
+      demoStore.setOrgOutreachQueue(organizationId, [...list, item]);
+      demoStore.saveToDisk();
+      return item;
+    }
+
+    const { prisma } = await import('./prisma');
+    const created = await prisma.outreachQueueItem.create({
+      data: {
+        id: item.id,
+        organizationId,
+        leadId: input.leadId,
+        demoId: input.demoId ?? null,
+        channel: (input.channel || 'WHATSAPP') as any,
+        status,
+        mode: input.mode || 'MANUAL',
+        message: input.message,
+        screenshotUrl: input.screenshotUrl ?? null,
+        scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
+        createdBy: input.createdBy ?? null,
+      },
+    });
+    return {
+      id: created.id,
+      organizationId: created.organizationId,
+      leadId: created.leadId,
+      demoId: created.demoId,
+      channel: created.channel as any,
+      status: created.status as OutreachQueueStatus,
+      mode: created.mode as 'MANUAL' | 'AUTO',
+      message: created.message,
+      screenshotUrl: created.screenshotUrl,
+      scheduledAt: created.scheduledAt ? created.scheduledAt.toISOString() : null,
+      attempts: created.attempts,
+      lastError: created.lastError,
+      sentAt: created.sentAt ? created.sentAt.toISOString() : null,
+      approvedBy: created.approvedBy,
+      approvedAt: created.approvedAt ? created.approvedAt.toISOString() : null,
+      createdBy: created.createdBy,
+      createdAt: created.createdAt.toISOString(),
+      updatedAt: created.updatedAt.toISOString(),
+    };
+  }
+
+  static async list(organizationId: string, opts?: { status?: OutreachQueueStatus | OutreachQueueStatus[]; limit?: number }): Promise<OutreachQueueItemData[]> {
+    await ensureDatabaseMode();
+    if (!organizationId) throw new Error('organizationId is required');
+
+    const statuses = opts?.status ? (Array.isArray(opts.status) ? opts.status : [opts.status]) : null;
+    const limit = opts?.limit ?? 200;
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      let items = demoStore.getOrgOutreachQueue(organizationId);
+      if (statuses) items = items.filter((i) => statuses.includes(i.status));
+      return items.slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, limit);
+    }
+
+    const { prisma } = await import('./prisma');
+    const rows = await prisma.outreachQueueItem.findMany({
+      where: { organizationId, ...(statuses ? { status: { in: statuses } } : {}) },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      organizationId: r.organizationId,
+      leadId: r.leadId,
+      demoId: r.demoId,
+      channel: r.channel as any,
+      status: r.status as OutreachQueueStatus,
+      mode: r.mode as 'MANUAL' | 'AUTO',
+      message: r.message,
+      screenshotUrl: r.screenshotUrl,
+      scheduledAt: r.scheduledAt ? r.scheduledAt.toISOString() : null,
+      attempts: r.attempts,
+      lastError: r.lastError,
+      sentAt: r.sentAt ? r.sentAt.toISOString() : null,
+      approvedBy: r.approvedBy,
+      approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
+      createdBy: r.createdBy,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    }));
+  }
+
+  static async get(id: string, organizationId: string): Promise<OutreachQueueItemData | null> {
+    await ensureDatabaseMode();
+    if (!organizationId) throw new Error('organizationId is required');
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      return demoStore.getOrgOutreachQueue(organizationId).find((i) => i.id === id) || null;
+    }
+
+    const { prisma } = await import('./prisma');
+    const r = await prisma.outreachQueueItem.findFirst({ where: { id, organizationId } });
+    if (!r) return null;
+    return {
+      id: r.id,
+      organizationId: r.organizationId,
+      leadId: r.leadId,
+      demoId: r.demoId,
+      channel: r.channel as any,
+      status: r.status as OutreachQueueStatus,
+      mode: r.mode as 'MANUAL' | 'AUTO',
+      message: r.message,
+      screenshotUrl: r.screenshotUrl,
+      scheduledAt: r.scheduledAt ? r.scheduledAt.toISOString() : null,
+      attempts: r.attempts,
+      lastError: r.lastError,
+      sentAt: r.sentAt ? r.sentAt.toISOString() : null,
+      approvedBy: r.approvedBy,
+      approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
+      createdBy: r.createdBy,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    };
+  }
+
+  static async approve(id: string, organizationId: string, actor: string, scheduledAt?: string | null): Promise<OutreachQueueItemData | null> {
+    await ensureDatabaseMode();
+    if (!organizationId) throw new Error('organizationId is required');
+
+    const now = new Date().toISOString();
+    const sched = scheduledAt || now;
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const list = demoStore.getOrgOutreachQueue(organizationId);
+      const idx = list.findIndex((i) => i.id === id);
+      if (idx < 0) return null;
+      if (list[idx].status !== 'DRAFT') return list[idx];
+      list[idx] = { ...list[idx], status: 'READY', approvedBy: actor, approvedAt: now, scheduledAt: list[idx].scheduledAt || sched, updatedAt: now };
+      demoStore.setOrgOutreachQueue(organizationId, list);
+      demoStore.saveToDisk();
+      return list[idx];
+    }
+
+    const { prisma } = await import('./prisma');
+    const existing = await prisma.outreachQueueItem.findFirst({ where: { id, organizationId } });
+    if (!existing) return null;
+    if (existing.status !== 'DRAFT') return this.get(id, organizationId);
+    const updated = await prisma.outreachQueueItem.update({
+      where: { id },
+      data: { status: 'READY', approvedBy: actor, approvedAt: new Date(), scheduledAt: existing.scheduledAt || new Date(sched) },
+    });
+    return this.get(updated.id, organizationId);
+  }
+
+  static async cancel(id: string, organizationId: string): Promise<OutreachQueueItemData | null> {
+    await ensureDatabaseMode();
+    if (!organizationId) throw new Error('organizationId is required');
+
+    const now = new Date().toISOString();
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const list = demoStore.getOrgOutreachQueue(organizationId);
+      const idx = list.findIndex((i) => i.id === id);
+      if (idx < 0) return null;
+      if (list[idx].status === 'SENT') return list[idx];
+      list[idx] = { ...list[idx], status: 'CANCELLED', updatedAt: now };
+      demoStore.setOrgOutreachQueue(organizationId, list);
+      demoStore.saveToDisk();
+      return list[idx];
+    }
+
+    const { prisma } = await import('./prisma');
+    const existing = await prisma.outreachQueueItem.findFirst({ where: { id, organizationId } });
+    if (!existing) return null;
+    if (existing.status === 'SENT') return this.get(id, organizationId);
+    const updated = await prisma.outreachQueueItem.update({ where: { id }, data: { status: 'CANCELLED' } });
+    return this.get(updated.id, organizationId);
+  }
+
+  static async getDue(organizationId: string | undefined, limit = 10): Promise<OutreachQueueItemData[]> {
+    await ensureDatabaseMode();
+    const now = new Date();
+
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const orgs = organizationId ? [organizationId] : [DEMO_ORGANIZATION_ID, PILOT_ORGANIZATION_ID];
+      const allItems: OutreachQueueItemData[] = [];
+      for (const org of orgs) allItems.push(...demoStore.getOrgOutreachQueue(org));
+      return allItems
+        .filter((i) => i.status === 'READY' && (!i.scheduledAt || new Date(i.scheduledAt) <= now))
+        .sort((a, b) => (a.scheduledAt || a.createdAt).localeCompare(b.scheduledAt || b.createdAt))
+        .slice(0, limit);
+    }
+
+    const { prisma } = await import('./prisma');
+    const rows = await prisma.outreachQueueItem.findMany({
+      where: {
+        status: 'READY',
+        ...(organizationId ? { organizationId } : {}),
+        OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }],
+      },
+      orderBy: [{ scheduledAt: 'asc' }, { createdAt: 'asc' }],
+      take: limit,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      organizationId: r.organizationId,
+      leadId: r.leadId,
+      demoId: r.demoId,
+      channel: r.channel as any,
+      status: r.status as OutreachQueueStatus,
+      mode: r.mode as 'MANUAL' | 'AUTO',
+      message: r.message,
+      screenshotUrl: r.screenshotUrl,
+      scheduledAt: r.scheduledAt ? r.scheduledAt.toISOString() : null,
+      attempts: r.attempts,
+      lastError: r.lastError,
+      sentAt: r.sentAt ? r.sentAt.toISOString() : null,
+      approvedBy: r.approvedBy,
+      approvedAt: r.approvedAt ? r.approvedAt.toISOString() : null,
+      createdBy: r.createdBy,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
+    }));
+  }
+
+  static async markSent(id: string, organizationId: string): Promise<void> {
+    await ensureDatabaseMode();
+    const now = new Date().toISOString();
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const list = demoStore.getOrgOutreachQueue(organizationId);
+      const idx = list.findIndex((i) => i.id === id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], status: 'SENT', sentAt: now, updatedAt: now };
+        demoStore.setOrgOutreachQueue(organizationId, list);
+        demoStore.saveToDisk();
+      }
+      return;
+    }
+    const { prisma } = await import('./prisma');
+    await prisma.outreachQueueItem.update({ where: { id }, data: { status: 'SENT', sentAt: new Date() } });
+  }
+
+  static async markFailed(id: string, organizationId: string, error: string): Promise<void> {
+    await ensureDatabaseMode();
+    const now = new Date().toISOString();
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const list = demoStore.getOrgOutreachQueue(organizationId);
+      const idx = list.findIndex((i) => i.id === id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], status: 'FAILED', attempts: list[idx].attempts + 1, lastError: error, updatedAt: now };
+        demoStore.setOrgOutreachQueue(organizationId, list);
+        demoStore.saveToDisk();
+      }
+      return;
+    }
+    const { prisma } = await import('./prisma');
+    await prisma.outreachQueueItem.update({ where: { id }, data: { status: 'FAILED', attempts: { increment: 1 }, lastError: error } });
+  }
+
+  static async markSuppressed(id: string, organizationId: string, reason: string): Promise<void> {
+    await ensureDatabaseMode();
+    const now = new Date().toISOString();
+    if (isExplicitDemoMode()) {
+      demoStore.syncFromDisk();
+      const list = demoStore.getOrgOutreachQueue(organizationId);
+      const idx = list.findIndex((i) => i.id === id);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], status: 'SUPPRESSED', lastError: reason, updatedAt: now };
+        demoStore.setOrgOutreachQueue(organizationId, list);
+        demoStore.saveToDisk();
+      }
+      return;
+    }
+    const { prisma } = await import('./prisma');
+    await prisma.outreachQueueItem.update({ where: { id }, data: { status: 'SUPPRESSED', lastError: reason } });
+  }
+}
 

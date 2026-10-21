@@ -456,6 +456,36 @@ export interface WebsiteDemoData {
   updatedAt: string;
 }
 
+export type OutreachQueueStatus =
+  | 'DRAFT'
+  | 'READY'
+  | 'SENDING'
+  | 'SENT'
+  | 'FAILED'
+  | 'SUPPRESSED'
+  | 'CANCELLED';
+
+export interface OutreachQueueItemData {
+  id: string;
+  leadId: string;
+  organizationId: string;
+  demoId?: string | null;
+  channel: 'EMAIL' | 'WHATSAPP' | 'SMS' | 'VOICE';
+  status: OutreachQueueStatus;
+  mode: 'MANUAL' | 'AUTO';
+  message: string;
+  screenshotUrl?: string | null;
+  scheduledAt?: string | null;
+  attempts: number;
+  lastError?: string | null;
+  sentAt?: string | null;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  createdBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ActivityData {
   id: string;
   type: string;
