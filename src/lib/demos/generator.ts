@@ -12,6 +12,7 @@ import {
 } from './ai-content-generator';
 import { buildWebsiteImagesObject, getContextualImageUrl } from './image-engine';
 import { getIndustryImages, pickIndustryImage } from './industry-images';
+import { getIndustryLogoUrl } from './industry-logos';
 import { classifyProfession } from './profession-engine';
 import {
   sourceIndustryImages,
@@ -441,7 +442,10 @@ export class WebsiteDemoGeneratorService {
         aspectRatio: '4:5',
       };
     }
-    content.images = imageSet;
+    const industryLogoUrl = industryBlueprint
+      ? getIndustryLogoUrl(industryBlueprint.key)
+      : undefined;
+    content.images = industryLogoUrl ? { ...imageSet, logoUrl: industryLogoUrl } : imageSet;
 
     // Section composition: honor Gemini's chosen sections when valid, otherwise
     // use the deterministic profession plan. This is what makes the same

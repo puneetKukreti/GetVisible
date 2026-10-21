@@ -26,6 +26,8 @@ function escapeHtml(str: unknown): string {
 interface RenderContext {
   design: ProfessionStitchDesign;
   brand: string;
+  /** Optional trade logo; when set it leads the header instead of the name. */
+  logoUrl: string;
   profession: string;
   city: string;
   address: string;
@@ -61,10 +63,12 @@ function buildContext(design: ProfessionStitchDesign, content: WebsiteContent | 
     content?.images?.heroImage?.url || content?.hero?.imageUrl || design.defaultHeroImage;
   const aboutImage =
     content?.images?.aboutImage?.url || content?.about?.imageUrl || design.defaultAboutImage;
+  const logoUrl = content?.images?.logoUrl || '';
 
   return {
     design,
     brand,
+    logoUrl,
     profession,
     city,
     address,
@@ -134,6 +138,7 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid color-mix(in srgb, var(--gv-accent) 45%, transparent);
   background: color-mix(in srgb, var(--gv-accent) 12%, transparent);
 }
+.gv-brand__logo { height: 46px; width: auto; display: block; border-radius: 8px; box-shadow: 0 1px 10px rgba(0,0,0,.35); }
 .gv-nav { display: flex; align-items: center; gap: 26px; }
 .gv-nav a { font-size: 14px; font-weight: 500; color: var(--gv-muted); transition: color .2s; }
 .gv-nav a:hover { color: var(--gv-ink); }
@@ -345,6 +350,7 @@ a { color: inherit; text-decoration: none; }
   .gv-header__inner .gv-btn { display: none; }
   .gv-brand { font-size: 17px; max-width: 100%; min-width: 0; }
   .gv-brand__tag { display: none; }
+  .gv-brand__logo { height: 38px; }
 }
 `;
 }
@@ -784,7 +790,7 @@ export function buildProfessionStitchShell(design: ProfessionStitchDesign): stri
 <body>
   <header class="gv-header">
     <div class="gv-wrap gv-header__inner">
-      <a href="#hero" class="gv-brand">{{BRAND}}<span class="gv-brand__tag">{{PROFESSION}}</span></a>
+      <a href="#hero" class="gv-brand">{{BRAND_MARK}}</a>
       <nav class="gv-nav">{{NAV}}</nav>
       <a href="#contact" class="gv-btn">{{CTA_LABEL}}</a>
     </div>
@@ -855,6 +861,11 @@ export function renderProfessionStitchPage(
 
   const replacements: Record<string, string> = {
     '{{BRAND}}': escapeHtml(ctx.brand),
+    // A shipped trade logo leads the header (its own text carries the name);
+    // otherwise the text brand plus the profession tag stays as before.
+    '{{BRAND_MARK}}': ctx.logoUrl
+      ? `<img class="gv-brand__logo" src="${escapeHtml(ctx.logoUrl)}" alt="${escapeHtml(ctx.brand)} logo">`
+      : `${escapeHtml(ctx.brand)}<span class="gv-brand__tag">${escapeHtml(ctx.profession)}</span>`,
     '{{PROFESSION}}': escapeHtml(ctx.profession),
     '{{CITY}}': escapeHtml(ctx.city),
     '{{ADDRESS}}': escapeHtml(ctx.address),
