@@ -1,5 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { generateDeterministicOutreach } from '@/lib/sales/outreach';
 import { POST as batchGeneratePOST } from '@/app/api/demos/batch-generate/route';
 import { POST as sendWhatsappPOST } from '@/app/api/outreach/send-whatsapp/route';
@@ -18,6 +21,23 @@ import { OWNER_AUTH_COOKIE, createOwnerSessionToken } from '@/lib/session';
 async function ownerSessionCookie(): Promise<string> {
   const token = await createOwnerSessionToken();
   return `${OWNER_AUTH_COOKIE}=${token}`;
+}
+
+/** Deletes the route's on-disk screenshot cache for these ids, so a stale
+ *  capture from an earlier run can never masquerade as a fresh result. */
+function clearScreenshotCache(ids: string[]): void {
+  const dir = path.join(os.tmpdir(), 'getvisible-screenshots');
+  for (const id of ids) {
+    for (const suffix of ['', '-mobile']) {
+      for (const ext of ['.png', '.svg']) {
+        try {
+          fs.unlinkSync(path.join(dir, `${id}${suffix}${ext}`));
+        } catch {
+          // nothing cached for this lead — fine
+        }
+      }
+    }
+  }
 }
 
 describe('Growth & Workflow Upgrades', () => {
@@ -248,35 +268,72 @@ describe('Growth & Workflow Upgrades', () => {
       expect(arrayBuf.byteLength).toBeGreaterThan(1000);
     }, 15000);
 
-    it('serves a portrait mobile concept card when viewport=mobile is requested', async () => {
+    it('serves the portrait concept card when the cloud renderer is unreachable', async () => {
       const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
-      const testLead = leads[0];
+      clearScreenshotCache([leads[0].id]);
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://demo.example');
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('boom', { status: 503 })));
+      try {
 
-      const req = new NextRequest(
-        `http://localhost:3000/api/demos/${testLead.id}/screenshot?format=image&viewport=mobile`,
-        {
-          method: 'GET',
-          headers: {
-            'x-organization-id': DEMO_ORGANIZATION_ID,
-          },
-        }
-      );
+        const testLead = leads[0];
 
-      const res = await screenshotGET(req, { params: { id: testLead.id } });
-      expect(res.status).toBe(200);
-      expect(res.headers.get('content-type')).toMatch(/image\/(png|svg\+xml)/);
+        const req = new NextRequest(
+          `http://localhost:3000/api/demos/${testLead.id}/screenshot?format=image&viewport=mobile`,
+          {
+            method: 'GET',
+            headers: {
+              'x-organization-id': DEMO_ORGANIZATION_ID,
+            },
+          }
+        );
 
-      const body = Buffer.from(await res.arrayBuffer());
-      expect(body.byteLength).toBeGreaterThan(1000);
+        const res = await screenshotGET(req, { params: { id: testLead.id } });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8');
 
-      // Where a local browser is available this is a 390x844 PNG capture;
-      // otherwise the SVG card must be the tall 1080x1350 portrait variant.
-      if (res.headers.get('content-type')?.includes('svg')) {
-        const svg = body.toString('utf-8');
+        // The zero-fail fallback is the tall 1080x1350 portrait card.
+        const svg = await res.text();
         expect(svg).toContain('viewBox="0 0 1080 1350"');
         expect(svg).toContain('WEBSITE CONCEPT PREVIEW');
         expect(svg).not.toContain('0 0 1024 640');
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
       }
-    }, 45000);
+    }, 30000);
+
+    it('captures the real demo page for the WhatsApp portrait bubble when a cloud renderer is reachable', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://demo.example');
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string | URL | Request) => {
+          const url = String(input);
+          if (!url.startsWith('https://api.microlink.io')) {
+            throw new Error(`unexpected fetch: ${url}`);
+          }
+          const bytes = new Uint8Array(25_000); // above the 10KB placeholder guard
+          return new Response(bytes.buffer, { status: 200, headers: { 'content-type': 'image/png' } });
+        })
+      );
+      const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
+      clearScreenshotCache([leads[0].id]);
+      try {
+        const testLead = leads[0];
+
+        const req = new NextRequest(
+          `http://localhost:3000/api/demos/${testLead.id}/screenshot?format=image&viewport=mobile`,
+          { method: 'GET', headers: { 'x-organization-id': DEMO_ORGANIZATION_ID } }
+        );
+
+        const res = await screenshotGET(req, { params: { id: testLead.id } });
+        expect(res.status).toBe(200);
+        // A genuine capture of the demo page, not the designed concept card.
+        expect(res.headers.get('content-type')).toBe('image/png');
+        expect((await res.arrayBuffer()).byteLength).toBeGreaterThan(10_000);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+    }, 30000);
   });
 });

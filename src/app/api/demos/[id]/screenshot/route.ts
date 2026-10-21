@@ -131,8 +131,11 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     const heroSvgPath = path.join(cacheDir, `${actualLeadId}${variantSuffix}.svg`);
     const dynamicImageUrl = `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}&profession=${encodeURIComponent(profession)}${isMobileViewport ? '&viewport=mobile' : ''}`;
 
-    // 2. Return cached local hero screenshot if already exists and not refreshing
-    if (!forceRefresh && !isMobileViewport) {
+    // 2. Return the cached real capture if one exists; paths already carry the
+    // `-mobile` suffix so the two variants never collide. The SVG card cache
+    // stays desktop-only: a failed mobile capture must be able to succeed on a
+    // later attempt rather than keep serving the designed card.
+    if (!forceRefresh) {
       try {
         if (fs.existsSync(heroDiskPath) && fs.statSync(heroDiskPath).size > 1000) {
           if (isImageFormat) {
@@ -157,7 +160,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       } catch {}
 
       try {
-        if (fs.existsSync(heroSvgPath) && fs.statSync(heroSvgPath).size > 200) {
+        if (fs.existsSync(heroSvgPath) && fs.statSync(heroSvgPath).size > 200 && !isMobileViewport) {
           if (isImageFormat) {
             const svgBuf = fs.readFileSync(heroSvgPath, 'utf-8');
             return new NextResponse(svgBuf, {
@@ -190,6 +193,60 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     const templatePreviewPath = getTemplateScreenshotPath(layout);
 
     const hasLocalBrowser = Boolean(findSystemBrowser());
+
+    // 3a. A real capture of the prospect's own demo page, so the WhatsApp
+    // portrait bubble shows the actual website rather than the designed card.
+    // The phone-viewport capture is attempted on every host (the cloud
+    // renderer bypasses the ~500px local-crop problem entirely); the wide
+    // variant only tries it when no local Chrome exists, since that host can
+    // capture deterministically for free. If the cloud renderer is unreachable
+    // the SVG card below remains the zero-fail fallback, and non-public pages
+    // (http/localhost) are skipped by the capture helper itself.
+    if (!hasLocalBrowser || isMobileViewport) {
+      const publicAccessToken = demo?.publicToken || actualLeadId;
+      const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
+        publicAccessToken
+      )}/html`;
+      const cloudBytes = await captureCloudHeroScreenshot(
+        livePageUrl,
+        isMobileViewport ? 390 : 1280,
+        isMobileViewport ? 844 : 800
+      );
+
+      if (cloudBytes) {
+        // DOM BodyInit needs a snapshot BufferSource; hand over a plain copy.
+        const cloudBody = new Uint8Array(cloudBytes.byteLength);
+        cloudBody.set(cloudBytes);
+        try {
+          fs.writeFileSync(heroDiskPath, cloudBytes);
+        } catch {}
+        if (demo) {
+          demo.screenshotUrl = dynamicImageUrl;
+          await WebsiteDemoRepository.updateDemo(
+            demo.organizationId || orgId,
+            demo.id,
+            { ...demo } as any,
+            'system'
+          ).catch(() => {});
+        }
+        if (isImageFormat) {
+          return new NextResponse(cloudBody, {
+            headers: {
+              'Content-Type': 'image/png',
+              'Cache-Control': 'public, max-age=86400',
+              'Access-Control-Allow-Origin': '*',
+              'Content-Disposition': `inline; filename="hero_preview${isMobileViewport ? '_mobile' : ''}.png"`,
+            },
+          });
+        }
+        return NextResponse.json({
+          success: true,
+          screenshotUrl: dynamicImageUrl,
+          cached: false,
+          source: 'microlink',
+        });
+      }
+    }
 
     if (!hasLocalBrowser && isImageFormat) {
       // No headless browser on this host (e.g. Vercel serverless), so the static
@@ -291,53 +348,8 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }
     }
 
-    // 4. Wide variant: try a genuine cloud render. Reaching this point means no
-    // local browser bytes came back (no Chrome on host, or a phantom browser
-    // binary in the env), so instead of resigning to the mock card we send the
-    // *public* personalized page to Microlink — zero config, no API key. If that
-    // is unavailable, fail through to the designed SVG card. The portrait
-    // variant always keeps the designed card: a chat bubble needs the oversized
-    // prospect name far more than a shrunken real page.
-    if (!isMobileViewport) {
-      const publicAccessToken = demo?.publicToken || actualLeadId;
-      const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
-        publicAccessToken
-      )}/html`;
-      const cloudBytes = await captureCloudHeroScreenshot(livePageUrl, 1280, 800);
-      if (cloudBytes) {
-        // DOM BodyInit needs a snapshot BufferSource; hand over a plain copy.
-        const cloudBody = new Uint8Array(cloudBytes.byteLength);
-        cloudBody.set(cloudBytes);
-        try {
-          fs.writeFileSync(heroDiskPath, cloudBytes);
-        } catch {}
-        if (demo) {
-          demo.screenshotUrl = dynamicImageUrl;
-          await WebsiteDemoRepository.updateDemo(
-            demo.organizationId || orgId,
-            demo.id,
-            { ...demo } as any,
-            'system'
-          ).catch(() => {});
-        }
-        if (isImageFormat) {
-          return new NextResponse(cloudBody, {
-            headers: {
-              'Content-Type': 'image/png',
-              'Cache-Control': 'public, max-age=86400',
-              'Access-Control-Allow-Origin': '*',
-              'Content-Disposition': `inline; filename="hero_preview.png"`,
-            },
-          });
-        }
-        return NextResponse.json({
-          success: true,
-          screenshotUrl: dynamicImageUrl,
-          cached: false,
-          source: 'microlink',
-        });
-      }
-    }
+    // 4. (wide-only local-browser capture lives above in 3b; the cloud capture
+    // now runs for both viewports in step 3a before this point.)
 
     // 5. Zero-fail instant SVG Hero Mockup (Works 100% on Vercel Serverless / Cloud without Chrome)
     const heroHeadline = content?.hero?.headline;

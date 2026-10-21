@@ -3,7 +3,6 @@ import { LeadData, WebsiteDemoData, OutreachMessage, OutreachInput } from '@/typ
 import { canPrepareOutreach } from './lifecycle';
 import { GeminiAIProvider } from '@/lib/providers/ai.provider';
 import { getAppBaseUrl, getPublicDemoUrl, generatePublicDemoToken } from '@/lib/demos/public';
-import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
 
 export const OutreachMessageSchema = z.object({
   subject: z.string().min(5).max(120),
@@ -346,14 +345,25 @@ export class OutreachGeneratorService {
         : `${base}/demo/${lead.id}`;
 
     let screenshotUrl = activeDemo?.screenshotUrl || null;
-    if (
+    const isPlaceholderShot =
       !screenshotUrl ||
+      /\/demo-templates\//.test(screenshotUrl) ||
       (screenshotUrl.includes('api.microlink.io') &&
-        (screenshotUrl.includes('localhost') || screenshotUrl.includes('127.0.0.1')))
-    ) {
-      screenshotUrl = getTemplateScreenshotPath(
-        activeDemo?.design?.layout || activeDemo?.templateId
-      );
+        (screenshotUrl.includes('localhost') || screenshotUrl.includes('127.0.0.1')));
+    if (isPlaceholderShot && activeDemo) {
+      // Bundled template art shows someone else's business; the prospect must
+      // see their own site. Point at the live screenshot route instead — on a
+      // cloud host it returns a genuine capture of this very demo page, and its
+      // designed card only if the capture itself fails. The wide variant suits
+      // the email attachment; the WhatsApp Blitz client requests its own
+      // portrait variant directly.
+      screenshotUrl = `${base}/api/demos/${encodeURIComponent(
+        activeDemo.id || lead.id
+      )}/screenshot?format=image&name=${encodeURIComponent(
+        lead.businessName || ''
+      )}&city=${encodeURIComponent(lead.city || 'Delhi NCR')}&profession=${encodeURIComponent(
+        lead.profession || 'Local Business'
+      )}`;
     }
 
     const fallback = generateDeterministicOutreach({
