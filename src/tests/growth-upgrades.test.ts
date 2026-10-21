@@ -23,19 +23,24 @@ async function ownerSessionCookie(): Promise<string> {
   return `${OWNER_AUTH_COOKIE}=${token}`;
 }
 
-/** Deletes the route's on-disk screenshot cache for these ids, so a stale
- *  capture from an earlier run can never masquerade as a fresh result. */
+/** Deletes the route's on-disk screenshot cache for these ids. File names are
+ *  version-suffixed (`<id>-v<version>.png`) and legacy names are also possible,
+ *  so every matching file for the lead is removed, not just an exact name. */
 function clearScreenshotCache(ids: string[]): void {
   const dir = path.join(os.tmpdir(), 'getvisible-screenshots');
-  for (const id of ids) {
-    for (const suffix of ['', '-mobile']) {
-      for (const ext of ['.png', '.svg']) {
-        try {
-          fs.unlinkSync(path.join(dir, `${id}${suffix}${ext}`));
-        } catch {
-          // nothing cached for this lead — fine
-        }
-      }
+  let files: string[] = [];
+  try {
+    files = fs.readdirSync(dir);
+  } catch {
+    return; // cache dir doesn't exist — nothing to clear
+  }
+  for (const file of files) {
+    if (!ids.some((id) => file === id || file.startsWith(`${id}-`))) continue;
+    if (!/\.(png|svg)$/.test(file)) continue;
+    try {
+      fs.unlinkSync(path.join(dir, file));
+    } catch {
+      // already gone — fine
     }
   }
 }

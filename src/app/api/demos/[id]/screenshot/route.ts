@@ -122,14 +122,18 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     } catch {}
 
     const variantSuffix = isMobileViewport ? '-mobile' : '';
+    // The cache MUST be keyed by the demo version, not just the lead: a
+    // regenerated demo keeps the same lead id and public token, so any
+    // version-agnostic key serves the stale capture of the previous design
+    // forever. Legacy unsuffixed names may exist and are simply ignored.
+    const demoVersion = demo?.version || 1;
     // A headless `--window-size=390` capture is laid out at Chrome's ~500px
     // minimum window width and then cropped back to 390, so it comes back with
-    // the hero copy sliced mid-word. The portrait variant is therefore always the
-    // designed 1080x1350 concept card (see generateMobileHeroMockupSvg); only the
-    // wide variant uses a real pixel capture.
-    const heroDiskPath = path.join(cacheDir, `${actualLeadId}${variantSuffix}.png`);
+    // the hero copy sliced mid-word; local captures therefore stay desktop-only.
+    // The portrait variant uses the cloud renderer, which does not have that bug.
+    const heroDiskPath = path.join(cacheDir, `${actualLeadId}-v${demoVersion}${variantSuffix}.png`);
     const heroSvgPath = path.join(cacheDir, `${actualLeadId}${variantSuffix}.svg`);
-    const dynamicImageUrl = `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}&profession=${encodeURIComponent(profession)}${isMobileViewport ? '&viewport=mobile' : ''}`;
+    const dynamicImageUrl = `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}&profession=${encodeURIComponent(profession)}${isMobileViewport ? '&viewport=mobile' : ''}&v=${demoVersion}`;
 
     // 2. Return the cached real capture if one exists; paths already carry the
     // `-mobile` suffix so the two variants never collide. The SVG card cache
@@ -152,7 +156,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
           return NextResponse.json({
             success: true,
-            screenshotUrl: `${dynamicImageUrl}&v=${demo?.version || 1}`,
+            screenshotUrl: dynamicImageUrl,
             cached: true,
             source: 'local_hero',
           });
@@ -204,9 +208,13 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
     if (!hasLocalBrowser || isMobileViewport) {
       const publicAccessToken = demo?.publicToken || actualLeadId;
+      // The `v` param is a capture-cache buster: both Microlink and our own
+      // disk cache key on the full URL, and a regenerated demo keeps the same
+      // public token — without versioning, the previous design's capture
+      // would be served forever.
       const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
         publicAccessToken
-      )}/html`;
+      )}/html?v=${demoVersion}`;
       const cloudBytes = await captureCloudHeroScreenshot(
         livePageUrl,
         isMobileViewport ? 480 : 1280,
@@ -286,7 +294,8 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
     // 3b. If a local headless browser is available (local dev / VPS with Chrome),
     // capture a fresh, pixel-perfect PNG of the personalized Stitch template.
-    // Skipped for the portrait variant, which is always the designed concept card.
+    // Skipped for the portrait variant, which uses the cloud renderer in 3a
+    // because of the local ~500px crop bug.
     if (hasLocalBrowser && !isMobileViewport) {
       let personalizedHtml = '';
       try {
