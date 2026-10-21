@@ -1234,6 +1234,77 @@ export class LeadRepository {
   }
 
   /**
+   * Update a single profile field of a lead (profession only, kept minimal).
+   * Used by the owner dashboard to correct a mis-categorised trade *before*
+   * demo generation: the demo's design, imagery and tag line all derive from
+   * the recorded profession, so a wrong value bakes the wrong industry into
+   * the site. Writes an audit entry like every other owner mutation.
+   */
+  static async updateLeadProfession(
+    leadId: string,
+    profession: string,
+    organizationId: string,
+    actorName: string
+  ): Promise<LeadData> {
+    await ensureDatabaseMode();
+
+    if (!organizationId) {
+      throw new Error('Unauthorized: organizationId is required for data isolation.');
+    }
+    const nextProfession = String(profession || '').trim();
+    if (nextProfession.length < 2 || nextProfession.length > 80) {
+      throw new Error('Profession must be between 2 and 80 characters.');
+    }
+
+    if (isExplicitDemoMode()) {
+      const lead = demoStore.getOrgLeads(organizationId).find((l) => l.id === leadId);
+      if (!lead) {
+        throw new Error(`Lead ${leadId} not found in organization.`);
+      }
+      const oldProfession = lead.profession;
+      lead.profession = nextProfession;
+      lead.updatedAt = new Date().toISOString();
+      const audit = createAuditLogEntry({
+        action: 'LEAD_PROFILE_UPDATED',
+        entity: 'Lead',
+        entityId: leadId,
+        actor: actorName,
+        organizationId,
+        details: { field: 'profession', from: oldProfession, to: nextProfession },
+      });
+      demoStore.getOrgAuditLogs(organizationId).unshift(audit);
+      demoStore.saveToDisk();
+      return lead;
+    }
+
+    const { prisma } = await import('./prisma');
+    const existing = await prisma.lead.findFirst({
+      where: { id: leadId, organizationId },
+    });
+    if (!existing) {
+      throw new Error(`Lead ${leadId} not found in organization.`);
+    }
+
+    const updated = await prisma.lead.update({
+      where: { id: leadId },
+      data: { profession: nextProfession },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'LEAD_PROFILE_UPDATED',
+        entity: 'Lead',
+        entityId: leadId,
+        actor: actorName,
+        organizationId,
+        details: { field: 'profession', from: existing.profession, to: nextProfession },
+      },
+    });
+
+    return updated as unknown as LeadData;
+  }
+
+  /**
    * Add a note to the lead and record an activity entry.
    */
   static async addNote(

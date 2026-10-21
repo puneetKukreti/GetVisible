@@ -197,11 +197,11 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     // 3a. A real capture of the prospect's own demo page, so the WhatsApp
     // portrait bubble shows the actual website rather than the designed card.
     // The phone-viewport capture is attempted on every host (the cloud
-    // renderer bypasses the ~500px local-crop problem entirely); the wide
-    // variant only tries it when no local Chrome exists, since that host can
-    // capture deterministically for free. If the cloud renderer is unreachable
-    // the SVG card below remains the zero-fail fallback, and non-public pages
-    // (http/localhost) are skipped by the capture helper itself.
+    // renderer bypasses the ~500px local-crop problem entirely); 480x1200 CSS
+    // renders a slightly zoomed-out phone frame so more of the demo fits in
+    // the bubble. The wide variant only tries the cloud renderer when no local
+    // Chrome exists, since that host can capture deterministically for free.
+
     if (!hasLocalBrowser || isMobileViewport) {
       const publicAccessToken = demo?.publicToken || actualLeadId;
       const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
@@ -209,8 +209,8 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       )}/html`;
       const cloudBytes = await captureCloudHeroScreenshot(
         livePageUrl,
-        isMobileViewport ? 390 : 1280,
-        isMobileViewport ? 844 : 800
+        isMobileViewport ? 480 : 1280,
+        isMobileViewport ? 1200 : 800
       );
 
       if (cloudBytes) {

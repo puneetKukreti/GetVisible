@@ -2,12 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST as loginPOST, DELETE as loginDELETE } from '@/app/api/auth/login/route';
 import { POST as logoutPOST } from '@/app/api/auth/logout/route';
+import { PATCH as leadPatch } from '@/app/api/leads/[id]/route';
 import { middleware } from '@/middleware';
 import {
   createOwnerSessionToken,
   verifyOwnerSessionToken,
   OWNER_AUTH_COOKIE,
 } from '@/lib/session';
+import { LeadRepository } from '@/lib/db/repository';
+import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
 
 describe('Solo Owner Password & Middleware Security', () => {
   const originalAdminPassword = process.env.ADMIN_PASSWORD;
@@ -220,6 +223,50 @@ describe('Solo Owner Password & Middleware Security', () => {
         );
         expect(regeneratePost.status).toBe(401);
       });
+    });
+  });
+
+  describe('Owner profession correction (PATCH /api/leads/[id])', () => {
+    // The demo's design, imagery, header logo and tag line all derive from the
+    // recorded profession, so an owner must be able to correct a mis-set trade
+    // before generating a demo (car-care businesses must not ship as CA sites).
+    it('updates a lead profession with a valid owner session', async () => {
+      const token = await createOwnerSessionToken();
+      const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
+      const lead = leads.find((l) => !/chartered|ca/i.test(l.profession || ''));
+      if (!lead) return; // no candidate in this seed set — nothing to correct
+
+      const res = await leadPatch(
+        new NextRequest(`http://localhost:3000/api/leads/${lead.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            cookie: `${OWNER_AUTH_COOKIE}=${token}`,
+            'x-organization-id': DEMO_ORGANIZATION_ID,
+          },
+          body: JSON.stringify({ profession: 'Car Detailing' }),
+        }),
+        { params: { id: lead.id } }
+      );
+      expect(res.status).toBe(200);
+      const updated = await res.json();
+      expect(updated.profession).toBe('Car Detailing');
+
+      const persisted = await LeadRepository.getLeadById(lead.id, DEMO_ORGANIZATION_ID);
+      expect(persisted?.profession).toBe('Car Detailing');
+    });
+
+    it('rejects profession updates without a session', async () => {
+      const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
+      const res = await leadPatch(
+        new NextRequest(`http://localhost:3000/api/leads/${leads[0].id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profession: 'Car Detailing' }),
+        }),
+        { params: { id: leads[0].id } }
+      );
+      expect(res.status).toBe(401);
     });
   });
 });

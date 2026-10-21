@@ -4,6 +4,7 @@ export interface CreateAuditLogParams {
   action:
     | 'LEAD_CREATED'
     | 'LEAD_UPDATED'
+    | 'LEAD_PROFILE_UPDATED'
     | 'LEAD_STATUS_CHANGED'
     | 'LEAD_MARKED_DO_NOT_CONTACT'
     | 'CONTACT_UPDATED'

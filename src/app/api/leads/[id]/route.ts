@@ -75,6 +75,15 @@ export async function PATCH(
 
     let updatedLead = null;
 
+    if (typeof body.profession === 'string') {
+      updatedLead = await LeadRepository.updateLeadProfession(
+        leadId,
+        body.profession,
+        targetOrg,
+        body.actor || 'Agency User'
+      );
+    }
+
     if (body.note) {
       await LeadRepository.addNote(
         targetOrg,
