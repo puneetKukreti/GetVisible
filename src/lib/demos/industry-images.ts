@@ -14,7 +14,20 @@ export interface IndustryImageSet {
 }
 
 export function getIndustryImages(profession?: string, businessName?: string): IndustryImageSet {
-  const text = `${profession || ''} ${businessName || ''}`.toLowerCase();
+  // The profession names the trade; a business name often only decorates it
+  // ("… Detailing Studio", "… Dental Clinic"). Match the profession alone first,
+  // so a word like "Studio" cannot turn a car-detailing lead into a photography
+  // set. The full text is still tried when the profession says nothing useful.
+  const professionText = (profession || '').toLowerCase();
+  const byProfession = professionText ? matchIndustryImages(professionText) : undefined;
+  if (byProfession) return byProfession;
+
+  const fullText = `${professionText} ${(businessName || '').toLowerCase()}`.trim();
+  return (fullText ? matchIndustryImages(fullText) : undefined) || NEUTRAL_INDUSTRY_IMAGES;
+}
+
+/** The curated rule chain, tried in order. Undefined when no rule fits. */
+function matchIndustryImages(text: string): IndustryImageSet | undefined {
 
   // 1. Dental / Dentist
   if (/dent|dental|orthodont|teeth|oral|smile/i.test(text)) {
@@ -119,7 +132,8 @@ export function getIndustryImages(profession?: string, businessName?: string): I
   if (/car|auto|garage|mechanic|detailing|motor|solar|pest|electric|plumb|contractor|clean|rooftop/i.test(text)) {
     return {
       heroImage: 'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1200&q=85',
-      secondaryImage: 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=900&q=80',
+      // Replaces photo-1486006920555-c77dce18193b, which Unsplash now returns 404.
+      secondaryImage: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=900&q=80',
       aboutImage: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=900&q=80',
       accentColor: '#059669',
       categoryTag: 'Expert Technical & Field Services',
@@ -138,11 +152,45 @@ export function getIndustryImages(profession?: string, businessName?: string): I
   }
 
   // 12. Neutral professional fallback (never assume CA for unknown professions)
-  return {
-    heroImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=85',
-    secondaryImage: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=80',
-    aboutImage: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=900&q=80',
-    accentColor: '#2563eb',
-    categoryTag: 'Professional Services',
-  };
+  return undefined;
+}
+
+const NEUTRAL_INDUSTRY_IMAGES: IndustryImageSet = {
+  heroImage: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1200&q=85',
+  secondaryImage: 'https://images.unsplash.com/photo-1521737711867-e3b97375f902?auto=format&fit=crop&w=900&q=80',
+  aboutImage: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&w=900&q=80',
+  accentColor: '#2563eb',
+  categoryTag: 'Professional Services',
+};
+
+export interface IndustryImageChoice {
+  /** A photo sourced from the web for this exact trade (already self-hosted). */
+  sourced?: string;
+  /** The curated photo that matches the trade, when the industry is known. */
+  industryMatched?: string;
+  /** The category preset's photo: curated per category, or the neutral fallback. */
+  preset?: string;
+  /** Last resort, e.g. the content engine's own pool. */
+  fallback?: string;
+  /**
+   * General SMB trades have no curated category art, so their preset photo is
+   * the neutral corporate one. The trade-matched photo must outrank it there —
+   * an office lobby must never headline a car-detailing page. Curated
+   * categories keep their own preset first.
+   */
+  industryFirst: boolean;
+}
+
+/**
+ * Chooses the hero/about photo by trust order: a live-sourced photo of the
+ * actual trade, then the trade-matched set or the category preset, then the
+ * last resort. Always returns a usable URL or undefined.
+ */
+export function pickIndustryImage(choice: IndustryImageChoice): string | undefined {
+  const { sourced, industryMatched, preset, fallback, industryFirst } = choice;
+  if (sourced) return sourced;
+  const ordered = industryFirst
+    ? [industryMatched, preset, fallback]
+    : [preset, industryMatched, fallback];
+  return ordered.find((url): url is string => typeof url === 'string' && url.length > 0);
 }

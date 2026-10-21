@@ -11,7 +11,7 @@ import {
   AiBusinessContent,
 } from './ai-content-generator';
 import { buildWebsiteImagesObject, getContextualImageUrl } from './image-engine';
-import { getIndustryImages } from './industry-images';
+import { getIndustryImages, pickIndustryImage } from './industry-images';
 import { classifyProfession } from './profession-engine';
 import {
   sourceIndustryImages,
@@ -375,6 +375,29 @@ export class WebsiteDemoGeneratorService {
           },
           maxImages: 6,
         });
+
+        // A missing HERO slot used to send generic-trade demos back to the
+        // neutral corporate preset, so an office lobby headlined a detailing
+        // page. The trade photos did arrive for the other slots, which means
+        // sourcing works — ask once more with a different phrase (this also
+        // sidesteps the negative search cache) instead of settling for that.
+        if (
+          sourcedImages.length > 0 &&
+          !sourcedImages.some((s) => s.purpose === 'HERO' && s.url)
+        ) {
+          const heroRetry = await sourceIndustryImages({
+            keywords: {
+              HERO: buildIndustrySearchKeyword(
+                lead.profession,
+                blueprintKeywords[1] ||
+                  registryProfile.imageKeywords.about ||
+                  blueprintKeywords[0]
+              ),
+            },
+            maxImages: 1,
+          });
+          sourcedImages = [...sourcedImages, ...heroRetry];
+        }
       } catch {
         // Keep curated/default imagery on any sourcing failure.
       }
@@ -382,10 +405,23 @@ export class WebsiteDemoGeneratorService {
     const sourcedHero = sourcedImages.find((s) => s.purpose === 'HERO' && s.url)?.url;
     const sourcedAbout = sourcedImages.find((s) => s.purpose === 'ABOUT' && s.url)?.url;
 
-    // Live-sourced web photos are industry-accurate, so they outrank the generic
-    // SMB preset (which is only reached for professions without curated art).
-    const heroImgUrl = sourcedHero || preset.heroImage || industryImgs.heroImage || imageSet.heroImage?.url;
-    const aboutImgUrl = sourcedAbout || preset.aboutImage || industryImgs.aboutImage || imageSet.aboutImage?.url;
+    // Live-sourced web photos are industry-accurate, so they outrank everything.
+    // For a general SMB trade the trade-matched set then beats the neutral
+    // corporate preset; curated categories keep their own preset first.
+    const heroImgUrl = pickIndustryImage({
+      sourced: sourcedHero,
+      industryMatched: industryImgs.heroImage,
+      preset: preset.heroImage,
+      fallback: imageSet.heroImage?.url,
+      industryFirst: isGenericTrade,
+    });
+    const aboutImgUrl = pickIndustryImage({
+      sourced: sourcedAbout,
+      industryMatched: industryImgs.aboutImage,
+      preset: preset.aboutImage,
+      fallback: imageSet.aboutImage?.url,
+      industryFirst: isGenericTrade,
+    });
 
     if (heroImgUrl) {
       content.hero.imageUrl = heroImgUrl;
