@@ -3,6 +3,17 @@ import { LeadData, WebsiteDemoData, OutreachMessage, OutreachInput } from '@/typ
 import { canPrepareOutreach } from './lifecycle';
 import { GeminiAIProvider } from '@/lib/providers/ai.provider';
 import { getAppBaseUrl, getPublicDemoUrl, generatePublicDemoToken } from '@/lib/demos/public';
+import {
+  buildWhatsAppFirstTouch,
+  buildWhatsAppReplyFollowUp,
+  buildWhatsAppNoReplyFollowUp,
+} from './whatsapp-copy';
+
+export {
+  buildWhatsAppFirstTouch,
+  buildWhatsAppReplyFollowUp,
+  buildWhatsAppNoReplyFollowUp,
+};
 
 export const OutreachMessageSchema = z.object({
   subject: z.string().min(5).max(120),
@@ -248,35 +259,26 @@ GetVisible Digital Team`;
       ? input.demoUrl
       : `${baseOrigin}/demo/${businessSlug}`;
 
-  const whatsappMessage = `👋 *Want to Attract More Clients to Your Business?*
+  // WhatsApp first touch: short, human, one question, NO link/image/emojis.
+  // The demo link lives in the reply follow-up below, so the first message
+  // reads like a person asking a question rather than an ad.
+  const whatsappMessage = buildWhatsAppFirstTouch({
+    businessName: input.businessName,
+    city: input.city,
+    profession: input.profession,
+    hasWebsite,
+  });
 
-Did you know that having a professional website can help potential clients find you online and build trust in your services?
+  // Touch 2: sent only after the prospect replies.
+  const whatsappFollowUpWithLink = buildWhatsAppReplyFollowUp({
+    businessName: input.businessName,
+    demoUrl,
+  });
 
-🌐 *Get Your Own FREE Website!* 🎉
-
-✅ Showcase your services professionally
-✅ Make it easier for potential clients to contact you
-✅ Build trust and stand out from competitors
-✅ Help more people discover your business online
-
-👀 *See what your website could look like!*
-🖼️ *(preview image attached above 👆)*
-
-👉 *View Your Website Demo:*
-${demoUrl}
-
-🎁 Get started with your free website today!
-
-📩 Interested? Click the link above to explore your demo and learn more.
-
-— Puneet | GetVisible`;
-
-  // Touch 2: Follow-up Link Reply (Sent after prospect replies "PREVIEW" or "YES")
-  const whatsappFollowUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${input.businessName}*:
-
-👉 ${demoUrl}
-
-You can scroll through it right on your phone. Let me know if you'd like any color or text changes — we can make this live on your own domain within 48 hours!`;
+  // Touch 3: one polite nudge for reads that never replied, sent 2-3 days later.
+  const whatsappNoReplyFollowUp = buildWhatsAppNoReplyFollowUp({
+    businessName: input.businessName,
+  });
 
   const encodedWaText = encodeURIComponent(whatsappMessage);
   const whatsappShareUrl = waRecipient
@@ -287,6 +289,11 @@ You can scroll through it right on your phone. Let me know if you'd like any col
   const whatsappFollowUpShareUrl = waRecipient
     ? `https://api.whatsapp.com/send?phone=${waRecipient}&text=${encodedFollowUpText}`
     : `https://api.whatsapp.com/send?text=${encodedFollowUpText}`;
+
+  const encodedNoReplyText = encodeURIComponent(whatsappNoReplyFollowUp);
+  const whatsappNoReplyShareUrl = waRecipient
+    ? `https://api.whatsapp.com/send?phone=${waRecipient}&text=${encodedNoReplyText}`
+    : `https://api.whatsapp.com/send?text=${encodedNoReplyText}`;
 
   const personalizationReason = `Referenced ${input.businessName}, ${professionLabel} specialization, ${input.city} location, website status (${hasWebsite ? 'has website' : 'no website'}), and direct demo link.`;
 
@@ -299,6 +306,8 @@ You can scroll through it right on your phone. Let me know if you'd like any col
     whatsappShareUrl,
     whatsappFollowUpWithLink,
     whatsappFollowUpShareUrl,
+    whatsappNoReplyFollowUp,
+    whatsappNoReplyShareUrl,
     businessImprovementPitch: summary,
     interestDetectionHook: hookQuestion,
   };
@@ -418,10 +427,16 @@ export class OutreachGeneratorService {
                 ...result.data,
                 message: finalMessage,
                 screenshotUrl,
-                whatsappMessage: result.data.whatsappMessage || fallback.whatsappMessage,
+                // First-touch WhatsApp copy is intentionally NOT AI-generated:
+                // a short, human, question-first message has to stay free of
+                // hype, links and emojis, which models revert to. The AI only
+                // personalizes the email body.
+                whatsappMessage: fallback.whatsappMessage,
                 whatsappShareUrl: fallback.whatsappShareUrl,
                 whatsappFollowUpWithLink: fallback.whatsappFollowUpWithLink,
                 whatsappFollowUpShareUrl: fallback.whatsappFollowUpShareUrl,
+                whatsappNoReplyFollowUp: fallback.whatsappNoReplyFollowUp,
+                whatsappNoReplyShareUrl: fallback.whatsappNoReplyShareUrl,
                 businessImprovementPitch: fallback.businessImprovementPitch,
                 interestDetectionHook: fallback.interestDetectionHook,
               },

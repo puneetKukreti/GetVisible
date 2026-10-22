@@ -51,7 +51,7 @@ describe('Growth & Workflow Upgrades', () => {
   });
 
   describe('Upgrade 1: High-Converting Branded WhatsApp Strategy', () => {
-    it('generates a Touch 1 WhatsApp message with value hook, benefit checklist, and the branded demo link', () => {
+    it('generates a short, human Touch 1 WhatsApp message with no link, image, or hype', () => {
       const outreach = generateDeterministicOutreach({
         businessName: 'Sharma & Singhal CA',
         profession: 'Chartered Accountant',
@@ -65,28 +65,26 @@ describe('Growth & Workflow Upgrades', () => {
       expect(outreach.whatsappMessage).toBeDefined();
       const touch1 = outreach.whatsappMessage!;
 
-      // Attention hook + free-website promise
-      expect(touch1).toContain('👋 *Want to Attract More Clients to Your Business?*');
-      expect(touch1).toContain('🌐 *Get Your Own FREE Website!* 🎉');
+      // Personalized, conversational question opener
+      expect(touch1).toContain('Sharma & Singhal CA');
+      expect(touch1).toContain('Gurgaon');
+      expect(touch1.toLowerCase()).toContain('chartered accountant');
+      expect(touch1.trim().endsWith('?')).toBe(true);
 
-      // Four-point benefit checklist
-      expect(touch1.match(/✅ /g) || []).toHaveLength(4);
-      expect(touch1).toContain('✅ Showcase your services professionally');
-      expect(touch1).toContain('✅ Help more people discover your business online');
-
-      // Demo link travels in the first-touch message
-      expect(touch1).toContain('👀 *See what your website could look like!*');
-      expect(touch1).toContain('🖼️ *(preview image attached above 👆)*');
-      expect(touch1).toContain('👉 *View Your Website Demo:*');
-      expect(touch1).toContain('https://getvisible.in/demo/sharma-ca');
-      expect(touch1).toContain('📩 Interested? Click the link above to explore your demo and learn more.');
-
-      // Never leak the raw screenshot URL as a link, and never self-link wa.me
+      // Cold-message hygiene: no link, no image reference, no emojis, no "FREE"
+      expect(touch1).not.toContain('https://');
       expect(touch1).not.toContain('screenshot.png');
       expect(touch1).not.toContain('https://wa.me/');
+      expect(touch1).not.toMatch(/FREE/i);
+      for (const emoji of ['👋', '🌐', '🎉', '✅', '👀', '🖼️', '👉', '🎁', '📩']) {
+        expect(touch1).not.toContain(emoji);
+      }
+
+      // Short enough to read in a few seconds
+      expect(touch1.length).toBeLessThan(320);
     });
 
-    it('generates a Touch 2 follow-up reply that includes the demo live link', () => {
+    it('keeps the demo link in the after-reply follow-up, not the first touch', () => {
       const outreach = generateDeterministicOutreach({
         businessName: 'Mehta Clinic',
         profession: 'Dentist',
@@ -100,10 +98,14 @@ describe('Growth & Workflow Upgrades', () => {
       expect(outreach.whatsappFollowUpWithLink).toBeDefined();
       const touch2 = outreach.whatsappFollowUpWithLink!;
 
-      expect(touch2).toContain('Thanks for replying!');
+      expect(touch2).toContain('Thanks for getting back to me.');
       expect(touch2).toContain('https://getvisible.in/demo/mehta-clinic-token');
       expect(touch2).toContain('Mehta Clinic');
-      expect(touch2).toContain('48 hours');
+      expect(outreach.whatsappMessage).not.toContain('https://getvisible.in/demo/mehta-clinic-token');
+
+      // One polite nudge for reads that never replied
+      expect(outreach.whatsappNoReplyFollowUp).toBeDefined();
+      expect(outreach.whatsappNoReplyFollowUp).toContain('Mehta Clinic');
     });
   });
 

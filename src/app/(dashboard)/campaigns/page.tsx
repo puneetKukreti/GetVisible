@@ -41,6 +41,10 @@ import {
   Trash2,
 } from 'lucide-react';
 import { generatePublicDemoToken, getAppBaseUrl } from '@/lib/demos/public';
+import {
+  buildWhatsAppFirstTouch,
+  buildWhatsAppReplyFollowUp,
+} from '@/lib/sales/whatsapp-copy';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -305,34 +309,23 @@ function getMeaningfulWhatsAppMessage(lead: LeadData): {
   const baseOrigin = typeof window !== 'undefined' ? window.location.origin : getAppBaseUrl();
   const demoUrl = `${baseOrigin}/demo/${lead.websiteDemos?.[0]?.publicToken || businessSlug}`;
 
-  const message = `👋 *Want to Attract More Clients to Your Business?*
+  const hasWebsite =
+    lead.websiteStatus === 'WEBSITE_EXISTS' ||
+    (Boolean(lead.website) && lead.websiteStatus !== 'NO_WEBSITE');
 
-Did you know that having a professional website can help potential clients find you online and build trust in your services?
+  // Same copy as the server generator (shared module): one short human question
+  // with no link/image, then the demo link only after they reply.
+  const message = buildWhatsAppFirstTouch({
+    businessName: lead.businessName,
+    city: lead.city,
+    profession: lead.profession,
+    hasWebsite,
+  });
 
-🌐 *Get Your Own FREE Website!* 🎉
-
-✅ Showcase your services professionally
-✅ Make it easier for potential clients to contact you
-✅ Build trust and stand out from competitors
-✅ Help more people discover your business online
-
-👀 *See what your website could look like!*
-🖼️ *(preview image attached above 👆)*
-
-👉 *View Your Website Demo:*
-${demoUrl}
-
-🎁 Get started with your free website today!
-
-📩 Interested? Click the link above to explore your demo and learn more.
-
-— Puneet | GetVisible`;
-
-  const followUpWithLink = `Thanks for replying! 🙌 Here is the official live preview link we prepared for *${lead.businessName}*:
-
-👉 ${demoUrl}
-
-You can scroll through it right on your phone. Let me know if you'd like any color or text changes — we can make this live on your own domain within 48 hours!`;
+  const followUpWithLink = buildWhatsAppReplyFollowUp({
+    businessName: lead.businessName,
+    demoUrl,
+  });
 
   return { message, demoUrl, followUpWithLink };
 }
@@ -882,7 +875,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                🛡️ Step 1: Image Pitch + Preview Link
+                🛡️ Step 1: Question First (No Link/Image)
               </button>
               <button
                 type="button"
@@ -893,7 +886,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                🔗 Step 2: Send Live Link (After Reply)
+                🖼️ Step 2: Demo + Link (After Reply)
               </button>
             </div>
 
@@ -1085,10 +1078,24 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                   </div>
 
                   {/* Dispatch Guide banner */}
-                  <div className="p-2 rounded bg-white/70 dark:bg-card/70 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-center gap-1.5 font-medium">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" />
-                    <span>Click <strong>&ldquo;📋 Copy Image&rdquo;</strong> &rarr; In WhatsApp Web press <strong>Ctrl + V</strong> to send the card image directly!</span>
-                  </div>
+                  {whatsappStep === 'step1' ? (
+                    <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-start gap-1.5 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 mt-0.5" />
+                      <span>
+                        <strong>Send text only.</strong> No link and no image in the first message — that is what
+                        gets you filtered or blocked. Copy the text and send. Come back to Step 2 only after they reply.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-2 rounded bg-white/70 dark:bg-card/70 border border-emerald-500/20 text-emerald-800 dark:text-emerald-300 text-[11px] flex items-start gap-1.5 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600 mt-0.5" />
+                      <span>
+                        <strong>They replied — now send the demo.</strong> Click{' '}
+                        <strong>&ldquo;📋 Copy Image&rdquo;</strong>, then paste (Ctrl + V) in WhatsApp Web and send
+                        the link text from this step.
+                      </span>
+                    </div>
+                  )}
 
                   {/* Action Toolbar */}
                   <div className="grid grid-cols-3 gap-2 pt-0.5">
@@ -1097,13 +1104,17 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       variant="outline"
                       size="sm"
                       onClick={copyScreenshotImage}
-                      disabled={copyImageStatus === 'COPYING' || !screenshotUrl}
+                      disabled={copyImageStatus === 'COPYING' || !screenshotUrl || whatsappStep !== 'step2'}
                       className={`text-xs h-8 gap-1 font-medium bg-white dark:bg-card shadow-xs ${
                         copyImageStatus === 'COPIED'
                           ? 'border-emerald-500 bg-emerald-500/10 text-emerald-600'
                           : 'border-border'
                       }`}
-                      title="Copy PNG screenshot directly to OS clipboard for Ctrl+V in WhatsApp"
+                      title={
+                        whatsappStep === 'step2'
+                          ? 'Copy PNG screenshot directly to OS clipboard for Ctrl+V in WhatsApp'
+                          : 'Send the demo image only after the prospect replies (Step 2)'
+                      }
                     >
                       {copyImageStatus === 'COPYING' ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1581,23 +1592,23 @@ function OutreachQueueTab({
     setBlitzLoadingId(lead.id);
 
     try {
-      // 1. Copy screenshot PNG to OS clipboard if available (portrait card, so the
-      //    prospect reads it full-width on their phone)
-      try {
-        const imgUrl = getScreenshotImageUrl(lead, false, 'mobile');
-        const pngBlob = await renderUrlToPngBlob(imgUrl);
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': pngBlob }),
-        ]);
-      } catch (clipErr) {
-        console.warn('Clipboard image copy skipped/unsupported:', clipErr);
-      }
+      // Touch 1 is TEXT ONLY on purpose. A link or image in the first message
+      // from an unknown number is the strongest spam signal there is — it gets
+      // you filtered, unread, or blocked. The demo image/link is sent only
+      // after the prospect replies (Step 2 in the outreach panel).
 
-      // 2. Format high-converting WhatsApp message
+      // 1. Format the short, human, question-first WhatsApp message
       const cleanPhone = (lead.publicPhone || '').replace(/[^0-9]/g, '');
       const waPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
 
       const { message: meaningfulMsg } = getMeaningfulWhatsAppMessage(lead);
+
+      // 2. Copy the text so Ctrl+V also works if the deep link fails
+      try {
+        await navigator.clipboard.writeText(meaningfulMsg);
+      } catch (clipErr) {
+        console.warn('Clipboard text copy skipped/unsupported:', clipErr);
+      }
 
       // 3. Open WhatsApp Web deep link
       const waUrl = `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(meaningfulMsg)}`;
@@ -1985,7 +1996,7 @@ function OutreachQueueTab({
                               disabled={blitzLoadingId === lead.id}
                               className="h-7 px-2.5 text-[11px] gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold border-emerald-600 shadow-xs"
                               onClick={() => handleBlitzWhatsApp(lead)}
-                              title="1-Click Blitz: Copies screenshot to clipboard, opens WhatsApp Web pre-filled, and marks lead as Contacted"
+                              title="1-Click Blitz: copies the short question-first text, opens WhatsApp Web pre-filled, and marks the lead as Contacted. No image/link in the first touch."
                             >
                               {blitzLoadingId === lead.id ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />

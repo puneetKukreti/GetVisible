@@ -564,6 +564,8 @@ export interface OutreachMessage {
   whatsappShareUrl?: string;
   whatsappFollowUpWithLink?: string;
   whatsappFollowUpShareUrl?: string;
+  whatsappNoReplyFollowUp?: string;
+  whatsappNoReplyShareUrl?: string;
   businessImprovementPitch?: string;
   interestDetectionHook?: string;
 }

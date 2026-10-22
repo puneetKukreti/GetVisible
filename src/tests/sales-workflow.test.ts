@@ -281,7 +281,7 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(lawyerNoWeb.hookQuestion).toContain('Would you be open to reviewing the live concept');
     });
 
-    it('generates the new attract-more-clients WhatsApp copy with the demo link and no raw image URLs', () => {
+    it('generates short, human WhatsApp copy and defers the demo link to the reply follow-up', () => {
       const outreach = generateDeterministicOutreach({
         businessName: 'Apex Tax Partners CA',
         profession: 'Chartered Accountant',
@@ -295,24 +295,14 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(outreach.whatsappMessage).toBeDefined();
       const wa = outreach.whatsappMessage!;
 
-      // Verifies no raw screenshot URL link spam
+      // No raw screenshot URL, no hype, and no link in the first touch
       expect(wa).not.toContain('screenshot.png');
+      expect(wa).not.toContain('https://example.com/demo/apex-1');
+      expect(wa).not.toMatch(/FREE/i);
+      expect(wa).toContain('Apex Tax Partners CA');
+      expect(wa).toContain('Gurgaon');
 
-      // Verifies the new outreach copy
-      expect(wa).toContain('👋 *Want to Attract More Clients to Your Business?*');
-      expect(wa).toContain('🌐 *Get Your Own FREE Website!* 🎉');
-      expect(wa).toContain('✅ Showcase your services professionally');
-      expect(wa).toContain('✅ Make it easier for potential clients to contact you');
-      expect(wa).toContain('✅ Build trust and stand out from competitors');
-      expect(wa).toContain('✅ Help more people discover your business online');
-      expect(wa).toContain('👀 *See what your website could look like!*');
-      expect(wa).toContain('🖼️ *(preview image attached above 👆)*');
-      expect(wa).toContain('👉 *View Your Website Demo:*');
-
-      // The demo link must stay in the first-touch message.
-      expect(wa).toContain('https://example.com/demo/apex-1');
-
-      // Verifies WhatsApp Follow-Up contains the demoUrl
+      // The demo link lives in the after-reply follow-up
       expect(outreach.whatsappFollowUpWithLink).toBeDefined();
       expect(outreach.whatsappFollowUpWithLink).toContain('https://example.com/demo/apex-1');
 
@@ -320,6 +310,10 @@ describe('Phase 5 — Human-in-the-Loop Sales Workflow', () => {
       expect(outreach.whatsappShareUrl).toBeDefined();
       expect(outreach.whatsappShareUrl).toContain('api.whatsapp.com/send');
       expect(outreach.whatsappShareUrl).toContain('919811122233');
+
+      // One no-reply nudge exists, with its own share link
+      expect(outreach.whatsappNoReplyFollowUp).toBeDefined();
+      expect(outreach.whatsappNoReplyShareUrl).toContain('api.whatsapp.com/send');
     });
   });
 
