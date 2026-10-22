@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/outreach-flush",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }

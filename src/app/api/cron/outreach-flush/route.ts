@@ -5,7 +5,12 @@ import { createAuditLogEntry } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 // Process a small batch per invocation to keep paced sends and stay within
-// serverless time limits. Vercel cron drives this every few minutes.
+// serverless time limits.
+//
+// Vercel Hobby only permits a DAILY cron, so vercel.json fires this once at
+// 09:00. For true 5-minute pacing, either upgrade the project to Pro and change
+// the schedule to `*/5 * * * *`, or point an external scheduler (cron-job.org,
+// GitHub Actions) at this URL with the CRON_SECRET bearer token.
 export const maxDuration = 60;
 
 const BATCH_SIZE = 5;
