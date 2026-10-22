@@ -34,4 +34,21 @@ describe('Screenshot brand highlight', () => {
     expect(out).toContain('data-gv-brand-highlight="true"');
     expect(out.match(/data-gv-brand-highlight/g)).toHaveLength(1);
   });
+
+  it('never wraps the name inside an attribute value', () => {
+    const doc = `<html><body><header><img alt="Galaxy Car Care logo" src="/logo.png"></header><h1>Premium Detailing</h1><p>Galaxy Car Care</p></body></html>`;
+    const out = highlightBrandNameInHtml(doc, 'Galaxy Car Care');
+    // The logo alt stays valid HTML...
+    expect(out).not.toMatch(/alt="[^"]*data-gv-brand-highlight/);
+    // ...and the visible text node is the one that gets ringed.
+    expect(out).toContain('data-gv-brand-highlight="true"');
+    expect(out).toContain('<p><span data-gv-brand-highlight="true"');
+  });
+
+  it('rings the owner-supplied logo when the header renders the brand as an image', () => {
+    const doc = `<html><body><header><img class="gv-brand__logo" alt="Galaxy Car Care logo" src="/logo.png"></header><p>Galaxy Car Care</p></body></html>`;
+    const out = highlightBrandNameInHtml(doc, 'Galaxy Car Care');
+    expect(out).toMatch(/<img[^>]*outline:3px solid #facc15/);
+    expect(out).toContain('data-gv-brand-highlight="true"');
+  });
 });
