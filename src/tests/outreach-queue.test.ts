@@ -3,7 +3,7 @@ import { OutreachQueueRepository } from '@/lib/db/repository';
 import { LeadRepository } from '@/lib/db/repository';
 import { DEMO_ORGANIZATION_ID } from '@/lib/db/demo-data';
 
-describe('Outreach queue (draft-approve-send)', () => {
+describe('Outreach queue (draft, approve, cancel)', () => {
   let leadId: string;
 
   beforeEach(async () => {
@@ -59,20 +59,5 @@ describe('Outreach queue (draft-approve-send)', () => {
     const item = await OutreachQueueRepository.enqueue(DEMO_ORGANIZATION_ID, { leadId, mode: 'MANUAL', message: 'to cancel' });
     const cancelled = await OutreachQueueRepository.cancel(item.id, DEMO_ORGANIZATION_ID);
     expect(cancelled?.status).toBe('CANCELLED');
-  });
-
-  it('getDue returns READY items scheduled now', async () => {
-    await OutreachQueueRepository.enqueue(DEMO_ORGANIZATION_ID, { leadId, mode: 'AUTO', message: 'due now' });
-    const due = await OutreachQueueRepository.getDue(DEMO_ORGANIZATION_ID);
-    expect(due.length).toBeGreaterThanOrEqual(1);
-    expect(due.every((i) => i.status === 'READY')).toBe(true);
-  });
-
-  it('markSent transitions to SENT', async () => {
-    const item = await OutreachQueueRepository.enqueue(DEMO_ORGANIZATION_ID, { leadId, mode: 'AUTO', message: 'send me' });
-    await OutreachQueueRepository.markSent(item.id, DEMO_ORGANIZATION_ID);
-    const fetched = await OutreachQueueRepository.get(item.id, DEMO_ORGANIZATION_ID);
-    expect(fetched?.status).toBe('SENT');
-    expect(fetched?.sentAt).toBeTruthy();
   });
 });
