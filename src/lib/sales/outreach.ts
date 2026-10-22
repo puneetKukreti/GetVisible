@@ -372,7 +372,7 @@ export class OutreachGeneratorService {
         lead.businessName || ''
       )}&city=${encodeURIComponent(lead.city || 'Delhi NCR')}&profession=${encodeURIComponent(
         lead.profession || 'Local Business'
-      )}`;
+      )}&highlight=1`;
     }
 
     const fallback = generateDeterministicOutreach({

@@ -195,6 +195,8 @@ export interface HeroMockupOptions {
    * wide 1024x640 browser-window card.
    */
   viewport?: 'desktop' | 'mobile';
+  /** Ring the business name so it is instantly recognisable in a chat preview. */
+  highlightBrand?: boolean;
 }
 
 /**
@@ -210,7 +212,14 @@ export function generateHeroMockupSvg(
   options?: HeroMockupOptions
 ): string {
   if (options?.viewport === 'mobile') {
-    return generateMobileHeroMockupSvg(brandName, city, profession, headline, subheadline);
+    return generateMobileHeroMockupSvg(
+      brandName,
+      city,
+      profession,
+      headline,
+      subheadline,
+      options.highlightBrand
+    );
   }
 
   const escapeXml = escapeSvgXml;
@@ -358,6 +367,7 @@ export function generateHeroMockupSvg(
     <text x="92" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="12.5" font-weight="700" fill="#fde047" letter-spacing="0.5">&#10022; ${escapedBrand} &#8226; ${escapedCity.toUpperCase()}</text>
 
     <!-- The prospect's name is the dominant element so they instantly see it is theirs. -->
+    ${options?.highlightBrand ? `<rect x="${HERO_LEFT - 12}" y="${282 - heroNameSize + 2}" width="${Math.min(nameEstimatedWidth, HERO_TEXT_MAX) + 24}" height="${heroNameSize + 18}" rx="12" fill="#facc15" fill-opacity="0.18" stroke="#facc15" stroke-width="3"/>` : ''}
     <text x="${HERO_LEFT}" y="282" font-family="Georgia, 'Times New Roman', serif" font-size="${heroNameSize}" font-weight="bold" fill="#ffffff"${nameFitAttr}>${escapedBrand}</text>
 ${headlineSvg}
 ${subheadlineSvg}
@@ -391,7 +401,8 @@ export function generateMobileHeroMockupSvg(
   city: string,
   profession: string = 'Chartered Accountants',
   headline?: string,
-  subheadline?: string
+  subheadline?: string,
+  highlightBrand: boolean = false
 ): string {
   const brand = brandName || 'Chartered Accountants';
   const cityName = city || 'Gurgaon';
@@ -437,10 +448,13 @@ export function generateMobileHeroMockupSvg(
 
   const heroNameStartY = 452;
   const heroNameSvg = heroNameLines
-    .map(
-      (line, i) =>
-        `  <text x="${TEXT_LEFT}" y="${heroNameStartY + i * 88}" font-family="Georgia, 'Times New Roman', serif" font-size="${heroNameSize}" font-weight="bold" fill="#0a1f3c"${squeeze(line, heroNameSize)}>${escapeSvgXml(line)}</text>`
-    )
+    .map((line, i) => {
+      const lineWidth = Math.min(escapeSvgXml(line).length * heroNameSize * 0.56, TEXT_MAX_W);
+      const highlight = highlightBrand
+        ? `  <rect x="${TEXT_LEFT - 12}" y="${heroNameStartY + i * 88 - heroNameSize + 4}" width="${lineWidth + 24}" height="${heroNameSize + 16}" rx="14" fill="#facc15" fill-opacity="0.22" stroke="#facc15" stroke-width="4"/>\n`
+        : '';
+      return `${highlight}  <text x="${TEXT_LEFT}" y="${heroNameStartY + i * 88}" font-family="Georgia, 'Times New Roman', serif" font-size="${heroNameSize}" font-weight="bold" fill="#0a1f3c"${squeeze(line, heroNameSize)}>${escapeSvgXml(line)}</text>`;
+    })
     .join('\n');
 
   const headlineStartY = heroNameStartY + heroNameLines.length * 88 + 12;

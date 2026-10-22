@@ -22,6 +22,10 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
     const { searchParams } = new URL(request.url);
     const rawLayoutOverride = searchParams.get('layout') || undefined;
+    // Screenshot-only decoration: ring the business name so the prospect can
+    // relate to the attachment at a glance. It changes nothing but presentation.
+    const highlightBrand =
+      searchParams.get('highlight') === '1' || searchParams.get('highlight') === 'true';
 
     // A layout override lets a caller render any bundled design. It is only used
     // by the authenticated template gallery, so it requires an owner session and
@@ -42,6 +46,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       id,
       request,
       layoutOverride,
+      highlightBrand,
     });
 
     return new NextResponse(personalizedHtml, {

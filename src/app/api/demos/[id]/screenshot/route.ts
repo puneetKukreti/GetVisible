@@ -17,6 +17,7 @@ import { getStitchRawHtml } from '@/lib/demos/stitch-loader.server';
 import { personalizeStitchHtml } from '@/lib/demos/stitch-personalizer';
 import { selectWebsiteDesign } from '@/lib/demos/personalization';
 import { getTemplateScreenshotPath } from '@/lib/demos/stitch-templates';
+import { highlightBrandNameInHtml } from '@/lib/demos/brand-highlight';
 import { WebsiteContent } from '@/types';
 
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,10 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
   // Presentation-only switch: the portrait card is what reads well in a phone
   // chat bubble. It cannot carry caller-supplied content, so it needs no session.
   const isMobileViewport = searchParams.get('viewport') === 'mobile';
+  // Ring the business name inside the captured page so the prospect can relate
+  // to the attachment instantly. Presentation only; the page itself is unchanged.
+  const highlightBrand =
+    searchParams.get('highlight') === '1' || searchParams.get('highlight') === 'true';
 
   let actualLeadId = 'preview';
   let brandName = queryName || 'Chartered Accountants';
@@ -121,7 +126,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }
     } catch {}
 
-    const variantSuffix = isMobileViewport ? '-mobile' : '';
+    const variantSuffix = `${isMobileViewport ? '-mobile' : ''}${highlightBrand ? '-brand' : ''}`;
     // The cache MUST be keyed by the demo version, not just the lead: a
     // regenerated demo keeps the same lead id and public token, so any
     // version-agnostic key serves the stale capture of the previous design
@@ -133,7 +138,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     // The portrait variant uses the cloud renderer, which does not have that bug.
     const heroDiskPath = path.join(cacheDir, `${actualLeadId}-v${demoVersion}${variantSuffix}.png`);
     const heroSvgPath = path.join(cacheDir, `${actualLeadId}${variantSuffix}.svg`);
-    const dynamicImageUrl = `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}&profession=${encodeURIComponent(profession)}${isMobileViewport ? '&viewport=mobile' : ''}&v=${demoVersion}`;
+    const dynamicImageUrl = `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}&profession=${encodeURIComponent(profession)}${isMobileViewport ? '&viewport=mobile' : ''}${highlightBrand ? '&highlight=1' : ''}&v=${demoVersion}`;
 
     // 2. Return the cached real capture if one exists; paths already carry the
     // `-mobile` suffix so the two variants never collide. The SVG card cache
@@ -214,7 +219,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       // would be served forever.
       const livePageUrl = `${getAppBaseUrl(request.nextUrl.origin)}/api/demos/${encodeURIComponent(
         publicAccessToken
-      )}/html?v=${demoVersion}`;
+      )}/html?v=${demoVersion}${highlightBrand ? '&highlight=1' : ''}`;
       const cloudBytes = await captureCloudHeroScreenshot(
         livePageUrl,
         isMobileViewport ? 480 : 1280,
@@ -267,7 +272,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
         profession,
         content?.hero?.headline,
         content?.hero?.subheadline,
-        { viewport: isMobileViewport ? 'mobile' : 'desktop' }
+        { viewport: isMobileViewport ? 'mobile' : 'desktop', highlightBrand }
       );
 
       return new NextResponse(svg, {
@@ -310,6 +315,9 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
       }
 
       if (personalizedHtml) {
+        if (highlightBrand) {
+          personalizedHtml = highlightBrandNameInHtml(personalizedHtml, brandName);
+        }
         let captured = false;
         try {
           captured = await captureLocalHeroScreenshot(personalizedHtml, heroDiskPath, {
@@ -365,6 +373,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     const heroSubheadline = content?.hero?.subheadline;
     const svgContent = generateHeroMockupSvg(brandName, city, profession, heroHeadline, heroSubheadline, {
       viewport: isMobileViewport ? 'mobile' : 'desktop',
+      highlightBrand,
     });
     try {
       fs.writeFileSync(heroSvgPath, svgContent, 'utf-8');
@@ -392,6 +401,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
     console.error('Hero screenshot capture error, delivering instant SVG fallback:', error);
     const svgFallback = generateHeroMockupSvg(brandName, city, profession, undefined, undefined, {
       viewport: isMobileViewport ? 'mobile' : 'desktop',
+      highlightBrand,
     });
 
     if (isImageFormat) {
@@ -408,7 +418,7 @@ export async function GET(request: NextRequest, { params }: RouteProps) {
 
     return NextResponse.json({
       success: true,
-      screenshotUrl: `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}${isMobileViewport ? '&viewport=mobile' : ''}`,
+      screenshotUrl: `/api/demos/${encodeURIComponent(actualLeadId)}/screenshot?format=image&name=${encodeURIComponent(brandName)}&city=${encodeURIComponent(city)}${isMobileViewport ? '&viewport=mobile' : ''}${highlightBrand ? '&highlight=1' : ''}`,
       cached: false,
       source: 'svg_mockup',
     });

@@ -105,13 +105,13 @@ function scoreColor(score: number) {
 
 // ─── Screenshot & Media Utilities ──────────────────────────────────────────
 
-/** Portrait card for phone-sized WhatsApp bubbles, wide card for desktop/email. */
+/** Real desktop capture of the demo, with the business name ringed. */
 type ScreenshotViewport = 'mobile' | 'desktop';
 
 function getScreenshotImageUrl(
   lead: LeadData,
   refresh = false,
-  viewport: ScreenshotViewport = 'mobile'
+  viewport: ScreenshotViewport = 'desktop'
 ) {
   const params = new URLSearchParams({
     format: 'image',
@@ -119,6 +119,8 @@ function getScreenshotImageUrl(
     city: lead.city || 'Delhi NCR',
     profession: lead.profession || 'CA',
   });
+  // Ring the prospect's own business name so they recognise the site instantly.
+  params.set('highlight', '1');
   if (viewport === 'mobile') params.set('viewport', 'mobile');
   if (refresh) {
     params.set('refresh', 'true');
@@ -127,43 +129,15 @@ function getScreenshotImageUrl(
   return `/api/demos/${encodeURIComponent(lead.id)}/screenshot?${params.toString()}`;
 }
 
-function ScreenshotViewportToggle({
-  value,
-  onChange,
-}: {
-  value: ScreenshotViewport;
-  onChange: (v: ScreenshotViewport) => void;
-}) {
-  const base =
-    'px-2 py-1 text-[10px] font-semibold transition-colors flex items-center gap-1 cursor-pointer';
+function ScreenshotViewportToggle({ value }: { value: ScreenshotViewport }) {
   return (
-    <div className="inline-flex rounded border border-border bg-card/95 backdrop-blur-xs overflow-hidden shadow-xs">
-      <button
-        type="button"
-        onClick={() => onChange('mobile')}
-        title="Portrait 4:5 card — reads clearly in a phone WhatsApp chat"
-        className={`${base} ${
-          value === 'mobile'
-            ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground hover:bg-muted'
-        }`}
-      >
-        <span>📱</span>
-        <span>Mobile</span>
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange('desktop')}
-        title="Wide 16:10 card — best for desktop / email clients"
-        className={`${base} ${
-          value === 'desktop'
-            ? 'bg-primary text-primary-foreground'
-            : 'text-muted-foreground hover:bg-muted'
-        }`}
-      >
-        <span>🖥</span>
-        <span>Desktop</span>
-      </button>
+    <div
+      className="inline-flex items-center gap-1 rounded border border-border bg-card/95 px-2 py-1 text-[10px] font-semibold text-muted-foreground shadow-xs"
+      title="Desktop capture of the live demo, with the business name highlighted so the prospect recognises it"
+    >
+      <span>🖥</span>
+      <span>Desktop · name highlighted</span>
+      {value === 'mobile' ? <span className="text-amber-600">(mobile)</span> : null}
     </div>
   );
 }
@@ -349,7 +323,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
   const [whatsappMessage, setWhatsappMessage] = useState(initialWa.message);
   const [whatsappFollowUpWithLink, setWhatsappFollowUpWithLink] = useState(initialWa.followUpWithLink);
   const [screenshotUrl, setScreenshotUrl] = useState<string>(() => getScreenshotImageUrl(lead));
-  const [screenshotViewport, setScreenshotViewport] = useState<ScreenshotViewport>('mobile');
+  const [screenshotViewport] = useState<ScreenshotViewport>('desktop');
   const [screenshotLoading, setScreenshotLoading] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
   const [refreshingHeroShot, setRefreshingHeroShot] = useState(false);
@@ -921,10 +895,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                 </Badge>
               </div>
               <div className="flex items-center gap-2">
-                <ScreenshotViewportToggle
-                  value={screenshotViewport}
-                  onChange={setScreenshotViewport}
-                />
+                <ScreenshotViewportToggle value={screenshotViewport} />
                 <Button
                   type="button"
                   variant="ghost"
@@ -1193,10 +1164,7 @@ function OutreachPanel({ lead, onClose, onContacted, onRefresh }: OutreachPanelP
                       <Loader2 className="w-3 h-3 animate-spin" /> Capturing snapshot…
                     </span>
                   )}
-                  <ScreenshotViewportToggle
-                    value={screenshotViewport}
-                    onChange={setScreenshotViewport}
-                  />
+                  <ScreenshotViewportToggle value={screenshotViewport} />
                   <Button
                     type="button"
                     variant="ghost"

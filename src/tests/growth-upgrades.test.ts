@@ -342,5 +342,48 @@ describe('Growth & Workflow Upgrades', () => {
         vi.unstubAllEnvs();
       }
     }, 30000);
+    it('requests a brand-highlighted capture of the demo page when highlight=1 is set', async () => {
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://demo.example');
+      const requested: string[] = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string | URL | Request) => {
+          const url = String(input);
+          requested.push(url);
+          if (!url.startsWith('https://api.microlink.io')) {
+            throw new Error(`unexpected fetch: ${url}`);
+          }
+          const bytes = new Uint8Array(25_000);
+          return new Response(bytes.buffer, { status: 200, headers: { 'content-type': 'image/png' } });
+        })
+      );
+      const { leads } = await LeadRepository.listLeads(DEMO_ORGANIZATION_ID, { pageSize: 5 });
+      clearScreenshotCache([leads[0].id]);
+      try {
+        const testLead = leads[0];
+
+        const req = new NextRequest(
+          `http://localhost:3000/api/demos/${testLead.id}/screenshot?format=image&viewport=mobile&highlight=1`,
+          { method: 'GET', headers: { 'x-organization-id': DEMO_ORGANIZATION_ID } }
+        );
+
+        const res = await screenshotGET(req, { params: { id: testLead.id } });
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toBe('image/png');
+
+        // The captured page URL must carry the highlight switch so the renderer
+        // rings the business name inside the real website.
+        expect(requested.some((u) => decodeURIComponent(u).includes('highlight=1'))).toBe(true);
+
+        // The highlight variant gets its own disk cache entry, never reusing the
+        // plain capture of the same demo version.
+        const dir = path.join(os.tmpdir(), 'getvisible-screenshots');
+        const files = fs.readdirSync(dir);
+        expect(files.some((f) => f.startsWith(`${testLead.id}-`) && f.includes('-brand'))).toBe(true);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+    }, 30000);
   });
 });

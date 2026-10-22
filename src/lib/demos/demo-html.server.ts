@@ -22,6 +22,7 @@ import {
   isProfessionStitchLayout,
 } from '@/lib/demos/profession-stitch';
 import { WebsiteContent } from '@/types';
+import { highlightBrandNameInHtml } from './brand-highlight';
 
 export interface DemoSiteHtmlOptions {
   /** Public token, demo id or lead id (used when no demo/lead is pre-resolved). */
@@ -40,6 +41,12 @@ export interface DemoSiteHtmlOptions {
    * the page render reuses it so prospect HTML matches the route exactly.
    */
   allowRegenerate?: boolean;
+  /**
+   * Screenshot-only: ring the business name in the rendered page so a prospect
+   * instantly recognises their own business in a chat thumbnail. Never enabled
+   * for the prospect-facing page itself.
+   */
+  highlightBrand?: boolean;
 }
 
 function neutralFallbackContent(): WebsiteContent {
@@ -66,6 +73,7 @@ export async function resolveDemoSiteHtml({
   request = null,
   layoutOverride,
   allowRegenerate = true,
+  highlightBrand = false,
 }: DemoSiteHtmlOptions): Promise<string> {
   let lead: any = null;
 
@@ -166,5 +174,11 @@ export async function resolveDemoSiteHtml({
     'design-1-premium';
 
   const rawHtml = getStitchRawHtml(chosenLayout);
-  return personalizeStitchHtml(rawHtml, content);
+  const personalized = personalizeStitchHtml(rawHtml, content);
+
+  if (!highlightBrand) return personalized;
+
+  const resolvedBrand =
+    content?.brand?.businessName || lead?.businessName || demo?.content?.brand?.businessName || '';
+  return highlightBrandNameInHtml(personalized, resolvedBrand);
 }
